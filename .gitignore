@@ -130,3 +130,6 @@ dmypy.json
 
 # comet ml api_key
 comet_api_key.txt
+
+# maxwel logs
+slurm-*
