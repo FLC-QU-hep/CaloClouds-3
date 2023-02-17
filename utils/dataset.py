@@ -146,11 +146,11 @@ class ShapeNetCore(Dataset):
 
 
 class PointCloudDataset(Dataset):
-    def __init__(self, file_path, chech_overfiting=False, bs=32, max_ds_seq_len=4000):
+    def __init__(self, file_path, chech_overfiting=False, bs=32, max_ds_seq_len=6000):
         self.dataset = h5py.File(file_path, 'r')
         self.Ymin, self.Ymax = 0, 30
         self.Xmin, self.Xmax = -200, 200
-        self.Zmin, self.Zmax = -200, 200
+        self.Zmin, self.Zmax = -160, 240
         self.chech_overfiting = chech_overfiting
         self.bs = bs
         self.max_ds_seq_len = max_ds_seq_len
@@ -159,16 +159,20 @@ class PointCloudDataset(Dataset):
         
         if idx > self.bs and idx < self.__len__() - self.bs:
             event = self.dataset['events'][idx-int(self.bs/2) : idx+int(self.bs/2)]
+            energy = self.dataset['energy'][idx-int(self.bs/2) : idx+int(self.bs/2)]
         elif idx < self.bs:
             event = self.dataset['events'][idx : idx+self.bs]
+            energy = self.dataset['energy'][idx : idx+self.bs]
         else:
             event = self.dataset['events'][idx-self.bs : idx]
+            energy = self.dataset['energy'][idx-self.bs : idx]
+            
             
         max_len = (event[:, -1] > 0).sum(axis=1).max()
         event = event[:, :, self.max_ds_seq_len-max_len:]
 
         
-        event[:, 2, :] = event[:, 2, :] - 40 # z shift to the origin
+        event[:, 2, :] = event[:, 2, :]
         event[:, 3, :] = event[:, 3, :] * 1000 # energy scale
         
         event[:, 0, :] = (event[:, 0, :] - self.Xmin) * 2 / (self.Xmax - self.Xmin) - 1 # x coordinate normalization
@@ -184,7 +188,7 @@ class PointCloudDataset(Dataset):
         
 
         return {'event' : event,
-                'energy' : self.dataset['energy'][idx]}
+                'energy' : energy}
 
     def __len__(self):
         return len(self.dataset['events'])
