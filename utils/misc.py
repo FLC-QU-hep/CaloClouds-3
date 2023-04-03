@@ -5,6 +5,9 @@ import random
 import time
 import logging
 import logging.handlers
+from nflows import transforms, distributions, flows
+import torch.nn as nn
+from typing import Callable
 
 THOUSAND = 1000
 MILLION = 1000000
@@ -167,3 +170,106 @@ def log_hyperparams(writer, args):
     writer.file_writer.add_summary(exp)
     writer.file_writer.add_summary(ssi)
     writer.file_writer.add_summary(sei)
+
+
+
+def get_flow_model(cfg):
+    if cfg.flow_model == 'MaskedPiecewiseRationalQuadraticAutoregressiveTransform':
+        flow = get_maf_spline_flow(cfg)
+    elif cfg.flow_model == 'PiecewiseRationalQuadraticCouplingTransform':
+        flow = get_coupling_spline_flow(cfg)
+    else:
+        raise NotImplementedError('flow model not defined')
+    return flow
+
+
+def get_maf_spline_flow(cfg):
+    params_flow = {
+        'features': cfg.latent_dim, 
+        'context_features': cfg.cond_features,     # condtioning features
+        'hidden_features': cfg.flow_hidden_dims, 
+        'num_blocks': cfg.flow_layers,
+        'activation': nn.LeakyReLU(),
+        'use_residual_blocks': True,
+        'tails': cfg.tails,
+        'tail_bound': cfg.tail_bound,
+    }
+    # Define an invertible transformation.
+    t_list = []
+    for _ in range(cfg.flow_transforms):
+        t_list.append(transforms.MaskedPiecewiseRationalQuadraticAutoregressiveTransform(**params_flow))
+        t_list.append(transforms.RandomPermutation(features=cfg.latent_dim))
+    transform = transforms.CompositeTransform(t_list)
+    # Define a base distribution.
+    base_distribution = distributions.StandardNormal(shape=[cfg.latent_dim]) 
+    # Combine into a flow.
+    flow = flows.Flow(transform=transform, distribution=base_distribution)
+    return flow
+
+
+def get_coupling_spline_flow(cfg):
+    params_subnet = {
+        'hidden_features' : cfg.flow_hidden_dims,
+        'context_features': cfg.cond_features,
+        'num_layers': cfg.flow_layers,
+        'activation': nn.LeakyReLU,
+        'dropout_probability': 0.
+    }
+    subnet = SubnetFactory(**params_subnet)
+    params_flow = {
+        'tails': cfg.tails,
+        'tail_bound': cfg.tail_bound,
+        'transform_net_create_fn': subnet,
+        'mask': torch.range(0, cfg.latent_dim-1)<cfg.latent_dim//2
+    }
+    # Define an invertible transformation.
+    t_list = []
+    for _ in range(cfg.flow_transforms):
+        t_list.append(transforms.PiecewiseRationalQuadraticCouplingTransform(**params_flow))
+        t_list.append(transforms.RandomPermutation(features=cfg.latent_dim))
+    transform = transforms.CompositeTransform(t_list)
+    # Define a base distribution.
+    base_distribution = distributions.StandardNormal(shape=[cfg.latent_dim]) 
+    # Combine into a flow.
+    flow = flows.Flow(transform=transform, distribution=base_distribution)
+    return flow
+
+
+
+class SubnetFactory:
+
+    class CatCall(nn.Module):
+
+        def __init__(self, layers) -> None:
+            super().__init__()
+            self.layers = layers
+
+        def forward(self, x, context):
+            if context is not None:
+                x = torch.cat((x, context), dim=1)
+            return self.layers(x)
+
+    def __init__(
+                self,
+                hidden_features:int,
+                context_features:int,
+                num_layers:int,
+                activation:Callable,
+                dropout_probability:float) -> None:
+            self.context_features = context_features
+            self.hidden_features = hidden_features
+            self.num_layers = num_layers
+            self.activation = activation
+            self.dropout_probability = dropout_probability
+
+    def __call__(self, num_features_in, num_features_out):
+        layers = []
+        last_features = num_features_in + self.context_features
+        for i in range(self.num_layers):
+            layers.append(nn.Linear(last_features, self.hidden_features))
+            layers.append(self.activation())
+            if self.dropout_probability > 0.:
+                layers.append(nn.Dropout(self.dropout_probability))
+            last_features = self.hidden_features
+        layers.append(nn.Linear(last_features, num_features_out))
+        return self.CatCall(nn.Sequential(*layers))

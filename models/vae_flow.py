@@ -69,3 +69,9 @@ class FlowVAE(Module):
         z = self.flow(w, reverse=True).view(batch_size, -1)
         samples = self.diffusion.sample(num_points, context=z, flexibility=flexibility)
         return samples
+
+    def inference(self, num_points, cfg, num_samples=256):
+        with torch.no_grad():
+            z = torch.randn([num_samples, cfg.latent_dim]).to(cfg.device)
+            x = self.sample(z, num_points, flexibility=cfg.flexibility)
+        return x

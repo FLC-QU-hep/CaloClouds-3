@@ -115,7 +115,8 @@ class DiffusionPoint(Module):
         e_rand = torch.randn_like(x_0)  # (B, N, d)
         e_theta = self.net(c0 * x_0 + c1 * e_rand, beta=beta, context=context)
 
-        loss = F.mse_loss(e_theta.view(-1, point_dim), e_rand.view(-1, point_dim), reduction='mean')
+        # loss = F.mse_loss(e_theta.view(-1, point_dim), e_rand.view(-1, point_dim), reduction='mean')
+        loss = F.l1_loss(e_theta.view(-1, point_dim), e_rand.view(-1, point_dim), reduction='mean')
         return loss
 
     def sample(self, num_points, context, point_dim=4, flexibility=0.0, ret_traj=False):
