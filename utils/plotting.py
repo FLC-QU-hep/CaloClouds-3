@@ -106,14 +106,14 @@ def create_map(X, Y, Z, dm=3):
         
             
         H, xedges, zedges = np.histogram2d(X[idx], Z[idx], bins=(xedges, zedges))
-        layers.append({'xedges': xedges, 'zedges': zedges})
+        layers.append({'xedges': xedges, 'zedges': zedges, 'grid': H})
 
     return layers, offset
 
 
 
 
-def get_projections(showers, MAP, layer_bottom_pos):
+def get_projections(showers, MAP, layer_bottom_pos, return_cell_point_cloud=False):
     events = []
     
     for shower in tqdm(showers):
@@ -126,15 +126,23 @@ def get_projections(showers, MAP, layer_bottom_pos):
             idx = np.where((y_coord <= (layer_bottom_pos[l] + 1)) & (y_coord >= layer_bottom_pos[l] - 0.5 ))
             
             xedges = MAP[l]['xedges']
-            zedges = MAP[l]['zedges']       
+            zedges = MAP[l]['zedges']
+            H_base = MAP[l]['grid']
             
             H, xedges, zedges = np.histogram2d(x_coord[idx], z_coord[idx], bins=(xedges, zedges), weights=e_coord[idx])
+            H[H_base==0] = 0
             
             layers.append(H)
         
         events.append(layers)
     
-    return events
+    if not return_cell_point_cloud:
+        return events
+    
+    else:
+        pass
+
+
 
 
 def get_cog(x, y, z, e):
@@ -304,13 +312,23 @@ def plt_cog(cog, cog_list, labels, cfg=cfg):
         plt.subplot(1, 3, j+1)
         h = plt.hist(np.array(cog[j]), bins=cfg.bins_cog, label=labels[0], color='lightgrey')
         
+        if j == 0:
+            h = plt.hist(np.array(cog[j]), bins=cfg.bins_cog, label=labels[0], color='lightgrey', range=(-4, 4))
+            plt.xlim(-4, 4)
+        if j == 2:
+            h = plt.hist(np.array(cog[j]), bins=cfg.bins_cog, label=labels[0], color='lightgrey', range=(36, 44))
+            plt.xlim(36, 44)
+
         for i, cog_ in enumerate(cog_list):
             plt.hist(np.array(cog_[j]), bins=h[1], histtype='step', lw=2, label=labels[i+1])
+
+        if j == 1:
+            plt.legend(prop=cfg.font)
 
         plt.xlabel(f'CoG {lables[j]} [mm]', fontsize=15, family='serif')
         plt.ylabel('Counts', fontsize=15, family='serif')
 
-    plt.legend(prop=cfg.font, loc='upper left')
+    
     plt.tight_layout()
     plt.savefig('cog.png', dpi=200)
     plt.show()
