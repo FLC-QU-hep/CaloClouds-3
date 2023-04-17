@@ -133,3 +133,7 @@ comet_api_key.txt
 
 # maxwel logs
 slurm-*
+
+# custom
+.cometml-runs
+.vscode

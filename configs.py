@@ -3,7 +3,7 @@ class Configs():
     def __init__(self):
         
     # Experiment Name
-        self.name = 'AllCond_epicVAE_nFlow_PointDiff_100s_L1Loss'
+        self.name = 'AllCond_epicVAE_nFlow_PointDiff_100s_MSE_loss_smired_possitions_sigmoid'
 
     # Model arguments
         self.model = 'AllCond_epicVAE_nFlow_PointDiff'             # choices=['flow', 'AllCond_epicVAE_nFlow_PointDiff']
@@ -11,7 +11,7 @@ class Configs():
         self.num_steps = 100
         self.beta_1 = 1e-4
         self.beta_T = 0.02
-        self.sched_mode = 'linear'
+        self.sched_mode = 'sigmoid'
         self.flexibility = 0.0
         self.truncate_std = 2.0
         self.latent_flow_depth = 14
@@ -52,7 +52,8 @@ class Configs():
         # self.dataset_path = '/beegfs/desy/user/korcariw/CaloClouds/dataset/showers/photons_10_100GeV_float32_sorted_train.h5'
         # self.dataset_path = '/beegfs/desy/user/korcariw/CaloClouds/dataset/showers/photons_50GeV_sorted.h5'
         # self.dataset_path = '/beegfs/desy/user/akorol/projects/getting_high/ILDConfig/StandardConfig/production/out/photons_50GeV_40k.slcio.hdf5'
-        self.quantized_pos = True
+        self.quantized_pos = False
+
     # Dtataloader
         self.workers = 32
         self.train_bs = 256

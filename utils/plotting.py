@@ -18,7 +18,7 @@ class Configs():
         self.bins_r = 35
 
     # occupancy
-        self.occup_bins = np.linspace(200, 1500, 50)
+        self.occup_bins = np.linspace(200, 1500, 70)
 
     # hits
         self.hit_bins = np.logspace(np.log10(0.01), np.log10(200), 70)
@@ -253,6 +253,7 @@ def plt_spinal(e_layers, e_layers_list, labels, cfg=cfg):
     plt.legend(prop=cfg.font, loc='upper left')
     plt.tight_layout()
 
+    plt.savefig('spinal.png', dpi=300)
     plt.show()
     
 def plot_occupancy(occ, occ_list, labels, cfg=cfg):
@@ -306,21 +307,31 @@ def plt_esum(e_sum, e_sum_list, labels, cfg=cfg):
 
 def plt_cog(cog, cog_list, labels, cfg=cfg):
     lables = ["x", "y", "z"]
-    plt.figure(figsize=(21,7))
+    plt.figure(figsize=(7,21))
 
     for j in range(3):
-        plt.subplot(1, 3, j+1)
-        h = plt.hist(np.array(cog[j]), bins=cfg.bins_cog, label=labels[0], color='lightgrey')
+        plt.subplot(3, 1, j+1)
+        
         
         if j == 0:
             h = plt.hist(np.array(cog[j]), bins=cfg.bins_cog, label=labels[0], color='lightgrey', range=(-4, 4))
             plt.xlim(-4, 4)
-        if j == 2:
+        elif j == 2:
             h = plt.hist(np.array(cog[j]), bins=cfg.bins_cog, label=labels[0], color='lightgrey', range=(36, 44))
             plt.xlim(36, 44)
+        else:
+            h = plt.hist(np.array(cog[j]), bins=cfg.bins_cog, label=labels[0], color='lightgrey')
 
         for i, cog_ in enumerate(cog_list):
-            plt.hist(np.array(cog_[j]), bins=h[1], histtype='step', lw=2, label=labels[i+1])
+
+            if j == 0:
+                h = plt.hist(np.array(cog_[j]), bins=h[1], histtype='step', lw=2, label=labels[i+1], range=(-4, 4))
+                plt.xlim(-4, 4)
+            elif j == 2:
+                h = plt.hist(np.array(cog_[j]), bins=h[1], histtype='step', lw=2, label=labels[i+1], range=(36, 44))
+                plt.xlim(36, 44)
+            else:
+                plt.hist(np.array(cog_[j]), bins=h[1], histtype='step', lw=2, label=labels[i+1])
 
         if j == 1:
             plt.legend(prop=cfg.font)

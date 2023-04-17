@@ -10,7 +10,7 @@ class VarianceSchedule(Module):
 
     def __init__(self, num_steps, beta_1, beta_T, mode='linear'):
         super().__init__()
-        assert mode in ('linear', )
+        assert mode in ('linear', 'quardatic', 'sigmoid')
         self.num_steps = num_steps
         self.beta_1 = beta_1
         self.beta_T = beta_T
@@ -18,6 +18,11 @@ class VarianceSchedule(Module):
 
         if mode == 'linear':
             betas = torch.linspace(beta_1, beta_T, steps=num_steps)
+        elif mode == 'quardatic':
+            betas = torch.linspace(beta_1**0.5, beta_T**0.5, steps=num_steps) ** 2
+        elif mode == 'sigmoid':
+            betas = torch.linspace(-10, 10, steps=num_steps)
+            betas = torch.sigmoid(betas) * (beta_T - beta_1) + beta_1
 
         betas = torch.cat([torch.zeros([1]), betas], dim=0)     # Padding
 
@@ -115,8 +120,10 @@ class DiffusionPoint(Module):
         e_rand = torch.randn_like(x_0)  # (B, N, d)
         e_theta = self.net(c0 * x_0 + c1 * e_rand, beta=beta, context=context)
 
-        # loss = F.mse_loss(e_theta.view(-1, point_dim), e_rand.view(-1, point_dim), reduction='mean')
-        loss = F.l1_loss(e_theta.view(-1, point_dim), e_rand.view(-1, point_dim), reduction='mean')
+        loss = F.mse_loss(e_theta.view(-1, point_dim), e_rand.view(-1, point_dim), reduction='mean')
+        # loss = F.l1_loss(e_theta.view(-1, point_dim), e_rand.view(-1, point_dim), reduction='mean')
+        # loss = F.huber_loss(e_theta.view(-1, point_dim), e_rand.view(-1, point_dim), reduction='mean')
+
         return loss
 
     def sample(self, num_points, context, point_dim=4, flexibility=0.0, ret_traj=False):
