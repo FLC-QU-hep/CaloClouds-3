@@ -11,7 +11,7 @@ class Configs():
         self.num_steps = 100
         self.beta_1 = 1e-4
         self.beta_T = 0.02
-        self.sched_mode = 'quadratic'  # options: ['linear', 'quadratic', 'sigmoid]
+        self.sched_mode = 'quardatic'  # options: ['linear', 'quardatic', 'sigmoid]
         self.flexibility = 0.0
         self.truncate_std = 2.0
         self.latent_flow_depth = 14
