@@ -137,3 +137,5 @@ slurm-*
 # custom
 .cometml-runs
 .vscode
+*.png
+joblog/
