@@ -35,13 +35,55 @@ max_e = 100
 
 num = 2000 # total number of generated events
 
-bs = 128 # batch size
+bs = 128 # batch size   # optimized: bs=64 for GPU, bs=128 for CPU
 
 iterations = 5 # number of iterations for timing
 
 ########################
 ########################
 ########################
+
+
+def main(cfg, min_e, max_e, num, bs, iterations):
+
+    num_blocks = 10
+    flow, distribution = compile_HybridTanH_model(num_blocks, 
+                                            num_inputs=32, ### when 'condioning' on additional Esum, Nhits etc add them on as inputs rather than 
+                                            num_cond_inputs=1, device=cfg.device)  # num_cond_inputs
+
+    checkpoint = torch.load('/beegfs/desy/user/akorol/chekpoints/ECFlow/EFlow+CFlow_138.pth')
+    flow.load_state_dict(checkpoint['model'])
+    flow.eval().to(cfg.device)
+
+
+    cfg.sched_mode = 'quardatic'
+    model = AllCond_epicVAE_nFlow_PointDiff(cfg).to(cfg.device)
+
+    # checkpoint = torch.load('/beegfs/desy/user/akorol/logs/point-cloud/AllCond_epicVAE_nFlow_PointDiff_100s2023_03_29__14_39_04/ckpt_0.000000_570000.pt') #worst cog x
+    # checkpoint = torch.load('/beegfs/desy/user/akorol/logs/point-cloud/AllCond_epicVAE_nFlow_PointDiff_100s2023_03_29__14_39_04/ckpt_0.000000_748000.pt') #best cog x
+
+    # checkpoint = torch.load('/beegfs/desy/user/akorol/logs/point-cloud/AllCond_epicVAE_nFlow_PointDiff_100s_MSE_loss_smired_possitions_sigmoid2023_04_06__16_35_47/ckpt_0.000000_849000.pt') # sigmoid 
+    checkpoint = torch.load('/beegfs/desy/user/akorol/logs/point-cloud/AllCond_epicVAE_nFlow_PointDiff_100s_MSE_loss_smired_possitions_quardatic2023_04_06__16_34_39/ckpt_0.000000_837000.pt') # quadratic
+
+
+
+    model.load_state_dict(checkpoint['state_dict'])
+    model.eval()
+
+    times_per_shower = []
+    for _ in range(iterations):
+
+        s_t = time.time()
+        fake_showers = gen_showers_batch(distribution, model, min_e, max_e, num, bs)
+        t = time.time() - s_t
+        print(fake_showers.shape)
+        print('total time (seconds): ', t)
+        print('time per shower (seconds): ', t / num)
+        times_per_shower.append(t / num)
+
+    print('mean time per shower (seconds): ', np.mean(times_per_shower))
+    print('std time per shower (seconds): ', np.std(times_per_shower))
+
 
 
 
@@ -283,48 +325,6 @@ def gen_showers_batch(distribution, model, e_min, e_max, num=2000, bs=32):
     
     return fake_showers
 
-
-
-
-def main(cfg, min_e, max_e, num, bs, iterations):
-
-    num_blocks = 10
-    flow, distribution = compile_HybridTanH_model(num_blocks, 
-                                            num_inputs=32, ### when 'condioning' on additional Esum, Nhits etc add them on as inputs rather than 
-                                            num_cond_inputs=1, device=cfg.device)  # num_cond_inputs
-
-    checkpoint = torch.load('/beegfs/desy/user/akorol/chekpoints/ECFlow/EFlow+CFlow_138.pth')
-    flow.load_state_dict(checkpoint['model'])
-    flow.eval().to(cfg.device)
-
-
-    cfg.sched_mode = 'quardatic'
-    model = AllCond_epicVAE_nFlow_PointDiff(cfg).to(cfg.device)
-
-    # checkpoint = torch.load('/beegfs/desy/user/akorol/logs/point-cloud/AllCond_epicVAE_nFlow_PointDiff_100s2023_03_29__14_39_04/ckpt_0.000000_570000.pt') #worst cog x
-    # checkpoint = torch.load('/beegfs/desy/user/akorol/logs/point-cloud/AllCond_epicVAE_nFlow_PointDiff_100s2023_03_29__14_39_04/ckpt_0.000000_748000.pt') #best cog x
-
-    # checkpoint = torch.load('/beegfs/desy/user/akorol/logs/point-cloud/AllCond_epicVAE_nFlow_PointDiff_100s_MSE_loss_smired_possitions_sigmoid2023_04_06__16_35_47/ckpt_0.000000_849000.pt') # sigmoid 
-    checkpoint = torch.load('/beegfs/desy/user/akorol/logs/point-cloud/AllCond_epicVAE_nFlow_PointDiff_100s_MSE_loss_smired_possitions_quardatic2023_04_06__16_34_39/ckpt_0.000000_837000.pt') # quadratic
-
-
-
-    model.load_state_dict(checkpoint['state_dict'])
-    model.eval()
-
-    times_per_shower = []
-    for _ in range(iterations):
-
-        s_t = time.time()
-        fake_showers = gen_showers_batch(distribution, model, min_e, max_e, num, bs)
-        t = time.time() - s_t
-        print(fake_showers.shape)
-        print('total time: ', t)
-        print('time per shower: ', t / num)
-        times_per_shower.append(t / num)
-
-    print('mean time per shower: ', np.mean(times_per_shower))
-    print('std time per shower: ', np.std(times_per_shower))
 
 
 
