@@ -28,6 +28,8 @@ from models.allCond_epicVAE_nflow_PointDiff import AllCond_epicVAE_nFlow_PointDi
 
 cfg = Configs()
 cfg.device = 'cpu'
+#use single thread
+torch.set_num_threads(1)
 
 # min and max energy of the generated events
 min_e = 10
@@ -35,9 +37,10 @@ max_e = 100
 
 num = 2000 # total number of generated events
 
-bs = 128 # batch size   # optimized: bs=64 for GPU, bs=128 for CPU
+bs = 1 # batch size   # optimized: bs=64 for GPU, bs=512 for CPU (multi-threaded), bs=1 for CPU (single-threaded)
 
 iterations = 5 # number of iterations for timing
+
 
 ########################
 ########################
