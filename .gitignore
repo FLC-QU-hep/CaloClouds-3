@@ -139,3 +139,4 @@ slurm-*
 .vscode
 *.png
 joblog/
+*.pdf
