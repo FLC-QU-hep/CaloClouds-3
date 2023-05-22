@@ -3,7 +3,9 @@ class Configs():
     def __init__(self):
         
     # Experiment Name
-        self.name = 'AllCond_epicVAE_nFlow_PointDiff_100s_MSE_loss_smired_possitions_sigmoid'
+        self.name = 'CaloClouds_'  
+        self.Acomment = 'running baselione CaloClouds with default parameters'
+        self.comet_project = 'k-CaloClouds'    # project name in comet.ml
 
     # Model arguments
         self.model = 'AllCond_epicVAE_nFlow_PointDiff'             # choices=['flow', 'AllCond_epicVAE_nFlow_PointDiff']
@@ -72,10 +74,10 @@ class Configs():
 
     # Others
         self.device = 'cuda'
-        self.logdir = '/beegfs/desy/user/akorol/logs/point-cloud'
+        self.logdir = '/beegfs/desy/user/buhmae/6_PointCloudDiffusion/log'
         self.seed = 42
         self.max_iters = 2 * 1e6
-        self.val_freq = 1e3
+        self.val_freq = 1e3          # saving intervall for checkpoints
         self.test_freq = 30 * 1e3
         self.test_size = 400
         self.tag = None

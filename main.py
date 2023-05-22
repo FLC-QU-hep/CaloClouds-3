@@ -18,22 +18,24 @@ from configs import Configs
 
 cfg = Configs()
 
-with open('comet_api_key.txt', 'r') as file:
-    key = file.read()
+# with open('comet_api_key.txt', 'r') as file:
+    # key = file.read()
 
 experiment = Experiment(
-    api_key=key,
-    project_name="point-cloud",
-    workspace="akorol",
+    # api_key=key,
+    project_name=cfg.comet_project,
+    # workspace="akorol",
 )
 
+seed_all(seed = cfg.seed)
+
+start_time = time.localtime()
+
 experiment.log_parameters(cfg.__dict__)
-
-
-seed_all()
+experiment.set_name(cfg.name+time.strftime('%Y_%m_%d__%H_%M_%S', start_time))
 
 # Logging
-log_dir = get_new_log_dir(cfg.logdir, prefix=cfg.name, postfix='_' + cfg.tag if cfg.tag is not None else '')
+log_dir = get_new_log_dir(cfg.logdir, prefix=cfg.name, postfix='_' + cfg.tag if cfg.tag is not None else '', start_time=start_time)
 ckpt_mgr = CheckpointManager(log_dir)
 
 # Datasets and loaders
