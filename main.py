@@ -1,11 +1,10 @@
 from comet_ml import Experiment
 
-import math
-import argparse
+import sys
 import torch
 from torch.utils.data import DataLoader
 from torch.nn.utils import clip_grad_norm_
-from tqdm.auto import tqdm
+# from tqdm.auto import tqdm
 
 from utils.dataset import *
 from utils.misc import *
@@ -65,7 +64,10 @@ if cfg.model == 'flow':
     model = FlowVAE(cfg).to(cfg.device)
 elif cfg.model == 'AllCond_epicVAE_nFlow_PointDiff':
     model = AllCond_epicVAE_nFlow_PointDiff(cfg).to(cfg.device)
+    model_ema = AllCond_epicVAE_nFlow_PointDiff(cfg).to(cfg.device)
 
+# initiate EMA (exponential moving average) model
+model_ema.load_state_dict(model.state_dict())
 
 if cfg.spectral_norm:
     add_spectral_norm(model)
