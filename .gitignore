@@ -140,3 +140,4 @@ slurm-*
 *.png
 joblog/
 *.pdf
+testbed.ipynb

@@ -93,5 +93,10 @@ class Configs():
         self.sigma_min = 0.002
         self.sigma_max = 80.0
         self.sigma_data = 0.5
+        self.sigma_sample_density = {
+            "type": "lognormal",
+            "mean": -1.2,
+            "std": 1.2
+        }
 
     
