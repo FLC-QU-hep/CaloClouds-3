@@ -93,7 +93,7 @@ if cfg.model == 'flow':
 
 elif cfg.model == 'AllCond_epicVAE_nFlow_PointDiff':
 
-    optimizer = torch.optim.Adam(
+    optimizer = torch.optim.Adam(   # Consistency Model was trained with Rectified Adam, in k-diffusion AdamW is used, in EDM normal Adam
             [
             {'params': model.encoder.parameters()}, 
             {'params': model.diffusion.parameters()},

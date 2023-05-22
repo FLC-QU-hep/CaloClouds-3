@@ -89,5 +89,9 @@ class Configs():
         self.ema_power = 0.6667   # depends on the number of iterations, 2/3 good for 1e6 iterations, 3/4 good for less
         self.ema_max_value = 0.9999
         
+    # EDM diffusion parameters
+        self.sigma_min = 0.002
+        self.sigma_max = 80.0
+        self.sigma_data = 0.5
 
     
