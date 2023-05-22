@@ -16,6 +16,8 @@ from models.flow import add_spectral_norm, spectral_norm_power_iteration
 from models.allCond_epicVAE_nflow_PointDiff import AllCond_epicVAE_nFlow_PointDiff
 from configs import Configs
 
+import k_diffusion as K
+
 cfg = Configs()
 seed_all(seed = cfg.seed)
 start_time = time.localtime()
