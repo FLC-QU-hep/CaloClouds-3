@@ -77,12 +77,17 @@ class Configs():
         self.device = 'cuda'
         self.logdir = '/beegfs/desy/user/buhmae/6_PointCloudDiffusion/log'
         self.seed = 42
-        self.max_iters = 2 * 1e6
-        self.val_freq = 1e3          # saving intervall for checkpoints
+        self.max_iters = 150 # 2 * 1e6
+        self.val_freq =  100  #  1e3          # saving intervall for checkpoints
         self.test_freq = 30 * 1e3
         self.test_size = 400
         self.tag = None
         self.log_iter = 10   # log every n iterations
+
+    # EMA scheduler
+        self.ema_type = 'inverse'
+        self.ema_power = 0.6667   # depends on the number of iterations, 2/3 good for 1e6 iterations, 3/4 good for less
+        self.ema_max_value = 0.9999
         
 
     

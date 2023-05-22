@@ -68,6 +68,9 @@ elif cfg.model == 'AllCond_epicVAE_nFlow_PointDiff':
 
 # initiate EMA (exponential moving average) model
 model_ema.load_state_dict(model.state_dict())
+assert cfg.ema_type == 'inverse'
+ema_sched = K.utils.EMAWarmup(power=cfg.ema_power,
+                                max_value=cfg.ema_max_value)
 
 if cfg.spectral_norm:
     add_spectral_norm(model)
@@ -153,9 +156,14 @@ def train(batch, it):
         scheduler.step()
         scheduler_flow.step()
 
+    # Update EMA model
+        ema_decay = ema_sched.get_value()
+        K.utils.ema_update(model, model_ema, ema_decay)
+        ema_sched.step()
+
     if it % cfg.log_iter == 0:
-        print('[Train] Iter %04d | Loss %.6f | Grad %.4f | KLWeight %.4f' % (
-            it, loss.item(), orig_grad_norm, cfg.kl_weight
+        print('[Train] Iter %04d | Loss %.6f | Grad %.4f | KLWeight %.4f | EMAdecay %.4f' % (
+            it, loss.item(), orig_grad_norm, cfg.kl_weight, ema_decay
         ))
         if cfg.log_comet:
             experiment.log_metric('train/loss', loss, it)
@@ -164,6 +172,7 @@ def train(batch, it):
             experiment.log_metric('train/lr', optimizer.param_groups[0]['lr'], it)
             experiment.log_metric('train/lr_flow', optimizer_flow.param_groups[0]['lr'], it)
             experiment.log_metric('train/grad_norm', orig_grad_norm, it)
+            experiment.log_metric('train/ema_decay', ema_decay, it)
 
 # Main loop
 print('Start training...')
@@ -182,6 +191,8 @@ while not stop:
                 }
             elif cfg.model == 'AllCond_epicVAE_nFlow_PointDiff':
                 opt_states = {
+                    'model_ema': model_ema.state_dict(), # save the EMA model
+                    'ema_sched': ema_sched.state_dict(),
                     'optimizer': optimizer.state_dict(),
                     'optimizer_flow': optimizer_flow.state_dict(),
                     'scheduler': scheduler.state_dict(),
