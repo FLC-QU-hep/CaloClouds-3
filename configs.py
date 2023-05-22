@@ -3,9 +3,10 @@ class Configs():
     def __init__(self):
         
     # Experiment Name
-        self.name = 'CaloClouds_'  
+        self.name = 'TEST_'  
         self.Acomment = 'running baselione CaloClouds with default parameters'
         self.comet_project = 'k-CaloClouds'    # project name in comet.ml
+        self.log_comet = False
 
     # Model arguments
         self.model = 'AllCond_epicVAE_nFlow_PointDiff'             # choices=['flow', 'AllCond_epicVAE_nFlow_PointDiff']
@@ -81,6 +82,7 @@ class Configs():
         self.test_freq = 30 * 1e3
         self.test_size = 400
         self.tag = None
+        self.log_iter = 10   # log every n iterations
         
 
     

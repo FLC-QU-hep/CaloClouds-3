@@ -17,22 +17,20 @@ from models.allCond_epicVAE_nflow_PointDiff import AllCond_epicVAE_nFlow_PointDi
 from configs import Configs
 
 cfg = Configs()
+seed_all(seed = cfg.seed)
+start_time = time.localtime()
 
 # with open('comet_api_key.txt', 'r') as file:
     # key = file.read()
 
-experiment = Experiment(
-    # api_key=key,
-    project_name=cfg.comet_project,
-    # workspace="akorol",
-)
-
-seed_all(seed = cfg.seed)
-
-start_time = time.localtime()
-
-experiment.log_parameters(cfg.__dict__)
-experiment.set_name(cfg.name+time.strftime('%Y_%m_%d__%H_%M_%S', start_time))
+if cfg.log_comet:
+    experiment = Experiment(
+        # api_key=key,
+        project_name=cfg.comet_project,
+        # workspace="akorol",
+    )
+    experiment.log_parameters(cfg.__dict__)
+    experiment.set_name(cfg.name+time.strftime('%Y_%m_%d__%H_%M_%S', start_time))
 
 # Logging
 log_dir = get_new_log_dir(cfg.logdir, prefix=cfg.name, postfix='_' + cfg.tag if cfg.tag is not None else '', start_time=start_time)
@@ -137,7 +135,10 @@ def train(batch, it):
             e = e / 100 * 2 -1   # max incident energy: 100 GeV
             n = n / cfg.max_points * 2  - 1
         cond_feats = torch.cat([e,n], -1) 
-        loss, loss_flow = model.get_loss(x, cond_feats, kl_weight=cfg.kl_weight, writer=experiment, it=it, kld_min=cfg.kld_min)
+        if cfg.log_comet:
+            loss, loss_flow = model.get_loss(x, cond_feats, kl_weight=cfg.kl_weight, writer=experiment, it=it, kld_min=cfg.kld_min)
+        else:
+            loss, loss_flow = model.get_loss(x, cond_feats, kl_weight=cfg.kl_weight, writer=None, it=it, kld_min=cfg.kld_min)
 
      # Backward and optimize
         loss.backward()
@@ -148,16 +149,17 @@ def train(batch, it):
         scheduler.step()
         scheduler_flow.step()
 
-    if it % 10 == 0:
+    if it % cfg.log_iter == 0:
         print('[Train] Iter %04d | Loss %.6f | Grad %.4f | KLWeight %.4f' % (
             it, loss.item(), orig_grad_norm, cfg.kl_weight
         ))
-        experiment.log_metric('train/loss', loss, it)
-        experiment.log_metric('train/loss_flow', loss_flow, it)
-        experiment.log_metric('train/kl_weight', cfg.kl_weight, it)
-        experiment.log_metric('train/lr', optimizer.param_groups[0]['lr'], it)
-        experiment.log_metric('train/lr_flow', optimizer_flow.param_groups[0]['lr'], it)
-        experiment.log_metric('train/grad_norm', orig_grad_norm, it)
+        if cfg.log_comet:
+            experiment.log_metric('train/loss', loss, it)
+            experiment.log_metric('train/loss_flow', loss_flow, it)
+            experiment.log_metric('train/kl_weight', cfg.kl_weight, it)
+            experiment.log_metric('train/lr', optimizer.param_groups[0]['lr'], it)
+            experiment.log_metric('train/lr_flow', optimizer_flow.param_groups[0]['lr'], it)
+            experiment.log_metric('train/grad_norm', orig_grad_norm, it)
 
 # Main loop
 print('Start training...')
