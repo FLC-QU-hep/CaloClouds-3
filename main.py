@@ -72,10 +72,8 @@ assert cfg.ema_type == 'inverse'
 ema_sched = K.utils.EMAWarmup(power=cfg.ema_power,
                                 max_value=cfg.ema_max_value)
 
-# Noise distibution
+# Noise distibution --> lognormal distribution, so minimum value is 0
 sample_density = K.config.make_sample_density(cfg.__dict__)
-
-sys.exit()
 
 if cfg.spectral_norm:
     add_spectral_norm(model)
