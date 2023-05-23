@@ -9,7 +9,7 @@ class Configs():
         self.log_comet = False
 
     # Model arguments
-        self.model = 'AllCond_epicVAE_nFlow_PointDiff'             # choices=['flow', 'AllCond_epicVAE_nFlow_PointDiff']
+        self.model_name = 'AllCond_epicVAE_nFlow_PointDiff'             # choices=['flow', 'AllCond_epicVAE_nFlow_PointDiff', 'epicVAE_nFlow_kDiffusion]
         self.latent_dim = 256
         self.num_steps = 100
         self.beta_1 = 1e-4
@@ -93,12 +93,12 @@ class Configs():
             "sigma_data" : 0.5,
             "has_variance" : False,
             "loss_config" : "karras",
-        }
-        self.sigma_sample_density = {
-            "type": "lognormal",
-            "mean": -1.2,
-            "std": 1.2
-        }
+            "sigma_sample_density" : {
+                "type": "lognormal",
+                "mean": -1.2,
+                "std": 1.2
+                }
+            }
 
     # EDM diffusion parameters for sampling
         self.sigma_min = 0.002
