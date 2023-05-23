@@ -8,6 +8,8 @@ from .flow import *
 from .encoders.epic_encoder_cond import EPiC_encoder_cond
 from utils.misc import *
 
+import k_diffusion as K
+
 
 class epicVAE_nFlow_kDiffusion(Module):
 
@@ -17,7 +19,7 @@ class epicVAE_nFlow_kDiffusion(Module):
         self.encoder = EPiC_encoder_cond(args.latent_dim, input_dim=args.features, cond_features=args.cond_features)
         self.flow = get_flow_model(args)
         self.diffusion = DiffusionPoint(
-            net = PointwiseNet(point_dim=args.features, context_dim=args.latent_dim+args.cond_features, residual=args.residual),
+            net = PointwiseNet_kDiffusion(point_dim=args.features, context_dim=args.latent_dim+args.cond_features, residual=args.residual),
             var_sched = VarianceSchedule(
                 num_steps=args.num_steps,
                 beta_1=args.beta_1,
@@ -95,6 +97,60 @@ class epicVAE_nFlow_kDiffusion(Module):
         z = torch.cat([z, cond_feats], -1)   # B,F+C
         samples = self.diffusion.sample(num_points, context=z, flexibility=flexibility)
         return samples
+    
+
+
+
+
+class PointwiseNet_kDiffusion(Module):
+
+    def __init__(self, point_dim, context_dim, residual):
+        super().__init__()
+        time_dim = 64
+
+        self.act = F.leaky_relu
+        self.residual = residual
+        self.layers = ModuleList([
+            ConcatSquashLinear(point_dim, 128, context_dim+time_dim),
+            ConcatSquashLinear(128, 256, context_dim+time_dim),
+            ConcatSquashLinear(256, 512, context_dim+time_dim),
+            ConcatSquashLinear(512, 256, context_dim+time_dim),
+            ConcatSquashLinear(256, 128, context_dim+time_dim),
+            ConcatSquashLinear(128, point_dim, context_dim+time_dim)
+        ])
+
+        self.timestep_embed = nn.Sequential(
+            K.layers.FourierFeatures(1, time_dim),   # 1D Fourier features --> with register_buffer, so weights are not trained
+            nn.Linear(time_dim, time_dim), # this is a trainable layer
+        )
+
+    def forward(self, x, beta, context):
+        """
+        Args:
+            x:  Point clouds at some timestep t, (B, N, d).
+            beta:     Time. (B, ).  --> becomes "sigma" in k-diffusion
+            context:  Shape latents. (B, F). 
+        """
+        batch_size = x.size(0)
+        beta = beta.view(batch_size, 1, 1)          # (B, 1, 1)
+        context = context.view(batch_size, 1, -1)   # (B, 1, F)
+
+        c_noise = beta.log() / 4  # (B, 1, 1)
+        time_emb = self.act(self.timestep_embed(c_noise))  # (B, 1, T)
+        
+        # time_emb = torch.cat([beta, torch.sin(beta), torch.cos(beta)], dim=-1)  # (B, 1, 3)
+        ctx_emb = torch.cat([time_emb, context], dim=-1)    # (B, 1, F+T)   # TODO: might want to add additional linear embedding net for context or only cond_feats
+
+        out = x
+        for i, layer in enumerate(self.layers):
+            out = layer(ctx=ctx_emb, x=out)
+            if i < len(self.layers) - 1:
+                out = self.act(out)
+
+        if self.residual:
+            return x + out
+        else:
+            return out
 
 
 
