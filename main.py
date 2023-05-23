@@ -75,9 +75,6 @@ ema_sched = K.utils.EMAWarmup(power=cfg.ema_power,
 # Noise distibution --> lognormal distribution, so minimum value is 0
 sample_density = K.config.make_sample_density(cfg.__dict__)
 
-if cfg.spectral_norm:
-    add_spectral_norm(model)
-
 # Optimizer and scheduler
 if cfg.model == 'flow':
 
@@ -119,7 +116,7 @@ elif cfg.model == 'AllCond_epicVAE_nFlow_PointDiff':
 # Train, validate and test
 def train(batch, it):
     # Load data
-    x = batch['event'][0].float().to(cfg.device)
+    x = batch['event'][0].float().to(cfg.device) 
     e = batch['energy'][0].float().to(cfg.device)
     n = batch['points'][0].float().to(cfg.device)
     # Reset grad and model state
@@ -127,8 +124,6 @@ def train(batch, it):
     if cfg.model == 'AllCond_epicVAE_nFlow_PointDiff':
         optimizer_flow.zero_grad()
     model.train()
-    if cfg.spectral_norm:
-        spectral_norm_power_iteration(model, n_power_iterations=1)
 
     # Forward
     if cfg.model == 'flow':
