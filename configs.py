@@ -9,7 +9,7 @@ class Configs():
         self.log_comet = False
 
     # Model arguments
-        self.model_name = 'AllCond_epicVAE_nFlow_PointDiff'             # choices=['flow', 'AllCond_epicVAE_nFlow_PointDiff', 'epicVAE_nFlow_kDiffusion]
+        self.model_name = 'epicVAE_nFlow_kDiffusion'             # choices=['flow', 'AllCond_epicVAE_nFlow_PointDiff', 'epicVAE_nFlow_kDiffusion]
         self.latent_dim = 256
         self.num_steps = 100
         self.beta_1 = 1e-4
@@ -58,7 +58,7 @@ class Configs():
 
     # Dtataloader
         self.workers = 32
-        self.train_bs = 256
+        self.train_bs = 128
         self.pin_memory = False         # choices=[True, False]
         self.shuffle = True             # choices=[True, False]
         self.max_points = 6_000
