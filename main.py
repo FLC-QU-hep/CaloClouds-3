@@ -188,6 +188,7 @@ print('Start training...')
 
 stop = False
 it = 1
+start_time = time.time()
 while not stop:
     for batch in dataloader:
         it += 1
@@ -211,3 +212,4 @@ while not stop:
         if it >= cfg.max_iters:
             stop = True
             break
+print('training done in %.2f seconds' % (time.time() - start_time))
