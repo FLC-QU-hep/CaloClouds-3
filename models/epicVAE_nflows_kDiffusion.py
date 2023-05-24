@@ -107,6 +107,7 @@ class PointwiseNet_kDiffusion(Module):
     def __init__(self, point_dim, context_dim, residual):
         super().__init__()
         time_dim = 64
+        fourier_scale = 16   # 1 in k-diffusion, 16 in EDM, 30 in Score-based generative modeling
 
         self.act = F.leaky_relu
         self.residual = residual
@@ -120,7 +121,7 @@ class PointwiseNet_kDiffusion(Module):
         ])
 
         self.timestep_embed = nn.Sequential(
-            K.layers.FourierFeatures(1, time_dim),   # 1D Fourier features --> with register_buffer, so weights are not trained
+            K.layers.FourierFeatures(1, time_dim, std=fourier_scale),   # 1D Fourier features --> with register_buffer, so weights are not trained
             nn.Linear(time_dim, time_dim), # this is a trainable layer
         )
 
