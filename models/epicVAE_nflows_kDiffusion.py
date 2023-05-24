@@ -18,51 +18,50 @@ class epicVAE_nFlow_kDiffusion(Module):
         self.args = args
         self.encoder = EPiC_encoder_cond(args.latent_dim, input_dim=args.features, cond_features=args.cond_features)
         self.flow = get_flow_model(args)
-        self.diffusion = DiffusionPoint(
-            net = PointwiseNet_kDiffusion(point_dim=args.features, context_dim=args.latent_dim+args.cond_features, residual=args.residual),
-            var_sched = VarianceSchedule(
-                num_steps=args.num_steps,
-                beta_1=args.beta_1,
-                beta_T=args.beta_T,
-                mode=args.sched_mode
-            ))
+
+        net = PointwiseNet_kDiffusion(point_dim=args.features, context_dim=args.latent_dim+args.cond_features, residual=args.residual)
+        self.diffusion = K.config.make_denoiser_wrapper(args.__dict__)(net)
+        # self.diffusion = DiffusionPoint(
+        #     net = PointwiseNet_kDiffusion(point_dim=args.features, context_dim=args.latent_dim+args.cond_features, residual=args.residual),
+        #     var_sched = VarianceSchedule(
+        #         num_steps=args.num_steps,
+        #         beta_1=args.beta_1,
+        #         beta_T=args.beta_T,
+        #         mode=args.sched_mode
+        #     ))
             
         self.kld = KLDloss()
 
-    def get_loss(self, x, cond_feats, kl_weight, writer=None, it=None, kld_min=0.0):
+    def get_loss(self, x, noise, sigma, cond_feats, kl_weight, writer=None, it=None, kld_min=0.0):
         """
         Args:
             x:  Input point clouds, (B, N, d).
-            cond_feats: conditioning features (B,C)
+            noise: Noise point cloud (B, N, d).
+            sigma: Time (B, ).
+            cond_feats: conditioning features (B, C)
         """
         # batch_size, _, _ = x.size()
-        # print(x.size())
+        # VAE encoder
         z_mu, z_sigma = self.encoder(x, cond_feats)
         z = reparameterize_gaussian(mean=z_mu, logvar=z_sigma)  # (B, F)
         
-        # H[Q(z|X)]
-        # entropy = gaussian_entropy(logvar=z_sigma)      # (B, )     encoder loss, but why not KLD incl. z_mu?
+        # VAE-like loss for encoder
         loss_kld = self.kld(mu=z_mu, logvar=z_sigma)
+        loss_kld_clamped = torch.clamp(loss_kld, min=kld_min)
 
         # P(z), Prior probability, parameterized by the flow: z -> w.
         nll = - self.flow.log_prob(z.detach().clone(), cond_feats)    # detach from computational graph if optimizing encoder+diffuison seperate from flow
-        # w, delta_log_pw = self.flow(z, torch.zeros([batch_size, 1]).to(z), reverse=False)
-        # log_pw = standard_normal_logprob(w).view(batch_size, -1).sum(dim=1, keepdim=True)   # (B, 1)
-        # log_pz = log_pw - delta_log_pw.view(batch_size, 1)  # (B, 1)        # flow loss, Logliklihood
-
-        # Negative ELBO of P(X|z)
-        z = torch.cat([z, cond_feats], -1)
-        neg_elbo = self.diffusion.get_loss(x, z)    # diffusion loss
-
-        # Loss
-        # loss_entropy = -entropy.mean()
         loss_prior = nll.mean()
-        loss_recons = neg_elbo
 
-        # print('loss_kld before clamp: ', loss_kld.item())
-        loss_kld_clamped = torch.clamp(loss_kld, min=kld_min)
+        # Diffusion MSE loss: Negative ELBO of P(X|z)
+        z = torch.cat([z, cond_feats], -1)
+        #loss_diffusion = self.diffusion.get_loss(x, z)    # diffusion loss
+        loss_diffusion = self.diffusion.loss(x, noise, sigma, context=z).mean()    # diffusion loss
+        # print('max values: ', loss_diffusion.max().item(), loss_diffusion.min().item())
+        # print('shape of loss_diffusion: ', loss_diffusion.shape)
 
-        loss = kl_weight*(loss_kld_clamped) + neg_elbo
+        # Total loss
+        loss = kl_weight*(loss_kld_clamped) + loss_diffusion
         # print(loss_kld_clamped.item(), loss_recons.item())
 
         if writer is not None:
@@ -70,7 +69,7 @@ class epicVAE_nFlow_kDiffusion(Module):
             writer.log_metric('train/loss_kld', loss_kld, it)
             writer.log_metric('train/loss_kld_clamped', loss_kld_clamped, it)
             writer.log_metric('train/loss_prior', loss_prior, it)
-            writer.log_metric('train/loss_recons', loss_recons, it)
+            writer.log_metric('train/loss_diffusion', loss_diffusion, it)
             writer.log_metric('train/z_mean', z_mu.mean(), it)
             writer.log_metric('train/z_mag', z_mu.abs().max(), it)
             writer.log_metric('train/z_var', (0.5*z_sigma).exp().mean(), it)
@@ -125,18 +124,19 @@ class PointwiseNet_kDiffusion(Module):
             nn.Linear(time_dim, time_dim), # this is a trainable layer
         )
 
-    def forward(self, x, beta, context):
+    def forward(self, x, sigma, context=None):
         """
         Args:
             x:  Point clouds at some timestep t, (B, N, d).
-            beta:     Time. (B, ).  --> becomes "sigma" in k-diffusion
+            sigma:     Time. (B, ).  --> becomes "sigma" in k-diffusion
             context:  Shape latents. (B, F). 
         """
         batch_size = x.size(0)
-        beta = beta.view(batch_size, 1, 1)          # (B, 1, 1)
+        sigma = sigma.view(batch_size, 1, 1)          # (B, 1, 1)
         context = context.view(batch_size, 1, -1)   # (B, 1, F)
 
-        c_noise = beta.log() / 4  # (B, 1, 1)
+        # formulation from EDM paper / k-diffusion
+        c_noise = sigma.log() / 4  # (B, 1, 1)
         time_emb = self.act(self.timestep_embed(c_noise))  # (B, 1, T)
         
         # time_emb = torch.cat([beta, torch.sin(beta), torch.cos(beta)], dim=-1)  # (B, 1, 3)

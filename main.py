@@ -151,10 +151,14 @@ def train(batch, it):
             e = e / 100 * 2 -1   # assumse max incident energy: 100 GeV
             n = n / cfg.max_points * 2  - 1
         cond_feats = torch.cat([e,n], -1) # B, 2
+
+        noise = torch.randn_like(x)    # noise for forward diffusion
+        sigma = sample_density([x.shape[0]], device=x.device)  # time steps
+
         if cfg.log_comet:
-            loss, loss_flow = model.get_loss(x, cond_feats, kl_weight=cfg.kl_weight, writer=experiment, it=it, kld_min=cfg.kld_min)
+            loss, loss_flow = model.get_loss(x, noise, sigma, cond_feats, kl_weight=cfg.kl_weight, writer=experiment, it=it, kld_min=cfg.kld_min)
         else:
-            loss, loss_flow = model.get_loss(x, cond_feats, kl_weight=cfg.kl_weight, writer=None, it=it, kld_min=cfg.kld_min)
+            loss, loss_flow = model.get_loss(x, noise, sigma, cond_feats, kl_weight=cfg.kl_weight, writer=None, it=it, kld_min=cfg.kld_min)
 
 
      # Backward and optimize
