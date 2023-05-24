@@ -3,10 +3,10 @@ class Configs():
     def __init__(self):
         
     # Experiment Name
-        self.name = 'TEST_'  
-        self.Acomment = 'running baselione CaloClouds with default parameters'
+        self.name = 'kCaloClouds_'  # options: [TEST_, kCaloClouds_, CaloClouds_]
+        self.Acomment = 'first run with EDM CaloClouds setup, 500k iterations, scheduler from 100k-400k, EMApower 0.75'
         self.comet_project = 'k-CaloClouds'    # project name in comet.ml
-        self.log_comet = False
+        self.log_comet = True
 
     # Model arguments
         self.model_name = 'epicVAE_nFlow_kDiffusion'             # choices=['flow', 'AllCond_epicVAE_nFlow_PointDiff', 'epicVAE_nFlow_kDiffusion]
@@ -23,7 +23,7 @@ class Configs():
         self.features = 4
         self.sample_num_points = 2048
         self.kl_weight = 0.001
-        self.residual = True            # choices=[True, False]
+        self.residual = False            # choices=[True, False]   # !! for CaloClouds was True, but for EDM False might be better (?)
         
         self.cond_features = 2       # number of conditioning features (i.e. energy+points=2)
         self.norm_cond = True    # normalize conditioniong to [-1,1]
@@ -69,28 +69,29 @@ class Configs():
         self.weight_decay = 0
         self.max_grad_norm = 10
         self.end_lr = 1e-4
-        self.sched_start_epoch = 300 * 1e3
-        self.sched_end_epoch = 2 * 1e6
+        self.sched_start_epoch = 100 * 1e3
+        self.sched_end_epoch = 400 * 1e3
 
     # Others
         self.device = 'cuda'
         self.logdir = '/beegfs/desy/user/buhmae/6_PointCloudDiffusion/log'
         self.seed = 42
-        self.max_iters = 150 # 2 * 1e6
-        self.val_freq =  100  #  1e3          # saving intervall for checkpoints
+        self.max_iters = 500_000 # 2 * 1e6
+        self.val_freq =  1000  #  1e3          # saving intervall for checkpoints
+
         self.test_freq = 30 * 1e3
         self.test_size = 400
         self.tag = None
-        self.log_iter = 10   # log every n iterations
+        self.log_iter = 100   # log every n iterations
 
     # EMA scheduler
         self.ema_type = 'inverse'
-        self.ema_power = 0.6667   # depends on the number of iterations, 2/3 good for 1e6 iterations, 3/4 good for less
+        self.ema_power = 0.75   # depends on the number of iterations, 2/3=0.6667 good for 1e6 iterations, 3/4=0.75 good for less
         self.ema_max_value = 0.9999
         
     # EDM diffusion parameters for training
         self.model = {
-            "sigma_data" : 0.5,
+            "sigma_data" : 0.5,    ## default parameters for EDM paper, might need to adjust for our dataset (meaning the std of our data) / or a seperate sigma for each feature?
             "has_variance" : False,
             "loss_config" : "karras",
             "sigma_sample_density" : {
@@ -101,7 +102,7 @@ class Configs():
             }
 
     # EDM diffusion parameters for sampling
-        self.sigma_min = 0.002
+        self.sigma_min = 0.002  # EDM paper: 0.002, k-diffusion config: 0.01
         self.sigma_max = 80.0
 
     
