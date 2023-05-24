@@ -77,25 +77,34 @@ class epicVAE_nFlow_kDiffusion(Module):
         return loss, loss_prior
 
 
-    def sample(self, cond_feats, num_points, flexibility):
+    def sample(self, cond_feats, num_points, config):
         batch_size, _ = cond_feats.size()
+
+        # contect / latent space
         z = self.flow.sample(context=cond_feats, num_samples=1).view(batch_size, -1)  # B,F
         z = torch.cat([z, cond_feats], -1)   # B, F+C
-        samples = self.diffusion.sample(num_points, context=z, flexibility=flexibility)
-        return samples
-    
-    def inference(self, num_points, cfg, num_samples=256):
-        with torch.no_grad():
-            z = torch.randn([num_samples, cfg.latent_dim]).to(cfg.device)
-            x = self.sample(z, num_points, flexibility=cfg.flexibility)
-        return x
 
-    def sample_fromData(self, x, cond_feats, num_points, flexibility):
-        z_mu, z_sigma = self.encoder(x, cond_feats)
-        z = reparameterize_gaussian(mean=z_mu, logvar=z_sigma)  # (B, F)
-        z = torch.cat([z, cond_feats], -1)   # B,F+C
-        samples = self.diffusion.sample(num_points, context=z, flexibility=flexibility)
-        return samples
+        sigmas = K.sampling.get_sigmas_karras(config.num_steps, config.sigma_min, config.sigma_max, rho=7., device=z.device)
+
+        x_T = torch.randn([z.size(0), num_points, config.features], device=z.device) * config.sigma_max
+
+        x_0 = K.sampling.sample_heun(self.diffusion, x_T, sigmas, context=z)
+
+        # samples = self.diffusion.sample(num_points, context=z, flexibility=flexibility)
+        return x_0
+    
+    # def inference(self, num_points, cfg, num_samples=256):
+    #     with torch.no_grad():
+    #         z = torch.randn([num_samples, cfg.latent_dim]).to(cfg.device)
+    #         x = self.sample(z, num_points, flexibility=cfg.flexibility)
+    #     return x
+
+    # def sample_fromData(self, x, cond_feats, num_points, flexibility):
+    #     z_mu, z_sigma = self.encoder(x, cond_feats)
+    #     z = reparameterize_gaussian(mean=z_mu, logvar=z_sigma)  # (B, F)
+    #     z = torch.cat([z, cond_feats], -1)   # B,F+C
+    #     samples = self.diffusion.sample(num_points, context=z, flexibility=flexibility)
+    #     return samples
     
 
 
