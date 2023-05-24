@@ -71,6 +71,7 @@ elif cfg.model_name == 'epicVAE_nFlow_kDiffusion':
 
 # initiate EMA (exponential moving average) model
 model_ema.load_state_dict(model.state_dict())
+model_ema.eval().requires_grad_(False)
 assert cfg.ema_type == 'inverse'
 ema_sched = K.utils.EMAWarmup(power=cfg.ema_power,
                                 max_value=cfg.ema_max_value)
