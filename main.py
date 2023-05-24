@@ -28,7 +28,7 @@ start_time = time.localtime()
 if cfg.log_comet:
     experiment = Experiment(
         # api_key=key,
-        project_name=cfg.comet_project,
+        project_name=cfg.comet_project, auto_metric_logging=False,
         # workspace="akorol",
     )
     experiment.log_parameters(cfg.__dict__)
