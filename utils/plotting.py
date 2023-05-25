@@ -61,9 +61,9 @@ class Configs():
 
 
     # all
-        # self.color_lines = ['tab:blue', 'tab:orange', 'tab:green', 'tab:red']
-        # self.color_lines = ['tab:orange', 'tab:blue', 'tab:green', 'tab:red']
-        self.color_lines = ['tab:orange', 'tab:orange', 'tab:orange', 'tab:orange']
+        #self.color_lines = ['tab:blue', 'tab:orange', 'tab:green', 'tab:red']
+        self.color_lines = ['tab:orange', 'tab:blue', 'tab:green', 'tab:red']
+        # self.color_lines = ['tab:orange', 'tab:orange', 'tab:orange', 'tab:orange']
 
         self.include_artifacts = True
 
@@ -255,15 +255,18 @@ def get_features(events, thr=0.05):
     return e_radial, occ_list, e_sum_list, hits_list, e_layers_list
 
 
-def plt_radial(e_radial, e_radial_list, labels, cfg=cfg):
+def plt_radial(e_radial, e_radial_list, labels, cfg=cfg, title=r'\textbf{full spectrum}'):
     fig = plt.figure(figsize=(7,7))
 
     ## for legend ##########################################
     plt.hist(np.zeros(1)+1, label=labels[0], color='lightgrey', edgecolor='dimgrey', lw=2)
-    plt.plot(0, 0, linestyle='-', lw=3, color='tab:orange', label=r'\textsc{CaloClouds}')
-    plt.title(r'\textbf{full spectrum}', fontsize=cfg.font.get_size(), loc='right')
-    plt.legend(prop=cfg.font, loc=(0.35, 0.78))
+    for i in range(len(e_radial_list)):
+        plt.plot(0, 0, linestyle='-', lw=3, color=cfg.color_lines[i], label=labels[i+1])
+    plt.title(title, fontsize=cfg.font.get_size(), loc='right')
+    # plt.legend(prop=cfg.font, loc=(0.35, 0.78))
+    plt.legend(prop=cfg.font, loc='best')
     ########################################################
+
 
     h = plt.hist(e_radial[0], bins=cfg.bins_r, weights=e_radial[1], color='lightgrey', rasterized=True)
     h = plt.hist(e_radial[0], bins=cfg.bins_r, weights=e_radial[1], color='dimgrey', histtype='step', lw=2)
@@ -293,13 +296,14 @@ def plt_radial(e_radial, e_radial_list, labels, cfg=cfg):
     plt.savefig('radial.pdf', dpi=100)
     plt.show()
     
-def plt_spinal(e_layers, e_layers_list, labels, cfg=cfg):
+def plt_spinal(e_layers, e_layers_list, labels, cfg=cfg, title=r'\textbf{full spectrum}'):
     
     plt.figure(figsize=(7,7))
 
     ## for legend ##########################################
     plt.hist(np.zeros(1)+1, label=labels[0], color='lightgrey', edgecolor='dimgrey', lw=2)
-    plt.plot(0, 0, linestyle='-', lw=3, color='tab:orange', label=r'\textsc{CaloClouds}')
+    for i in range(len(e_layers_list)):
+        plt.plot(0, 0, linestyle='-', lw=3, color=cfg.color_lines[i], label=labels[i+1])
     ########################################################
 
     plt.hist(np.arange(len(e_layers)), bins=30, weights=e_layers, color='lightgrey', rasterized=True)
@@ -313,8 +317,9 @@ def plt_spinal(e_layers, e_layers_list, labels, cfg=cfg):
     plt.xlabel('layers')
     plt.ylabel('energy sum [MeV]')
     
-    plt.legend(prop=cfg.font, loc=(0.35, 0.78))
-    plt.title(r'\textbf{full spectrum}', fontsize=cfg.font.get_size(), loc='right')
+    # plt.legend(prop=cfg.font, loc=(0.35, 0.78))
+    plt.legend(prop=cfg.font, loc='best')
+    plt.title(title, fontsize=cfg.font.get_size(), loc='right')
     plt.tight_layout()
 
     plt.savefig('spinal.pdf', dpi=100)
@@ -325,7 +330,8 @@ def plt_occupancy(occ, occ_list, labels, cfg=cfg):
 
     ## for legend ##########################################
     plt.hist(np.zeros(1)+1, label=labels[0], color='lightgrey', edgecolor='dimgrey', lw=2)
-    plt.plot(0, 0, linestyle='-', lw=3, color='tab:orange', label=r'\textsc{CaloClouds}')
+    for i in range(len(occ_list)):
+        plt.plot(0, 0, linestyle='-', lw=3, color=cfg.color_lines[i], label=labels[i+1])
     ########################################################
 
     h = plt.hist(occ, bins=cfg.occup_bins, color='lightgrey', rasterized=True)
@@ -338,7 +344,8 @@ def plt_occupancy(occ, occ_list, labels, cfg=cfg):
     plt.xlabel('number of hits')
     plt.ylabel('\# showers')
 
-    plt.legend(prop=cfg.font, loc=(0.35, 0.78))
+    # plt.legend(prop=cfg.font, loc=(0.35, 0.78))
+    plt.legend(prop=cfg.font, loc='best')
     if cfg.plot_text_occupancy:
         plt.text(315, 540, '10 GeV', fontsize=cfg.font.get_size() + 2)
         plt.text(870, 215, '50 GeV', fontsize=cfg.font.get_size() + 2)
@@ -349,16 +356,18 @@ def plt_occupancy(occ, occ_list, labels, cfg=cfg):
     plt.savefig('occ.pdf', dpi=100)
     plt.show()
     
-def plt_hit_e(hits, hits_list, labels, cfg=cfg):
+def plt_hit_e(hits, hits_list, labels, cfg=cfg, title=r'\textbf{full spectrum}'):
     plt.figure(figsize=(7,7))
 
     ## for legend ##########################################
     plt.hist(np.zeros(1)+1, label=labels[0], color='lightgrey', edgecolor='dimgrey', lw=2)
-    plt.plot(0, 0, linestyle='-', lw=3, color='tab:orange', label=r'\textsc{CaloClouds}')
+    for i in range(len(hits_list)):
+        plt.plot(0, 0, linestyle='-', lw=3, color=cfg.color_lines[i], label=labels[i+1])
     # plt.legend(prop=cfg.font, loc='upper right')
-    plt.legend(prop=cfg.font, loc=(0.35, 0.78))
+    # plt.legend(prop=cfg.font, loc=(0.35, 0.78))
+    plt.legend(prop=cfg.font, loc='best')
     # plt.title(r'\textbf{validation set, 50 GeV}', fontsize=cfg.font.get_size(), loc='right')
-    plt.title(r'\textbf{full spectrum}', fontsize=cfg.font.get_size(), loc='right')
+    plt.title(title, fontsize=cfg.font.get_size(), loc='right')
     ########################################################
 
     h = plt.hist(hits, bins=cfg.hit_bins, color='lightgrey', rasterized=True)
@@ -390,7 +399,8 @@ def plt_esum(e_sum, e_sum_list, labels, cfg=cfg):
 
     ## for legend ##########################################
     plt.hist(np.zeros(10), label=labels[0], color='lightgrey', edgecolor='dimgrey', lw=2)
-    plt.plot(0, 0, linestyle='-', lw=3, color='tab:orange', label=r'\textsc{CaloClouds}')
+    for i in range(len(e_sum_list)):
+        plt.plot(0, 0, linestyle='-', lw=3, color=cfg.color_lines[i], label=labels[i+1])
     ########################################################
 
     
@@ -409,13 +419,14 @@ def plt_esum(e_sum, e_sum_list, labels, cfg=cfg):
         plt.ylim(0, 799)
 
     if cfg.plot_legend_e:
-        plt.legend(prop=cfg.font, loc=(0.35, 0.78))
+        # plt.legend(prop=cfg.font, loc=(0.35, 0.78))
+        plt.legend(prop=cfg.font, loc='best')
 
     plt.tight_layout()
     plt.savefig('e_sum.pdf', dpi=100)
     plt.show()
 
-def plt_cog(cog, cog_list, labels, cfg=cfg):
+def plt_cog(cog, cog_list, labels, cfg=cfg, title=r'\textbf{full spectrum}'):
     lables = ["X", "Z", "Y"] # local coordinate system
     plt.figure(figsize=(21, 7))
 
@@ -423,7 +434,6 @@ def plt_cog(cog, cog_list, labels, cfg=cfg):
         plt.subplot(1, 3, k+1)
 
         plt.xlim(cfg.cog_ranges[j])
-
         
         h = plt.hist(np.array(cog[j]), bins=cfg.bins_cog, color='lightgrey', range=cfg.cog_ranges[j], rasterized=True)
         h = plt.hist(np.array(cog[j]), bins=h[1], color='dimgrey', histtype='step', lw=2)
@@ -432,7 +442,8 @@ def plt_cog(cog, cog_list, labels, cfg=cfg):
         if k == k:
         #     plt.plot(0, 0, lw=2, color='black', label=labels[0])
             plt.hist(np.zeros(10), label=labels[0], color='lightgrey', edgecolor='dimgrey', lw=2)
-            plt.plot(0, 0, linestyle='-', lw=3, color='tab:orange', label=r'\textsc{CaloClouds}')
+            for i in range(len(cog_list)):
+                plt.plot(0, 0, linestyle='-', lw=3, color=cfg.color_lines[i], label=labels[i+1])
         ###########################################################
 
         for i, cog_ in enumerate(cog_list):
@@ -440,10 +451,11 @@ def plt_cog(cog, cog_list, labels, cfg=cfg):
 
         # for legend ##############################################
         if k == k:
-            plt.legend(prop=cfg.font, loc=(0.37, 0.76))
+            # plt.legend(prop=cfg.font, loc=(0.37, 0.76))
+            plt.legend(prop=cfg.font, loc='best')
 
         ax = plt.gca()
-        plt.title(r'\textbf{full spectrum}', fontsize=cfg.font.get_size(), loc='right')
+        plt.title(title, fontsize=cfg.font.get_size(), loc='right')
 
         ###########################################################
 
@@ -460,7 +472,7 @@ def plt_cog(cog, cog_list, labels, cfg=cfg):
 
 
 
-def get_plots(events, events_list: list, labels: list = ['1', '2', '3'], thr=0.05):
+def get_plots(events, events_list: list, labels: list = ['1', '2', '3'], thr=0.05, title=r'\textbf{full spectrum}'):
     
     e_radial_real, occ_real, e_sum_real, hits_real, e_layers_real = get_features(events, thr)
     
@@ -476,11 +488,11 @@ def get_plots(events, events_list: list, labels: list = ['1', '2', '3'], thr=0.0
         e_layers_list.append(e_layers_real_)
         
     
-    plt_radial(e_radial_real, e_radial_list, labels=labels)
-    plt_spinal(e_layers_real, e_layers_list, labels=labels)
-    plt_hit_e(hits_real, hits_list, labels=labels)
-    # plt_occupancy(occ_real, occ_list, labels=labels)
-    # plt_esum(e_sum_real, e_sum_list, labels=labels)
+    plt_radial(e_radial_real, e_radial_list, labels=labels, title=title)
+    plt_spinal(e_layers_real, e_layers_list, labels=labels, title=title)
+    plt_hit_e(hits_real, hits_list, labels=labels, title=title)
+    plt_occupancy(occ_real, occ_list, labels=labels)
+    plt_esum(e_sum_real, e_sum_list, labels=labels)
 
 
 MAP, offset = create_map(X, Y, Z, dm=1)
