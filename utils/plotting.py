@@ -460,7 +460,7 @@ def plt_cog(cog, cog_list, labels, cfg=cfg, title=r'\textbf{full spectrum}'):
         ###########################################################
 
 
-        plt.ylim(0, max(h[0]) + max(h[0])*0.1)
+        plt.ylim(0, max(h[0]) + max(h[0])*0.5)
 
         plt.xlabel(f'center of gravity {lables[j]} [mm]')
         plt.ylabel('\# showers')
