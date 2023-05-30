@@ -102,6 +102,7 @@ class Configs():
 
     # EDM diffusion parameters for sampling
         self.num_steps = 100
+        self.sampler = 'heun'
         self.sigma_min = 0.002  # EDM paper: 0.002, k-diffusion config: 0.01
         self.sigma_max = 80.0
 

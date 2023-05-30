@@ -88,9 +88,12 @@ class epicVAE_nFlow_kDiffusion(Module):
 
         x_T = torch.randn([z.size(0), num_points, config.features], device=z.device) * config.sigma_max
 
-        x_0 = K.sampling.sample_heun(self.diffusion, x_T, sigmas, context=z)
-
-        # samples = self.diffusion.sample(num_points, context=z, flexibility=flexibility)
+        if config.sampler == 'heun':
+            x_0 = K.sampling.sample_heun(self.diffusion, x_T, sigmas, extra_args={'context' : z})
+        elif config.sampler == 'dpmpp_2m':
+            x_0 = K.sampling.sample_dpmpp_2m(self.diffusion, x_T, sigmas, extra_args={'context' : z})
+        else:
+            raise NotImplementedError('Sampler not implemented')
         return x_0
     
     # def inference(self, num_points, cfg, num_samples=256):
