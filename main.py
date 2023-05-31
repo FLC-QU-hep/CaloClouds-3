@@ -96,21 +96,41 @@ if cfg.model_name == 'flow':
 
 elif cfg.model_name == 'AllCond_epicVAE_nFlow_PointDiff' or cfg.model_name == 'epicVAE_nFlow_kDiffusion':
 
-    optimizer = torch.optim.Adam(   # Consistency Model was trained with Rectified Adam, in k-diffusion AdamW is used, in EDM normal Adam
+    if cfg.optimizer == 'Adam':
+        optimizer = torch.optim.Adam(   # Consistency Model was trained with Rectified Adam, in k-diffusion AdamW is used, in EDM normal Adam
+                [
+                {'params': model.encoder.parameters()}, 
+                {'params': model.diffusion.parameters()},
+                ], 
+                lr=cfg.lr,  
+                weight_decay=cfg.weight_decay
+            )
+        optimizer_flow = torch.optim.Adam(
             [
-            {'params': model.encoder.parameters()}, 
-            {'params': model.diffusion.parameters()},
+            {'params': model.flow.parameters()}, 
             ], 
             lr=cfg.lr,  
             weight_decay=cfg.weight_decay
         )
-    optimizer_flow = torch.optim.Adam(
-        [
-        {'params': model.flow.parameters()}, 
-        ], 
-        lr=cfg.lr,  
-        weight_decay=cfg.weight_decay
-    )
+    elif cfg.optimizer == 'RAdam':
+        optimizer = torch.optim.RAdam(   # Consistency Model was trained with Rectified Adam, in k-diffusion AdamW is used, in EDM normal Adam
+                [
+                {'params': model.encoder.parameters()}, 
+                {'params': model.diffusion.parameters()},
+                ], 
+                lr=cfg.lr,  
+                weight_decay=cfg.weight_decay
+            )
+        optimizer_flow = torch.optim.RAdam(
+            [
+            {'params': model.flow.parameters()}, 
+            ], 
+            lr=cfg.lr,  
+            weight_decay=cfg.weight_decay
+        )
+    else: 
+        raise NotImplementedError('Optimizer not implemented')
+
     scheduler = get_linear_scheduler(optimizer, start_epoch=cfg.sched_start_epoch, end_epoch=cfg.sched_end_epoch, start_lr=cfg.lr, end_lr=cfg.end_lr)
     scheduler_flow = get_linear_scheduler(optimizer_flow, start_epoch=cfg.sched_start_epoch, end_epoch=cfg.sched_end_epoch, start_lr=cfg.lr, end_lr=cfg.end_lr)
 
