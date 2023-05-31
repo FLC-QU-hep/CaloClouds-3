@@ -20,7 +20,8 @@ class epicVAE_nFlow_kDiffusion(Module):
         self.flow = get_flow_model(args)
 
         net = PointwiseNet_kDiffusion(point_dim=args.features, context_dim=args.latent_dim+args.cond_features, residual=args.residual)
-        self.diffusion = K.config.make_denoiser_wrapper(args.__dict__)(net)
+        self.diffusion = K.layers.Denoiser(net, sigma_data = args.model['sigma_data'])
+        # self.diffusion = K.config.make_denoiser_wrapper(args.__dict__)(net)
         # self.diffusion = DiffusionPoint(
         #     net = PointwiseNet_kDiffusion(point_dim=args.features, context_dim=args.latent_dim+args.cond_features, residual=args.residual),
         #     var_sched = VarianceSchedule(
