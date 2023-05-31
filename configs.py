@@ -3,10 +3,10 @@ class Configs():
     def __init__(self):
         
     # Experiment Name
-        self.name = 'TEST_'  # options: [TEST_, kCaloClouds_, CaloClouds_]
-        self.Acomment = 'first run with EDM CaloClouds setup, 500k iterations, scheduler from 100k-400k, EMApower 0.75'
+        self.name = 'kCaloClouds_'  # options: [TEST_, kCaloClouds_, CaloClouds_]
+        self.Acomment = 'RAdam optimizer, 2M iterations, scheduler from 300k-2M, EMApower 0.6667'
         self.comet_project = 'k-CaloClouds'    # project name in comet.ml
-        self.log_comet = False
+        self.log_comet = True
 
     # Model arguments
         self.model_name = 'epicVAE_nFlow_kDiffusion'             # choices=['flow', 'AllCond_epicVAE_nFlow_PointDiff', 'epicVAE_nFlow_kDiffusion]
@@ -69,14 +69,14 @@ class Configs():
         self.weight_decay = 0
         self.max_grad_norm = 10
         self.end_lr = 1e-4
-        self.sched_start_epoch = 100 * 1e3
-        self.sched_end_epoch = 400 * 1e3
+        self.sched_start_epoch = 300 * 1e3
+        self.sched_end_epoch = 2 * 1e6
+        self.max_iters = 2 * 1e6
 
     # Others
         self.device = 'cuda'
         self.logdir = '/beegfs/desy/user/buhmae/6_PointCloudDiffusion/log'
         self.seed = 42
-        self.max_iters = 500_000 # 2 * 1e6
         self.val_freq =  1000  #  1e3          # saving intervall for checkpoints
 
         self.test_freq = 30 * 1e3
@@ -86,7 +86,7 @@ class Configs():
 
     # EMA scheduler
         self.ema_type = 'inverse'
-        self.ema_power = 0.75   # depends on the number of iterations, 2/3=0.6667 good for 1e6 iterations, 3/4=0.75 good for less
+        self.ema_power = 0.6667   # depends on the number of iterations, 2/3=0.6667 good for 1e6 iterations, 3/4=0.75 good for less
         self.ema_max_value = 0.9999
         
     # EDM diffusion parameters for training
