@@ -4,7 +4,7 @@ class Configs():
         
     # Experiment Name
         self.name = 'kCaloClouds_'  # options: [TEST_, kCaloClouds_, CaloClouds_]
-        self.Acomment = 'RAdam optimizer, 2M iterations, scheduler from 300k-2M, EMApower 0.6667 - sigma_data=0.25'
+        self.Acomment = 'RAdam optimizer, 2M iterations, scheduler from 300k-2M, EMApower 0.6667 - sigma_data=0.5, residual=True'
         self.comet_project = 'k-CaloClouds'    # project name in comet.ml
         self.log_comet = True
 
@@ -22,7 +22,7 @@ class Configs():
         self.features = 4
         self.sample_num_points = 2048
         self.kl_weight = 0.001
-        self.residual = False            # choices=[True, False]   # !! for CaloClouds was True, but for EDM False might be better (?)
+        self.residual = True            # choices=[True, False]   # !! for CaloClouds was True, but for EDM False might be better (?)
         
         self.cond_features = 2       # number of conditioning features (i.e. energy+points=2)
         self.norm_cond = True    # normalize conditioniong to [-1,1]
