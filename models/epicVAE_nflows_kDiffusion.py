@@ -19,7 +19,10 @@ class epicVAE_nFlow_kDiffusion(Module):
         self.encoder = EPiC_encoder_cond(args.latent_dim, input_dim=args.features, cond_features=args.cond_features)
         self.flow = get_flow_model(args)
 
-        net = PointwiseNet_kDiffusion(point_dim=args.features, context_dim=args.latent_dim+args.cond_features, residual=args.residual)
+        if args.dropout_rate == 0.0:
+            net = PointwiseNet_kDiffusion(point_dim=args.features, context_dim=args.latent_dim+args.cond_features, residual=args.residual)
+        else:
+            net = PointwiseNet_kDiffusion_Dropout(point_dim=args.features, context_dim=args.latent_dim+args.cond_features, residual=args.residual, dropout_rate=args.dropout_rate)
         self.diffusion = K.layers.Denoiser(net, sigma_data = args.model['sigma_data'])
         # self.diffusion = K.config.make_denoiser_wrapper(args.__dict__)(net)
         # self.diffusion = DiffusionPoint(
@@ -172,60 +175,57 @@ class PointwiseNet_kDiffusion(Module):
 
 
 
-        # # Backward and optimize
-        # optimizer.zero_grad()
-        # loss.backward(retain_graph=True)
-        # orig_grad_norm = clip_grad_norm_(model.parameters(), cfg.max_grad_norm)
-        # optimizer.step()
-        # scheduler.step()
-    
-        # optimizer_flow.zero_grad()
-        # loss_prior.backward()
-        # orig_grad_norm = clip_grad_norm_(model.parameters(), cfg.max_grad_norm)
-        # optimizer_flow.step()
-        # scheduler_flow.step()
+class PointwiseNet_kDiffusion_Dropout(Module):
 
+    def __init__(self, point_dim, context_dim, residual, dropout_rate=0.0):
+        super().__init__()
+        time_dim = 64
+        fourier_scale = 16   # 1 in k-diffusion, 16 in EDM, 30 in Score-based generative modeling
 
+        self.act = F.leaky_relu
+        self.dropout = nn.Dropout(dropout_rate)
+        self.residual = residual
+        self.layers = ModuleList([
+            ConcatSquashLinear(point_dim, 128, context_dim+time_dim),
+            ConcatSquashLinear(128, 256, context_dim+time_dim),
+            ConcatSquashLinear(256, 512, context_dim+time_dim),
+            ConcatSquashLinear(512, 256, context_dim+time_dim),
+            ConcatSquashLinear(256, 128, context_dim+time_dim),
+            ConcatSquashLinear(128, point_dim, context_dim+time_dim)
+        ])
 
-# class PointwiseNet_epic_res_wn(Module):
+        self.timestep_embed = nn.Sequential(
+            K.layers.FourierFeatures(1, time_dim, std=fourier_scale),   # 1D Fourier features --> with register_buffer, so weights are not trained
+            nn.Linear(time_dim, time_dim), # this is a trainable layer
+        )
 
-#     def __init__(self, point_dim, context_dim, residual):
-#         super().__init__()
-#         self.act = F.leaky_relu
-#         self.residual = residual
-#         self.layers = ModuleList([
-#             ConcatSquashEPiCres_wn(point_dim, 128, context_dim+3+context_dim+3),     # gated learned sum of point vector and context vector
-#             ConcatSquashEPiCres_wn(128, 256, context_dim+3+context_dim+3),
-#             ConcatSquashEPiCres_wn(256, 512, context_dim+3+context_dim+3),
-#             ConcatSquashEPiCres_wn(512, 256, context_dim+3+context_dim+3),
-#             ConcatSquashEPiCres_wn(256, 128, context_dim+3+context_dim+3),
-#             ConcatSquashEPiCres_wn(128, point_dim, context_dim+3+context_dim+3)
-#         ])
+    def forward(self, x, sigma, context=None):
+        """
+        Args:
+            x:  Point clouds at some timestep t, (B, N, d).
+            sigma:     Time. (B, ).  --> becomes "sigma" in k-diffusion
+            context:  Shape latents. (B, F). 
+        """
+        batch_size = x.size(0)
+        sigma = sigma.view(batch_size, 1, 1)          # (B, 1, 1)
+        context = context.view(batch_size, 1, -1)   # (B, 1, F)
 
-#     def forward(self, x, beta, context):
-#         """
-#         Args:
-#             x:  Point clouds at some timestep t, (B, N, d).
-#             beta:     Time. (B, ).
-#             context:  Shape latents. (B, F).
-#         """
-#         batch_size = x.size(0)
-#         beta = beta.view(batch_size, 1, 1)          # (B, 1, 1)
-#         context = context.view(batch_size, 1, -1)   # (B, 1, F)
+        # formulation from EDM paper / k-diffusion
+        c_noise = sigma.log() / 4  # (B, 1, 1)
+        time_emb = self.act(self.timestep_embed(c_noise))  # (B, 1, T)
+        
+        # time_emb = torch.cat([beta, torch.sin(beta), torch.cos(beta)], dim=-1)  # (B, 1, 3)
+        ctx_emb = torch.cat([time_emb, context], dim=-1)    # (B, 1, F+T)   # TODO: might want to add additional linear embedding net for context or only cond_feats
 
-#         time_emb = torch.cat([beta, torch.sin(beta), torch.cos(beta)], dim=-1)  # (B, 1, 3)
-#         ctx_emb = torch.cat([time_emb, context], dim=-1)    # (B, 1, F+3)
-#         out = x
-#         ctx_emb_in = ctx_emb.clone()
-#         for i, layer in enumerate(self.layers):
-#             # out = layer(ctx=ctx_emb, x=out)
-#             ctx_emb = torch.cat([ctx_emb_in, ctx_emb], -1)
-#             ctx_emb, out = layer(ctx=ctx_emb, x=out)
-#             # ctx_emb = ctx_emb + ctx_emb_in
-#             if i < len(self.layers) - 1:
-#                 out = self.act(out)
+        out = x
+        for i, layer in enumerate(self.layers):
+            out = layer(ctx=ctx_emb, x=out)
+            if i < len(self.layers) - 1:    # no activation and dropout after last layer
+                out = self.act(out)
+                out = self.dropout(out)
 
-#         if self.residual:
-#             return x + out
-#         else:
-#             return out
+        if self.residual:
+            return x + out
+        else:
+            return out
+

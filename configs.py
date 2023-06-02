@@ -4,7 +4,7 @@ class Configs():
         
     # Experiment Name
         self.name = 'kCaloClouds_'  # options: [TEST_, kCaloClouds_, CaloClouds_]
-        self.Acomment = 'RAdam optimizer, 2M iterations, scheduler from 300k-2M, EMApower 0.6667 - sigma_data=0.5, residual=True'
+        self.Acomment = 'RAdam optimizer - sigma_data=0.5, residual=False, lr=2e-3, dropout_rate=0.1'
         self.comet_project = 'k-CaloClouds'    # project name in comet.ml
         self.log_comet = True
 
@@ -22,7 +22,7 @@ class Configs():
         self.features = 4
         self.sample_num_points = 2048
         self.kl_weight = 0.001
-        self.residual = True            # choices=[True, False]   # !! for CaloClouds was True, but for EDM False might be better (?)
+        self.residual = False            # choices=[True, False]   # !! for CaloClouds was True, but for EDM False might be better (?)
         
         self.cond_features = 2       # number of conditioning features (i.e. energy+points=2)
         self.norm_cond = True    # normalize conditioniong to [-1,1]
@@ -65,7 +65,7 @@ class Configs():
 
     # Optimizer and scheduler
         self.optimizer = 'RAdam'         # choices=['Adam', 'RAdam']
-        self.lr = 2e-3
+        self.lr = 2e-3              # Caloclouds default: 2e-3
         self.weight_decay = 0
         self.max_grad_norm = 10
         self.end_lr = 1e-4
@@ -91,7 +91,7 @@ class Configs():
         
     # EDM diffusion parameters for training
         self.model = {
-            "sigma_data" : 0.25,    ## default parameters for EDM pape = 0.5, might need to adjust for our dataset (meaning the std of our data) / or a seperate sigma for each feature?
+            "sigma_data" : 0.5,    ## default parameters for EDM pape = 0.5, might need to adjust for our dataset (meaning the std of our data) / or a seperate sigma for each feature?
             # "has_variance" : False,
             # "loss_config" : "karras",
             "sigma_sample_density" : {
@@ -100,6 +100,7 @@ class Configs():
                 "std": 1.2
                 }
             }
+        self.dropout_rate = 0.1       # EDM: approx. 0.1, Caloclouds default: 0.0
 
     # EDM diffusion parameters for sampling
         self.num_steps = 13
