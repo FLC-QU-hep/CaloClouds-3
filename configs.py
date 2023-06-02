@@ -4,7 +4,7 @@ class Configs():
         
     # Experiment Name
         self.name = 'kCaloClouds_'  # options: [TEST_, kCaloClouds_, CaloClouds_]
-        self.Acomment = 'RAdam optimizer, 2M iterations, scheduler from 300k-2M, EMApower 0.6667 - sigma_data=0.08'
+        self.Acomment = 'RAdam optimizer, 2M iterations, scheduler from 300k-2M, EMApower 0.6667 - sigma_data=0.25'
         self.comet_project = 'k-CaloClouds'    # project name in comet.ml
         self.log_comet = True
 
@@ -91,9 +91,9 @@ class Configs():
         
     # EDM diffusion parameters for training
         self.model = {
-            "sigma_data" : 0.08,    ## default parameters for EDM pape = 0.5, might need to adjust for our dataset (meaning the std of our data) / or a seperate sigma for each feature?
-            "has_variance" : False,
-            "loss_config" : "karras",
+            "sigma_data" : 0.25,    ## default parameters for EDM pape = 0.5, might need to adjust for our dataset (meaning the std of our data) / or a seperate sigma for each feature?
+            # "has_variance" : False,
+            # "loss_config" : "karras",
             "sigma_sample_density" : {
                 "type": "lognormal",
                 "mean": -1.2,
