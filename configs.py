@@ -3,10 +3,10 @@ class Configs():
     def __init__(self):
         
     # Experiment Name
-        self.name = 'TEST_'  # options: [TEST_, kCaloClouds_, CaloClouds_]
-        self.Acomment = 'RAdam optimizer - sigma_data=0.5, residual=False, lr=2e-3, dropout_rate=0.0'
+        self.name = 'kCaloClouds_'  # options: [TEST_, kCaloClouds_, CaloClouds_]
+        self.Acomment = '"sigma_data = 1'
         self.comet_project = 'k-CaloClouds'    # project name in comet.ml
-        self.log_comet = False
+        self.log_comet = True
 
     # Model arguments
         self.model_name = 'epicVAE_nFlow_kDiffusion'             # choices=['flow', 'AllCond_epicVAE_nFlow_PointDiff', 'epicVAE_nFlow_kDiffusion]
@@ -91,7 +91,8 @@ class Configs():
         
     # EDM diffusion parameters for training
         self.model = {
-            "sigma_data" : [0.5, 0.5, 0.5, 0.5],    ## default parameters for EDM pape = 0.5, might need to adjust for our dataset (meaning the std of our data) / or a seperate sigma for each feature?
+            # "sigma_data" : [0.08, 0.35, 0.08, 0.5],    ## default parameters for EDM pape = 0.5, might need to adjust for our dataset (meaning the std of our data) / or a seperate sigma for each feature?
+            "sigma_data" : 1.0,
             # "has_variance" : False,
             # "loss_config" : "karras",
             "sigma_sample_density" : {
