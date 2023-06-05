@@ -135,14 +135,14 @@ class Denoiser(nn.Module):
         return c_skip, c_out, c_in
 
     def loss(self, input, noise, sigma, **kwargs):
-        c_skip, c_out, c_in = [utils.append_dims(x, input.ndim) for x in self.get_scalings(sigma)]
-        noised_input = input + noise * utils.append_dims(sigma, input.ndim)
+        c_skip, c_out, c_in = [K.utils.append_dims(x, input.ndim) for x in self.get_scalings(sigma)]
+        noised_input = input + noise * K.utils.append_dims(sigma, input.ndim)
         model_output = self.inner_model(noised_input * c_in, sigma, **kwargs)
         target = (input - c_skip * noised_input) / c_out
         return (model_output - target).pow(2).flatten(1).mean(1)
 
     def forward(self, input, sigma, **kwargs):
-        c_skip, c_out, c_in = [utils.append_dims(x, input.ndim) for x in self.get_scalings(sigma)]
+        c_skip, c_out, c_in = [K.utils.append_dims(x, input.ndim) for x in self.get_scalings(sigma)]
         return self.inner_model(input * c_in, sigma, **kwargs) * c_out + input * c_skip
 
 
