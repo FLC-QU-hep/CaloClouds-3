@@ -77,7 +77,7 @@ class Configs():
         self.device = 'cuda'
         self.logdir = '/beegfs/desy/user/buhmae/6_PointCloudDiffusion/log'
         self.seed = 42
-        self.val_freq =  1000  #  1e3          # saving intervall for checkpoints
+        self.val_freq =  5000  #  1e3          # saving intervall for checkpoints
 
         self.test_freq = 30 * 1e3
         self.test_size = 400
