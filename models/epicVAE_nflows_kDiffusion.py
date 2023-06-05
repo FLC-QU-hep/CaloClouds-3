@@ -23,7 +23,7 @@ class epicVAE_nFlow_kDiffusion(Module):
             net = PointwiseNet_kDiffusion(point_dim=args.features, context_dim=args.latent_dim+args.cond_features, residual=args.residual)
         else:
             net = PointwiseNet_kDiffusion_Dropout(point_dim=args.features, context_dim=args.latent_dim+args.cond_features, residual=args.residual, dropout_rate=args.dropout_rate)
-        self.diffusion = K.layers.Denoiser(net, sigma_data = args.model['sigma_data'])
+        self.diffusion = Denoiser(net, sigma_data = args.model['sigma_data'])
         # self.diffusion = K.config.make_denoiser_wrapper(args.__dict__)(net)
         # self.diffusion = DiffusionPoint(
         #     net = PointwiseNet_kDiffusion(point_dim=args.features, context_dim=args.latent_dim+args.cond_features, residual=args.residual),
@@ -117,6 +117,35 @@ class epicVAE_nFlow_kDiffusion(Module):
     #     samples = self.diffusion.sample(num_points, context=z, flexibility=flexibility)
     #     return samples
     
+
+
+# from: https://github.com/crowsonkb/k-diffusion/blob/master/k_diffusion/layers.py#L12
+class Denoiser(nn.Module):
+    """A Karras et al. preconditioner for denoising diffusion models."""
+
+    def __init__(self, inner_model, sigma_data=1.):
+        super().__init__()
+        self.inner_model = inner_model
+        self.sigma_data = sigma_data
+
+    def get_scalings(self, sigma):
+        c_skip = self.sigma_data ** 2 / (sigma ** 2 + self.sigma_data ** 2)
+        c_out = sigma * self.sigma_data / (sigma ** 2 + self.sigma_data ** 2) ** 0.5
+        c_in = 1 / (sigma ** 2 + self.sigma_data ** 2) ** 0.5
+        return c_skip, c_out, c_in
+
+    def loss(self, input, noise, sigma, **kwargs):
+        c_skip, c_out, c_in = [utils.append_dims(x, input.ndim) for x in self.get_scalings(sigma)]
+        noised_input = input + noise * utils.append_dims(sigma, input.ndim)
+        model_output = self.inner_model(noised_input * c_in, sigma, **kwargs)
+        target = (input - c_skip * noised_input) / c_out
+        return (model_output - target).pow(2).flatten(1).mean(1)
+
+    def forward(self, input, sigma, **kwargs):
+        c_skip, c_out, c_in = [utils.append_dims(x, input.ndim) for x in self.get_scalings(sigma)]
+        return self.inner_model(input * c_in, sigma, **kwargs) * c_out + input * c_skip
+
+
 
 
 
