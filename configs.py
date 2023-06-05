@@ -3,10 +3,10 @@ class Configs():
     def __init__(self):
         
     # Experiment Name
-        self.name = 'kCaloClouds_'  # options: [TEST_, kCaloClouds_, CaloClouds_]
-        self.Acomment = 'RAdam optimizer - sigma_data=0.5, residual=False, lr=2e-3, dropout_rate=0.1'
+        self.name = 'TEST_'  # options: [TEST_, kCaloClouds_, CaloClouds_]
+        self.Acomment = 'RAdam optimizer - sigma_data=0.5, residual=False, lr=2e-3, dropout_rate=0.0'
         self.comet_project = 'k-CaloClouds'    # project name in comet.ml
-        self.log_comet = True
+        self.log_comet = False
 
     # Model arguments
         self.model_name = 'epicVAE_nFlow_kDiffusion'             # choices=['flow', 'AllCond_epicVAE_nFlow_PointDiff', 'epicVAE_nFlow_kDiffusion]
@@ -91,7 +91,7 @@ class Configs():
         
     # EDM diffusion parameters for training
         self.model = {
-            "sigma_data" : 0.5,    ## default parameters for EDM pape = 0.5, might need to adjust for our dataset (meaning the std of our data) / or a seperate sigma for each feature?
+            "sigma_data" : [0.5, 0.5, 0.5, 0.5],    ## default parameters for EDM pape = 0.5, might need to adjust for our dataset (meaning the std of our data) / or a seperate sigma for each feature?
             # "has_variance" : False,
             # "loss_config" : "karras",
             "sigma_sample_density" : {
@@ -100,7 +100,7 @@ class Configs():
                 "std": 1.2
                 }
             }
-        self.dropout_rate = 0.1       # EDM: approx. 0.1, Caloclouds default: 0.0
+        self.dropout_rate = 0.0       # EDM: approx. 0.1, Caloclouds default: 0.0
 
     # EDM diffusion parameters for sampling
         self.num_steps = 13

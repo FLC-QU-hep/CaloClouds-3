@@ -23,7 +23,7 @@ class epicVAE_nFlow_kDiffusion(Module):
             net = PointwiseNet_kDiffusion(point_dim=args.features, context_dim=args.latent_dim+args.cond_features, residual=args.residual)
         else:
             net = PointwiseNet_kDiffusion_Dropout(point_dim=args.features, context_dim=args.latent_dim+args.cond_features, residual=args.residual, dropout_rate=args.dropout_rate)
-        self.diffusion = Denoiser(net, sigma_data = args.model['sigma_data'])
+        self.diffusion = Denoiser(net, sigma_data = args.model['sigma_data'], device=args.device)
         # self.diffusion = K.config.make_denoiser_wrapper(args.__dict__)(net)
         # self.diffusion = DiffusionPoint(
         #     net = PointwiseNet_kDiffusion(point_dim=args.features, context_dim=args.latent_dim+args.cond_features, residual=args.residual),
@@ -123,19 +123,28 @@ class epicVAE_nFlow_kDiffusion(Module):
 class Denoiser(nn.Module):
     """A Karras et al. preconditioner for denoising diffusion models."""
 
-    def __init__(self, inner_model, sigma_data=1.):
+    def __init__(self, inner_model, sigma_data=1., device='cuda'):
         super().__init__()
         self.inner_model = inner_model
-        self.sigma_data = sigma_data
+        if isinstance(sigma_data, float):
+            sigma_data = [sigma_data, sigma_data, sigma_data, sigma_data]
+            print('HERE')
+        if len(sigma_data) != 4:
+            raise ValueError('sigma_data must be either a float or a list of 4 floats.')
+        # self.sigma_data = sigma_data   # B,
+        self.sigma_data = torch.tensor(sigma_data, device=device)   # 4,
 
-    def get_scalings(self, sigma):
-        c_skip = self.sigma_data ** 2 / (sigma ** 2 + self.sigma_data ** 2)
-        c_out = sigma * self.sigma_data / (sigma ** 2 + self.sigma_data ** 2) ** 0.5
-        c_in = 1 / (sigma ** 2 + self.sigma_data ** 2) ** 0.5
+    def get_scalings(self, sigma):   # B,
+        sigma_data = self.sigma_data.expand(sigma.shape[0], -1)   # B, 4
+        sigma = K.utils.append_dims(sigma, sigma_data.ndim)  # B, 4
+        c_skip = sigma_data ** 2 / (sigma ** 2 + sigma_data ** 2)  # B, 4
+        c_out = sigma * sigma_data / (sigma ** 2 + sigma_data ** 2) ** 0.5  # B, 4
+        c_in = 1 / (sigma ** 2 + sigma_data ** 2) ** 0.5  # B, 4
         return c_skip, c_out, c_in
 
     def loss(self, input, noise, sigma, **kwargs):
-        c_skip, c_out, c_in = [K.utils.append_dims(x, input.ndim) for x in self.get_scalings(sigma)]
+        # c_skip, c_out, c_in = [K.utils.append_dims(x, input.ndim) for x in self.get_scalings(sigma)]   # B,1,1
+        c_skip, c_out, c_in = [x.unsqueeze(1) for x in self.get_scalings(sigma)]   # B,1,4
         noised_input = input + noise * K.utils.append_dims(sigma, input.ndim)
         model_output = self.inner_model(noised_input * c_in, sigma, **kwargs)
         target = (input - c_skip * noised_input) / c_out
