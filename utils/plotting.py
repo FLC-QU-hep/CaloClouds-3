@@ -59,6 +59,13 @@ class Configs():
         # self.cog_ranges = [(-3.99, 3.99), (1861, 1999), (36.01, 43.99)]
         # self.cog_ranges = [(33.99, 39.99), (1861, 1999), (-38.9, -32.9)]
 
+    # xyz featas
+        self.bins_feats = 30  
+        # bin ranges for [X, Z, Y] coordinates, in ILD coordinate system [X', Y', Z']
+        self.feats_ranges = [(-200, 200), (1811, 2011), (-160, 240)]
+        # self.cog_ranges = [(-3.99, 3.99), (1861, 1999), (36.01, 43.99)]
+        # self.cog_ranges = [(33.99, 39.99), (1861, 1999), (-38.9, -32.9)]
+
 
     # all
         #self.color_lines = ['tab:blue', 'tab:orange', 'tab:green', 'tab:red']
@@ -468,6 +475,54 @@ def plt_cog(cog, cog_list, labels, cfg=cfg, title=r'\textbf{full spectrum}'):
     
     plt.tight_layout()
     plt.savefig('cog.pdf', dpi=100)
+    plt.show()
+
+
+def plt_feats(events, events_list: list, labels, cfg=cfg, title=r'\textbf{full spectrum}', scale=None):
+    lables = ["X", "Z", "Y"] # local coordinate system
+    plt.figure(figsize=(21, 7))
+
+    for k, j in enumerate([0, 2, 1]):
+        plt.subplot(1, 3, k+1)
+
+        plt.xlim(cfg.feats_ranges[j])
+        
+        h = plt.hist(np.array(events[:,j,:][events[:,3,:] != 0.0].flatten()), bins=cfg.bins_feats, color='lightgrey', range=cfg.feats_ranges[j], rasterized=True)
+        h = plt.hist(np.array(events[:,j,:][events[:,3,:] != 0.0].flatten()), bins=h[1], color='dimgrey', histtype='step', lw=2)
+        
+        # for legend ##############################################
+        if k == k:
+        #     plt.plot(0, 0, lw=2, color='black', label=labels[0])
+            plt.hist(np.zeros(10), label=labels[0], color='lightgrey', edgecolor='dimgrey', lw=2)
+            for i in range(len(events_list)):
+                plt.plot(0, 0, linestyle='-', lw=3, color=cfg.color_lines[i], label=labels[i+1])
+        ###########################################################
+
+        for i, events_ in enumerate(events_list):
+            h2 = plt.hist(np.array(events_[:,j,:][events_[:,3,:] != 0.0].flatten()), bins=h[1], histtype='step', linestyle='-', lw=3, color=cfg.color_lines[i], range=cfg.feats_ranges[j])
+
+        # for legend ##############################################
+        if k == k:
+            # plt.legend(prop=cfg.font, loc=(0.37, 0.76))
+            plt.legend(prop=cfg.font, loc='best')
+
+        ax = plt.gca()
+        plt.title(title, fontsize=cfg.font.get_size(), loc='right')
+
+        ###########################################################
+
+
+        plt.ylim(1, max(h[0]) + max(h[0])*0.5)
+
+        if scale == 'log':
+            plt.yscale('log')
+
+        plt.xlabel(f'feature {lables[j]}')
+        plt.ylabel('\# points')
+
+    
+    plt.tight_layout()
+    # plt.savefig('cog.pdf', dpi=100)
     plt.show()
 
 

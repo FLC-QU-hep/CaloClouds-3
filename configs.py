@@ -4,7 +4,7 @@ class Configs():
         
     # Experiment Name
         self.name = 'kCaloClouds_'  # options: [TEST_, kCaloClouds_, CaloClouds_]
-        self.Acomment = '"sigma_data = 1'
+        self.Acomment = '"sigma_data = 0.5, dropout=0.05'
         self.comet_project = 'k-CaloClouds'    # project name in comet.ml
         self.log_comet = True
 
@@ -92,7 +92,7 @@ class Configs():
     # EDM diffusion parameters for training
         self.model = {
             # "sigma_data" : [0.08, 0.35, 0.08, 0.5],    ## default parameters for EDM pape = 0.5, might need to adjust for our dataset (meaning the std of our data) / or a seperate sigma for each feature?
-            "sigma_data" : 1.0,
+            "sigma_data" : 0.5,
             # "has_variance" : False,
             # "loss_config" : "karras",
             "sigma_sample_density" : {
@@ -101,7 +101,7 @@ class Configs():
                 "std": 1.2
                 }
             }
-        self.dropout_rate = 0.0       # EDM: approx. 0.1, Caloclouds default: 0.0
+        self.dropout_rate = 0.05       # EDM: approx. 0.1, Caloclouds default: 0.0
 
     # EDM diffusion parameters for sampling
         self.num_steps = 13
