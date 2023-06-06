@@ -128,7 +128,6 @@ class Denoiser(nn.Module):
         self.inner_model = inner_model
         if isinstance(sigma_data, float):
             sigma_data = [sigma_data, sigma_data, sigma_data, sigma_data]
-            print('HERE')
         if len(sigma_data) != 4:
             raise ValueError('sigma_data must be either a float or a list of 4 floats.')
         # self.sigma_data = sigma_data   # B,
@@ -151,7 +150,8 @@ class Denoiser(nn.Module):
         return (model_output - target).pow(2).flatten(1).mean(1)
 
     def forward(self, input, sigma, **kwargs):
-        c_skip, c_out, c_in = [K.utils.append_dims(x, input.ndim) for x in self.get_scalings(sigma)]
+        # c_skip, c_out, c_in = [K.utils.append_dims(x, input.ndim) for x in self.get_scalings(sigma)]
+        c_skip, c_out, c_in = [x.unsqueeze(1) for x in self.get_scalings(sigma)]   # B,1,4
         return self.inner_model(input * c_in, sigma, **kwargs) * c_out + input * c_skip
 
 
