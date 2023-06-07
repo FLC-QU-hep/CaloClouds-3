@@ -457,7 +457,7 @@ def plt_cog(cog, cog_list, labels, cfg=cfg, title=r'\textbf{full spectrum}'):
             h2 = plt.hist(np.array(cog_[j]), bins=h[1], histtype='step', linestyle='-', lw=3, color=cfg.color_lines[i], range=cfg.cog_ranges[j])
 
         # for legend ##############################################
-        if k == k:
+        if k == 2:
             # plt.legend(prop=cfg.font, loc=(0.37, 0.76))
             plt.legend(prop=cfg.font, loc='best')
 
@@ -488,7 +488,7 @@ def plt_feats(events, events_list: list, labels, cfg=cfg, title=r'\textbf{full s
         plt.xlim(cfg.feats_ranges[j])
         
         h = plt.hist(np.array(events[:,j,:][events[:,3,:] != 0.0].flatten()), bins=cfg.bins_feats, color='lightgrey', range=cfg.feats_ranges[j], rasterized=True, density=density)
-        h = plt.hist(np.array(events[:,j,:][events[:,3,:] != 0.0].flatten()), bins=h[1], color='dimgrey', histtype='step', lw=2, density=density)
+        # h = plt.hist(np.array(events[:,j,:][events[:,3,:] != 0.0].flatten()), bins=h[1], color='dimgrey', histtype='step', lw=2, density=density)
         
         # for legend ##############################################
         if k == k:
@@ -502,7 +502,7 @@ def plt_feats(events, events_list: list, labels, cfg=cfg, title=r'\textbf{full s
             h2 = plt.hist(np.array(events_[:,j,:][events_[:,3,:] != 0.0].flatten()), bins=h[1], histtype='step', linestyle='-', lw=3, color=cfg.color_lines[i], range=cfg.feats_ranges[j], density=density)
 
         # for legend ##############################################
-        if k == k:
+        if k == 2:
             # plt.legend(prop=cfg.font, loc=(0.37, 0.76))
             plt.legend(prop=cfg.font, loc='best')
 
