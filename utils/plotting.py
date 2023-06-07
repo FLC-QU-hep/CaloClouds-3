@@ -53,7 +53,7 @@ class Configs():
         # self.ylim_hits = (10, 8*1e5)
 
     #CoG
-        self.bins_cog = 30  
+        self.bins_cog = 50  
         # bin ranges for [X, Z, Y] coordinates, in ILD coordinate system [X', Y', Z']
         self.cog_ranges = [(-3.99+1.5, 3.99+1.5), (1861, 1999), (36.01+1.5, 43.99+1.5)]
         # self.cog_ranges = [(-3.99, 3.99), (1861, 1999), (36.01, 43.99)]
