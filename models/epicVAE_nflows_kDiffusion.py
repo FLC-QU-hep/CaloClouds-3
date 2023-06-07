@@ -100,6 +100,12 @@ class epicVAE_nFlow_kDiffusion(Module):
             x_0 = K.sampling.sample_dpmpp_2m(self.diffusion, x_T, sigmas, extra_args={'context' : z})
         elif config.sampler == 'dpmpp_2s_ancestral':
             x_0 = K.sampling.sample_dpmpp_2s_ancestral(self.diffusion, x_T, sigmas, extra_args={'context' : z})
+        elif config.sampler == 'sample_euler_ancestral':
+            x_0 = K.sampling.sample_euler_ancestral(self.diffusion, x_T, sigmas, extra_args={'context' : z})
+        elif config.sampler == 'sample_lms':
+            x_0 = K.sampling.sample_lms(self.diffusion, x_T, sigmas, extra_args={'context' : z})
+        elif config.sampler == 'sample_dpmpp_2m_sde':
+            x_0 = K.sampling.sample_dpmpp_2m_sde(self.diffusion, x_T, sigmas, extra_args={'context' : z})
         else:
             raise NotImplementedError('Sampler not implemented')
         return x_0
