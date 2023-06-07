@@ -4,13 +4,13 @@ class Configs():
         
     # Experiment Name
         self.name = 'kCaloClouds_'  # options: [TEST_, kCaloClouds_, CaloClouds_]
-        self.Acomment = '"sigma_data = 0.5, dropout=0.05'
+        self.Acomment = 'baseline with latent_dim = 32, max_iter 500k'
         self.comet_project = 'k-CaloClouds'    # project name in comet.ml
         self.log_comet = True
 
     # Model arguments
         self.model_name = 'epicVAE_nFlow_kDiffusion'             # choices=['flow', 'AllCond_epicVAE_nFlow_PointDiff', 'epicVAE_nFlow_kDiffusion]
-        self.latent_dim = 256
+        self.latent_dim = 32     # caloclouds default: 256
         self.beta_1 = 1e-4
         self.beta_T = 0.02
         self.sched_mode = 'quardatic'  # options: ['linear', 'quardatic', 'sigmoid]
@@ -69,9 +69,9 @@ class Configs():
         self.weight_decay = 0
         self.max_grad_norm = 10
         self.end_lr = 1e-4
-        self.sched_start_epoch = 300 * 1e3
-        self.sched_end_epoch = 2 * 1e6
-        self.max_iters = 2 * 1e6
+        self.sched_start_epoch = 100 * 1e3
+        self.sched_end_epoch = 400 * 1e3
+        self.max_iters = 500 * 1e3
 
     # Others
         self.device = 'cuda'
@@ -101,7 +101,7 @@ class Configs():
                 "std": 1.2
                 }
             }
-        self.dropout_rate = 0.05       # EDM: approx. 0.1, Caloclouds default: 0.0
+        self.dropout_rate = 0.0       # EDM: approx. 0.1, Caloclouds default: 0.0
 
     # EDM diffusion parameters for sampling
         self.num_steps = 13
@@ -109,6 +109,7 @@ class Configs():
         self.sigma_min = 0.002  # EDM paper: 0.002, k-diffusion config: 0.01
         self.sigma_max = 80.0
         self.s_churn = 0.0
+        self.s_noise = 1.0
 
 
     
