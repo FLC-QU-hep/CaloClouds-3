@@ -493,7 +493,7 @@ def plt_feats(events, events_list: list, labels, cfg=cfg, title=r'\textbf{full s
         # for legend ##############################################
         if k == k:
         #     plt.plot(0, 0, lw=2, color='black', label=labels[0])
-            plt.hist(np.zeros(10), label=labels[0], color='lightgrey', edgecolor='dimgrey', lw=2, density=density)
+            plt.hist(np.ones(10)*(-300), label=labels[0], color='lightgrey', edgecolor='dimgrey', lw=2, density=density)
             for i in range(len(events_list)):
                 plt.plot(0, 0, linestyle='-', lw=3, color=cfg.color_lines[i], label=labels[i+1])
         ###########################################################
