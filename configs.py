@@ -4,13 +4,13 @@ class Configs():
         
     # Experiment Name
         self.name = 'kCaloClouds_'  # options: [TEST_, kCaloClouds_, CaloClouds_]
-        self.Acomment = 'baseline with latent_dim = 32, max_iter 500k'
+        self.Acomment = 'baseline with latent_dim = 2, max_iter 500k'
         self.comet_project = 'k-CaloClouds'    # project name in comet.ml
         self.log_comet = True
 
     # Model arguments
         self.model_name = 'epicVAE_nFlow_kDiffusion'             # choices=['flow', 'AllCond_epicVAE_nFlow_PointDiff', 'epicVAE_nFlow_kDiffusion]
-        self.latent_dim = 32     # caloclouds default: 256
+        self.latent_dim = 2     # caloclouds default: 256
         self.beta_1 = 1e-4
         self.beta_T = 0.02
         self.sched_mode = 'quardatic'  # options: ['linear', 'quardatic', 'sigmoid]
