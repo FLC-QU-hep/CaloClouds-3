@@ -4,13 +4,13 @@ class Configs():
         
     # Experiment Name
         self.name = 'kCaloClouds_'  # options: [TEST_, kCaloClouds_, CaloClouds_]
-        self.Acomment = 'baseline with latent_dim = 2, max_iter 500k'
+        self.Acomment = 'baseline with latent_dim = 32, max_iter 500k, kld_weight=1e-5'
         self.comet_project = 'k-CaloClouds'    # project name in comet.ml
         self.log_comet = True
 
     # Model arguments
         self.model_name = 'epicVAE_nFlow_kDiffusion'             # choices=['flow', 'AllCond_epicVAE_nFlow_PointDiff', 'epicVAE_nFlow_kDiffusion]
-        self.latent_dim = 2     # caloclouds default: 256
+        self.latent_dim = 32     # caloclouds default: 256
         self.beta_1 = 1e-4
         self.beta_T = 0.02
         self.sched_mode = 'quardatic'  # options: ['linear', 'quardatic', 'sigmoid]
@@ -21,7 +21,7 @@ class Configs():
         self.num_samples = 4
         self.features = 4
         self.sample_num_points = 2048
-        self.kl_weight = 0.001
+        self.kl_weight = 1e-5   # default: 0.001 = 1e-3
         self.residual = False            # choices=[True, False]   # !! for CaloClouds was True, but for EDM False might be better (?)
         
         self.cond_features = 2       # number of conditioning features (i.e. energy+points=2)
