@@ -116,6 +116,6 @@ class Configs():
         self.model_path = 'kCaloClouds_2023_05_24__14_54_09/ckpt_0.000000_500000.pt'
         self.start_ema = 0.95
         self.start_scale = 40
-        self.ema_rate = 0.999943
+        # self.ema_rate = 0.999943
 
     
