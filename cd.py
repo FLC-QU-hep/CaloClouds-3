@@ -132,8 +132,7 @@ def main():
         # noise = torch.randn_like(x)    # noise for forward diffusion
         # sigma = sample_density([x.shape[0]], device=x.device)  # time steps
 
-        loss = model.get_cd_loss(model_teacher, x, cond_feats, kl_weight=cfg.kl_weight, writer=experiment, it=it, kld_min=cfg.kld_min)
-
+        loss = model.get_cd_loss(x, cond_feats, model_teacher)
 
         # Backward and optimize
         loss.backward()
@@ -148,6 +147,7 @@ def main():
         ## TODO also add EMA model of online model with lower decay rate, i.e. 0.9999 
         # (might perfrom better than target model or last online model for sampling?)
 
+        # Logging
         if it % cfg.log_iter == 0:
             print('[Train] Iter %04d | Loss %.6f | Grad %.4f | KLWeight %.4f' % (
                 it, loss.item(), orig_grad_norm, cfg.kl_weight

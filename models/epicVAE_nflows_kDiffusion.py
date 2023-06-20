@@ -68,15 +68,15 @@ class epicVAE_nFlow_kDiffusion(Module):
         loss = kl_weight*(loss_kld_clamped) + loss_diffusion
         # print(loss_kld_clamped.item(), loss_recons.item())
 
-        if writer is not None:
-            # writer.log_metric('train/loss_e', loss_entropy, it)
-            writer.log_metric('train/loss_kld', loss_kld, it)
-            writer.log_metric('train/loss_kld_clamped', loss_kld_clamped, it)
-            writer.log_metric('train/loss_prior', loss_prior, it)
-            writer.log_metric('train/loss_diffusion', loss_diffusion, it)
-            writer.log_metric('train/z_mean', z_mu.mean(), it)
-            writer.log_metric('train/z_mag', z_mu.abs().max(), it)
-            writer.log_metric('train/z_var', (0.5*z_sigma).exp().mean(), it)
+        # if writer is not None:
+        #     # writer.log_metric('train/loss_e', loss_entropy, it)
+        #     writer.log_metric('train/loss_kld', loss_kld, it)
+        #     writer.log_metric('train/loss_kld_clamped', loss_kld_clamped, it)
+        #     writer.log_metric('train/loss_prior', loss_prior, it)
+        #     writer.log_metric('train/loss_diffusion', loss_diffusion, it)
+        #     writer.log_metric('train/z_mean', z_mu.mean(), it)
+        #     writer.log_metric('train/z_mag', z_mu.abs().max(), it)
+        #     writer.log_metric('train/z_var', (0.5*z_sigma).exp().mean(), it)
 
         return loss, loss_prior
 
@@ -122,6 +122,19 @@ class epicVAE_nFlow_kDiffusion(Module):
     #     z = torch.cat([z, cond_feats], -1)   # B,F+C
     #     samples = self.diffusion.sample(num_points, context=z, flexibility=flexibility)
     #     return samples
+
+
+    def get_loss(self, x, cond_feats, model_teacher):
+        """
+        Args:
+            x:  Input point clouds, (B, N, d).
+            sigma: Time (B, ).
+            model_teacher: teacher model as score function for ODE solver
+        """
+
+        loss = None
+
+        return loss
     
 
 
