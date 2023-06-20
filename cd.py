@@ -140,7 +140,7 @@ def main():
         orig_grad_norm = clip_grad_norm_(model.parameters(), cfg.max_grad_norm)
         optimizer.step()
 
-        # Update EMA traget model
+        # Update EMA target model  (necessary for CD, not the same as an EMA decay of the online model itself)
         mu = cfg.start_ema
         for targ, src in zip(model_ema_target.diffusion.parameters(), model.diffusion.parameters()):
             targ.detach().mul_(mu).add_(src, alpha=1 - mu)
