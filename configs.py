@@ -3,14 +3,14 @@ class Configs():
     def __init__(self):
         
     # Experiment Name
-        self.name = 'kCaloClouds_'  # options: [TEST_, kCaloClouds_, CaloClouds_]
-        self.Acomment = 'baseline with latent_dim = 32, max_iter 500k, kld_weight=1e-6'
-        self.comet_project = 'k-CaloClouds'    # project name in comet.ml
-        self.log_comet = True
+        self.name = 'TEST_'  # options: [TEST_, kCaloClouds_, CaloClouds_, CD_]
+        self.Acomment = 'CD baseline with lat_dim = 256, max_iter 500k, lr=1e-5 fixed'
+        self.comet_project = 'k-CaloClouds'
+        self.log_comet = False
 
     # Model arguments
         self.model_name = 'epicVAE_nFlow_kDiffusion'             # choices=['flow', 'AllCond_epicVAE_nFlow_PointDiff', 'epicVAE_nFlow_kDiffusion]
-        self.latent_dim = 32     # caloclouds default: 256
+        self.latent_dim = 256     # caloclouds default: 256
         self.beta_1 = 1e-4
         self.beta_T = 0.02
         self.sched_mode = 'quardatic'  # options: ['linear', 'quardatic', 'sigmoid]
@@ -21,7 +21,7 @@ class Configs():
         self.num_samples = 4
         self.features = 4
         self.sample_num_points = 2048
-        self.kl_weight = 1e-6   # default: 0.001 = 1e-3
+        self.kl_weight = 1e-3   # default: 0.001 = 1e-3
         self.residual = False            # choices=[True, False]   # !! for CaloClouds was True, but for EDM False might be better (?)
         
         self.cond_features = 2       # number of conditioning features (i.e. energy+points=2)
@@ -65,7 +65,7 @@ class Configs():
 
     # Optimizer and scheduler
         self.optimizer = 'RAdam'         # choices=['Adam', 'RAdam']
-        self.lr = 2e-3              # Caloclouds default: 2e-3
+        self.lr = 1e-5              # Caloclouds default: 2e-3
         self.weight_decay = 0
         self.max_grad_norm = 10
         self.end_lr = 1e-4
@@ -104,12 +104,18 @@ class Configs():
         self.dropout_rate = 0.0       # EDM: approx. 0.1, Caloclouds default: 0.0
 
     # EDM diffusion parameters for sampling
-        self.num_steps = 13
+        self.num_steps = 18
         self.sampler = 'heun'
         self.sigma_min = 0.002  # EDM paper: 0.002, k-diffusion config: 0.01
         self.sigma_max = 80.0
         self.s_churn = 0.0
         self.s_noise = 1.0
 
+
+    # Consistency Distillation parameters
+        self.model_path = 'kCaloClouds_2023_05_24__14_54_09/ckpt_0.000000_500000.pt'
+        self.start_ema = 0.95
+        self.start_scale = 40
+        self.ema_rate = 0.999943
 
     
