@@ -145,6 +145,9 @@ def main():
         for targ, src in zip(model_ema_target.diffusion.parameters(), model.diffusion.parameters()):
             targ.detach().mul_(mu).add_(src, alpha=1 - mu)
 
+        ## TODO also add EMA model of online model with lower decay rate, i.e. 0.9999 
+        # (might perfrom better than target model or last online model for sampling?)
+
         if it % cfg.log_iter == 0:
             print('[Train] Iter %04d | Loss %.6f | Grad %.4f | KLWeight %.4f' % (
                 it, loss.item(), orig_grad_norm, cfg.kl_weight
