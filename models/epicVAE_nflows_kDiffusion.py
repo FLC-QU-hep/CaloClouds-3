@@ -127,13 +127,13 @@ class epicVAE_nFlow_kDiffusion(Module):
     #     return samples
 
 
-    def get_cd_loss(self, x, cond_feats, model_teacher, model_ema_target, cfg):
+    def get_cd_loss(self, x, cond_feats, model_teacher, model_target, cfg):
         """
         Args:
             x:  Input point clouds, (B, N, d).
             cond_feats: conditional features, (B, C)
             model_teacher: teacher model as score function for ODE solver
-            model_ema_target: target model 
+            model_ema_target: target model
             cfg: config
         """
 
@@ -143,7 +143,7 @@ class epicVAE_nFlow_kDiffusion(Module):
             z = reparameterize_gaussian(mean=z_mu, logvar=z_sigma)  # (B, F)
             z = torch.cat([z, cond_feats], -1)   # B,F+C
 
-        loss = self.loss(x, z, model_teacher, model_ema_target, cfg).mean()    # diffusion loss
+        loss = self.consistency_loss(x, model_teacher.diffusion, model_target.diffusion, cfg, context=z).mean()    # diffusion loss
 
         return loss
     
@@ -195,10 +195,51 @@ class Denoiser(nn.Module):
         target = (input - c_skip * noised_input) / c_out
         return (model_output - target).pow(2).flatten(1).mean(1)
 
-    def forward(self, input, sigma, **kwargs):
+    def forward(self, input, sigma, **kwargs):   # same as "denoise" in KarrasDenoiser of CM code
         # c_skip, c_out, c_in = [K.utils.append_dims(x, input.ndim) for x in self.get_scalings(sigma)]
-        c_skip, c_out, c_in = [x.unsqueeze(1) for x in self.get_scalings(sigma)]   # B,1,4
+        if not self.distillation:
+            c_skip, c_out, c_in = [x.unsqueeze(1) for x in self.get_scalings(sigma)]   # B,1,4
+        else:
+            c_skip, c_out, c_in = [x.unsqueeze(1) for x in self.get_scalings_for_boundary_condition(sigma)]
+        # CM code did an additional resacling of the time sigma for the time conditing
         return self.inner_model(input * c_in, sigma, **kwargs) * c_out + input * c_skip
+    
+    def consistency_loss(self, input, model_teacher, model_target, cfg, **kwargs):
+
+        noise = torch.randn_like(input)
+
+        def denoise_fn(x, t):
+            return self(input, sigma, **kwargs)
+        
+        @torch.no_grad()
+        def target_denoise_fn(x, t):
+            return model_target(input, sigma, **kwargs)
+
+        @torch.no_grad()
+        def teacher_denoise_fn(x, t):
+            return model_teacher(input, sigma, **kwargs)
+
+
+        @torch.no_grad()
+        def heun_solver(samples, t, next_t, x0):
+            x = samples
+            denoiser = teacher_denoise_fn(x, t)
+
+            d = (x - denoiser) / append_dims(t, dims)
+            samples = x + d * append_dims(next_t - t, dims)
+            if teacher_model is None:
+                denoiser = x0
+            else:
+                denoiser = teacher_denoise_fn(samples, next_t)
+
+            next_d = (samples - denoiser) / append_dims(next_t, dims)
+            samples = x + (d + next_d) * append_dims((next_t - t) / 2, dims)
+
+            return samples
+
+
+        return loss
+
 
 
 
