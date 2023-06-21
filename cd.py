@@ -62,9 +62,9 @@ def main():
     )
 
     # Model
-    model = epicVAE_nFlow_kDiffusion(cfg).to(cfg.device)
-    model_teacher = epicVAE_nFlow_kDiffusion(cfg).to(cfg.device)
-    model_ema_target = epicVAE_nFlow_kDiffusion(cfg).to(cfg.device)
+    model = epicVAE_nFlow_kDiffusion(cfg, distillation = True).to(cfg.device)
+    model_ema_target = epicVAE_nFlow_kDiffusion(cfg, distillation = True).to(cfg.device)
+    model_teacher = epicVAE_nFlow_kDiffusion(cfg, distillation = False).to(cfg.device)
 
     # load model
     checkpoint = torch.load(cfg.logdir + '/' + cfg.model_path)    # EDM BASELINE first training
@@ -74,8 +74,10 @@ def main():
     print('Model loaded from: ', cfg.logdir + '/' + cfg.model_path)
 
     # set model status
-    model.requires_grad_(True)  # student ("online") model which is actually trained
-    model.train()
+    model.diffusion.requires_grad_(True)  # student ("online") model which is actually trained
+    model.encoder.requires_grad_(False)   # encoder is not trained
+    model.diffusion.train()
+    model.encoder.eval()
     model_ema_target.requires_grad_(False) # target model for sampling from consistency model, updated as EMA of student model
     model_ema_target.train() # traget model needs to be in same state as online model, but does not require gradients
     model_teacher.requires_grad_(False) # teacher model used as score function in ODE solver
@@ -120,8 +122,9 @@ def main():
         x = batch['event'][0].float().to(cfg.device) # B, N, 4
         e = batch['energy'][0].float().to(cfg.device) # B, 1
         n = batch['points'][0].float().to(cfg.device) # B, 1
-        # Reset grad and model state
+        # Reset grad
         optimizer.zero_grad()
+        model.zero_grad()
 
         # get condition features
         if cfg.norm_cond:
@@ -132,7 +135,7 @@ def main():
         # noise = torch.randn_like(x)    # noise for forward diffusion
         # sigma = sample_density([x.shape[0]], device=x.device)  # time steps
 
-        loss = model.get_cd_loss(x, cond_feats, model_teacher)
+        loss = model.get_cd_loss(x, cond_feats, model_teacher, model_ema_target, cfg)
 
         # Backward and optimize
         loss.backward()
@@ -140,6 +143,7 @@ def main():
         optimizer.step()
 
         # Update EMA target model  (necessary for CD, not the same as an EMA decay of the online model itself)
+        # update only diffusion parameters
         mu = cfg.start_ema
         for targ, src in zip(model_ema_target.diffusion.parameters(), model.diffusion.parameters()):
             targ.detach().mul_(mu).add_(src, alpha=1 - mu)

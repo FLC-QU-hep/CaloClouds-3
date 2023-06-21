@@ -13,7 +13,7 @@ import k_diffusion as K
 
 class epicVAE_nFlow_kDiffusion(Module):
 
-    def __init__(self, args):
+    def __init__(self, args, distillation = False):
         super().__init__()
         self.args = args
         self.encoder = EPiC_encoder_cond(args.latent_dim, input_dim=args.features, cond_features=args.cond_features)
@@ -23,7 +23,10 @@ class epicVAE_nFlow_kDiffusion(Module):
             net = PointwiseNet_kDiffusion(point_dim=args.features, context_dim=args.latent_dim+args.cond_features, residual=args.residual)
         else:
             net = PointwiseNet_kDiffusion_Dropout(point_dim=args.features, context_dim=args.latent_dim+args.cond_features, residual=args.residual, dropout_rate=args.dropout_rate)
-        self.diffusion = Denoiser(net, sigma_data = args.model['sigma_data'], device=args.device)
+        if not distillation:
+            self.diffusion = Denoiser(net, sigma_data = args.model['sigma_data'], device=args.device)
+        else:
+            self.diffusion = Denoiser(net, sigma_data = args.model['sigma_data'], device=args.device, distillation=True)
         # self.diffusion = K.config.make_denoiser_wrapper(args.__dict__)(net)
         # self.diffusion = DiffusionPoint(
         #     net = PointwiseNet_kDiffusion(point_dim=args.features, context_dim=args.latent_dim+args.cond_features, residual=args.residual),
@@ -124,15 +127,23 @@ class epicVAE_nFlow_kDiffusion(Module):
     #     return samples
 
 
-    def get_loss(self, x, cond_feats, model_teacher):
+    def get_cd_loss(self, x, cond_feats, model_teacher, model_ema_target, cfg):
         """
         Args:
             x:  Input point clouds, (B, N, d).
-            sigma: Time (B, ).
+            cond_feats: conditional features, (B, C)
             model_teacher: teacher model as score function for ODE solver
+            model_ema_target: target model 
+            cfg: config
         """
 
-        loss = None
+        # get latent code from encoder
+        with torch.no_grad():
+            z_mu, z_sigma = self.encoder(x, cond_feats)
+            z = reparameterize_gaussian(mean=z_mu, logvar=z_sigma)  # (B, F)
+            z = torch.cat([z, cond_feats], -1)   # B,F+C
+
+        loss = self.loss(x, z, model_teacher, model_ema_target, cfg).mean()    # diffusion loss
 
         return loss
     
@@ -142,7 +153,7 @@ class epicVAE_nFlow_kDiffusion(Module):
 class Denoiser(nn.Module):
     """A Karras et al. preconditioner for denoising diffusion models."""
 
-    def __init__(self, inner_model, sigma_data=1., device='cuda'):
+    def __init__(self, inner_model, sigma_data=1., device='cuda', distillation = False):
         super().__init__()
         self.inner_model = inner_model
         if isinstance(sigma_data, float):
@@ -151,6 +162,7 @@ class Denoiser(nn.Module):
             raise ValueError('sigma_data must be either a float or a list of 4 floats.')
         # self.sigma_data = sigma_data   # B,
         self.sigma_data = torch.tensor(sigma_data, device=device)   # 4,
+        self.distillation = distillation
 
     def get_scalings(self, sigma):   # B,
         sigma_data = self.sigma_data.expand(sigma.shape[0], -1)   # B, 4
