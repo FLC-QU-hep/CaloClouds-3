@@ -91,7 +91,7 @@ class epicVAE_nFlow_kDiffusion(Module):
         z = self.flow.sample(context=cond_feats, num_samples=1).view(batch_size, -1)  # B,F
         z = torch.cat([z, cond_feats], -1)   # B, F+C
 
-        sigmas = K.sampling.get_sigmas_karras(config.num_steps, config.sigma_min, config.sigma_max, rho=7., device=z.device)
+        sigmas = K.sampling.get_sigmas_karras(config.num_steps, config.sigma_min, config.sigma_max, rho=config.rho, device=z.device)
 
         x_T = torch.randn([z.size(0), num_points, config.features], device=z.device) * config.sigma_max
 
@@ -127,14 +127,14 @@ class epicVAE_nFlow_kDiffusion(Module):
     #     return samples
 
 
-    def get_cd_loss(self, x, cond_feats, model_teacher, model_target, cfg):
+    def get_cd_loss(self, x, cond_feats, model_teacher, model_target, config):
         """
         Args:
             x:  Input point clouds, (B, N, d).
             cond_feats: conditional features, (B, C)
             model_teacher: teacher model as score function for ODE solver
             model_ema_target: target model
-            cfg: config
+            config: config
         """
 
         # get latent code from encoder
@@ -143,7 +143,7 @@ class epicVAE_nFlow_kDiffusion(Module):
             z = reparameterize_gaussian(mean=z_mu, logvar=z_sigma)  # (B, F)
             z = torch.cat([z, cond_feats], -1)   # B,F+C
 
-        loss = self.consistency_loss(x, model_teacher.diffusion, model_target.diffusion, cfg, context=z).mean()    # diffusion loss
+        loss = self.consistency_loss(x, model_teacher.diffusion, model_target.diffusion, config, context=z).mean()    # consistency loss
 
         return loss
     
@@ -204,20 +204,24 @@ class Denoiser(nn.Module):
         # CM code did an additional resacling of the time sigma for the time conditing
         return self.inner_model(input * c_in, sigma, **kwargs) * c_out + input * c_skip
     
-    def consistency_loss(self, input, model_teacher, model_target, cfg, **kwargs):
+    # inspired by https://github.com/openai/consistency_models/blob/main/cm/karras_diffusion.py#L106
+    def consistency_loss(self, input, teacher_model, target_model, config, **kwargs):
 
         noise = torch.randn_like(input)
+        dims = input.ndim
+        num_scales = config.num_steps
 
-        def denoise_fn(x, t):
-            return self(input, sigma, **kwargs)
+
+        def denoise_fn(x, t):   # t = sigma
+            return self(input, t, **kwargs)
         
         @torch.no_grad()
         def target_denoise_fn(x, t):
-            return model_target(input, sigma, **kwargs)
+            return target_model(input, t, **kwargs)
 
         @torch.no_grad()
         def teacher_denoise_fn(x, t):
-            return model_teacher(input, sigma, **kwargs)
+            return teacher_model(input, t, **kwargs)
 
 
         @torch.no_grad()
@@ -225,18 +229,66 @@ class Denoiser(nn.Module):
             x = samples
             denoiser = teacher_denoise_fn(x, t)
 
-            d = (x - denoiser) / append_dims(t, dims)
-            samples = x + d * append_dims(next_t - t, dims)
+            d = (x - denoiser) / K.utils.append_dims(t, dims)
+            samples = x + d * K.utils.append_dims(next_t - t, dims)
             if teacher_model is None:
                 denoiser = x0
             else:
                 denoiser = teacher_denoise_fn(samples, next_t)
 
-            next_d = (samples - denoiser) / append_dims(next_t, dims)
-            samples = x + (d + next_d) * append_dims((next_t - t) / 2, dims)
+            next_d = (samples - denoiser) / K.utils.append_dims(next_t, dims)
+            samples = x + (d + next_d) * K.utils.append_dims((next_t - t) / 2, dims)
 
             return samples
 
+        @torch.no_grad()
+        def euler_solver(samples, t, next_t, x0):
+            x = samples
+            if teacher_model is None:
+                denoiser = x0
+            else:
+                denoiser = teacher_denoise_fn(x, t)
+            d = (x - denoiser) / K.utils.append_dims(t, dims)
+            samples = x + d * K.utils.append_dims(next_t - t, dims)
+
+            return samples
+
+
+        # Calculate sigmas / EDM boundaries    same as K.utils.get_sigmas_karras()
+        indices = torch.randint(
+            0, num_scales - 1, (input.shape[0],), device=input.device
+        )
+
+        t = config.sigma_max ** (1 / config.rho) + indices / (num_scales - 1) * (
+            config.sigma_min ** (1 / config.rho) - config.sigma_max ** (1 / config.rho)
+        )
+        t = t**self.rho
+
+        # t+1
+        t2 = config.sigma_max ** (1 / config.rho) + (indices + 1) / (num_scales - 1) * (
+            config.sigma_min ** (1 / config.rho) - config.sigma_max ** (1 / config.rho)
+        )
+        t2 = t2**self.rho
+
+        x_t = input + noise * K.utils.append_dims(t, dims)
+
+        dropout_state = torch.get_rng_state()   # get state of the random number generator
+        distiller = denoise_fn(x_t, t)
+
+        if teacher_model is None:
+            x_t2 = euler_solver(x_t, t, t2, input).detach()
+        else:
+            x_t2 = heun_solver(x_t, t, t2, input).detach()
+
+        torch.set_rng_state(dropout_state)
+        distiller_target = target_denoise_fn(x_t2, t2)
+        distiller_target = distiller_target.detach()
+
+        weights = 1.    # uniform weighting
+
+        # l2 loss
+        diffs = (distiller - distiller_target) ** 2
+        loss = mean_flat(diffs) * weights
 
         return loss
 

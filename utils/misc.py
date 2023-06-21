@@ -273,3 +273,10 @@ class SubnetFactory:
             last_features = self.hidden_features
         layers.append(nn.Linear(last_features, num_features_out))
         return self.CatCall(nn.Sequential(*layers))
+    
+
+def mean_flat(tensor):
+    """
+    Take the mean over all non-batch dimensions.
+    """
+    return tensor.mean(dim=list(range(1, len(tensor.shape))))

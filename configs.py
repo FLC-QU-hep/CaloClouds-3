@@ -104,10 +104,11 @@ class Configs():
         self.dropout_rate = 0.0       # EDM: approx. 0.1, Caloclouds default: 0.0
 
     # EDM diffusion parameters for sampling
-        self.num_steps = 18
+        self.num_steps = 18     # used also for CM distillation
         self.sampler = 'heun'
         self.sigma_min = 0.002  # EDM paper: 0.002, k-diffusion config: 0.01
         self.sigma_max = 80.0
+        self.rho = 7.0    # exponent in EDM boundaries
         self.s_churn = 0.0
         self.s_noise = 1.0
 
