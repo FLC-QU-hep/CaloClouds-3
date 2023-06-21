@@ -103,8 +103,8 @@ class Configs():
             }
         self.dropout_rate = 0.0       # EDM: approx. 0.1, Caloclouds default: 0.0
 
-    # EDM diffusion parameters for sampling
-        self.num_steps = 18     # used also for CM distillation
+    # EDM diffusion parameters for sampling    / also used in CM distillation
+        self.num_steps = 18
         self.sampler = 'heun'
         self.sigma_min = 0.002  # EDM paper: 0.002, k-diffusion config: 0.01
         self.sigma_max = 80.0
@@ -116,7 +116,6 @@ class Configs():
     # Consistency Distillation parameters
         self.model_path = 'kCaloClouds_2023_05_24__14_54_09/ckpt_0.000000_500000.pt'
         self.start_ema = 0.95
-        self.start_scale = 40
-        # self.ema_rate = 0.999943
+        # self.ema_rate = 0.999943    # decay rate of separately saved EMA model (not implemented yet)
 
     

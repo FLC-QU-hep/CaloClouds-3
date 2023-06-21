@@ -104,16 +104,6 @@ def main():
     print('optimizer used: ', cfg.optimizer, 'only diffusion parameters are optimized')
     print('no learning rate scheduler implemented')
 
-    # get time step boundaries
-    sigmas = K.sampling.get_sigmas_karras(cfg.num_steps, cfg.sigma_min, cfg.sigma_max, rho=7., device=cfg.device)
-
-    print('sigmas: ', sigmas)
-    print('len sigmas ', len(sigmas))
-
-
-
-
-
 
     # Train
     def train(batch, it):
@@ -162,12 +152,6 @@ def main():
                 experiment.log_metric('train/grad_norm', orig_grad_norm, it)
 
 
-
-
-
-
-
-
     ## training loop
     # Main loop
     print('Start training...')
@@ -186,12 +170,7 @@ def main():
                 }
                 ckpt_mgr.save(model, cfg, 0, others=opt_states, step=it)
 
-
-            breakpoint()
-
     print('training done in %.2f seconds' % (time.time() - start_time))
-
-
 
 
 

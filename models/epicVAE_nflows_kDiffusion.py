@@ -143,7 +143,7 @@ class epicVAE_nFlow_kDiffusion(Module):
             z = reparameterize_gaussian(mean=z_mu, logvar=z_sigma)  # (B, F)
             z = torch.cat([z, cond_feats], -1)   # B,F+C
 
-        loss = self.consistency_loss(x, model_teacher.diffusion, model_target.diffusion, config, context=z).mean()    # consistency loss
+        loss = self.diffusion.consistency_loss(x, model_teacher.diffusion, model_target.diffusion, config, context=z).mean()    # consistency loss
 
         return loss
     
@@ -153,7 +153,7 @@ class epicVAE_nFlow_kDiffusion(Module):
 class Denoiser(nn.Module):
     """A Karras et al. preconditioner for denoising diffusion models."""
 
-    def __init__(self, inner_model, sigma_data=1., device='cuda', distillation = False, sigma_min = 0.002):
+    def __init__(self, inner_model, sigma_data=0.5, device='cuda', distillation = False, sigma_min = 0.002):
         super().__init__()
         self.inner_model = inner_model
         if isinstance(sigma_data, float):
@@ -262,13 +262,13 @@ class Denoiser(nn.Module):
         t = config.sigma_max ** (1 / config.rho) + indices / (num_scales - 1) * (
             config.sigma_min ** (1 / config.rho) - config.sigma_max ** (1 / config.rho)
         )
-        t = t**self.rho
+        t = t**config.rho
 
         # t+1
         t2 = config.sigma_max ** (1 / config.rho) + (indices + 1) / (num_scales - 1) * (
             config.sigma_min ** (1 / config.rho) - config.sigma_max ** (1 / config.rho)
         )
-        t2 = t2**self.rho
+        t2 = t2**config.rho
 
         x_t = input + noise * K.utils.append_dims(t, dims)
 
