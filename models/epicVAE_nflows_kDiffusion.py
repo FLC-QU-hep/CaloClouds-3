@@ -254,39 +254,40 @@ class Denoiser(nn.Module):
             return samples
 
 
-        # Calculate sigmas / EDM boundaries    same as K.utils.get_sigmas_karras()
+        # Get random sigmas / EDM boundaries    same as K.utils.get_sigmas_karras()   with t and t+1
         indices = torch.randint(
             0, num_scales - 1, (input.shape[0],), device=input.device
         )
 
+        # in paper: t + 1
         t = config.sigma_max ** (1 / config.rho) + indices / (num_scales - 1) * (
             config.sigma_min ** (1 / config.rho) - config.sigma_max ** (1 / config.rho)
         )
         t = t**config.rho
 
-        # t+1
+        # in paper: t    --> so t > t2
         t2 = config.sigma_max ** (1 / config.rho) + (indices + 1) / (num_scales - 1) * (
             config.sigma_min ** (1 / config.rho) - config.sigma_max ** (1 / config.rho)
         )
         t2 = t2**config.rho
 
-        x_t = input + noise * K.utils.append_dims(t, dims)
+        x_t = input + noise * K.utils.append_dims(t, dims)   # calculate x_t at time step t+1 from data
 
         dropout_state = torch.get_rng_state()   # get state of the random number generator
-        distiller = denoise_fn(x_t, t)
+        distiller = denoise_fn(x_t, t)     # denoise x_t completely x_t (t + 1) --> x_0 = input
 
         if teacher_model is None:
-            x_t2 = euler_solver(x_t, t, t2, input).detach()
+            x_t2 = euler_solver(x_t, t, t2, input).detach()    # for consistency training, not used
         else:
-            x_t2 = heun_solver(x_t, t, t2, input).detach()
+            x_t2 = heun_solver(x_t, t, t2, input).detach()     # for consistency distllation, one solver step to get from t+1 to t
 
         torch.set_rng_state(dropout_state)
-        distiller_target = target_denoise_fn(x_t2, t2)
+        distiller_target = target_denoise_fn(x_t2, t2)   # target model (ema, not trained) denoises data completely from time t to t=0 / x_0 / input
         distiller_target = distiller_target.detach()
 
-        weights = 1.    # uniform weighting
+        weights = 1.    # paper: uniform weights work well in their experiments
 
-        # l2 loss
+        # l2 loss / MSE loss
         diffs = (distiller - distiller_target) ** 2
         loss = mean_flat(diffs) * weights
 
