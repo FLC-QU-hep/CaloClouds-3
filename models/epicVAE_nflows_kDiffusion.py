@@ -26,7 +26,7 @@ class epicVAE_nFlow_kDiffusion(Module):
         if not distillation:
             self.diffusion = Denoiser(net, sigma_data = args.model['sigma_data'], device=args.device)
         else:
-            self.diffusion = Denoiser(net, sigma_data = args.model['sigma_data'], device=args.device, distillation=True)
+            self.diffusion = Denoiser(net, sigma_data = args.model['sigma_data'], device=args.device, distillation=True, sigma_min=args.sigma_min)
         # self.diffusion = K.config.make_denoiser_wrapper(args.__dict__)(net)
         # self.diffusion = DiffusionPoint(
         #     net = PointwiseNet_kDiffusion(point_dim=args.features, context_dim=args.latent_dim+args.cond_features, residual=args.residual),
@@ -153,7 +153,7 @@ class epicVAE_nFlow_kDiffusion(Module):
 class Denoiser(nn.Module):
     """A Karras et al. preconditioner for denoising diffusion models."""
 
-    def __init__(self, inner_model, sigma_data=1., device='cuda', distillation = False):
+    def __init__(self, inner_model, sigma_data=1., device='cuda', distillation = False, sigma_min = 0.002):
         super().__init__()
         self.inner_model = inner_model
         if isinstance(sigma_data, float):
@@ -163,12 +163,27 @@ class Denoiser(nn.Module):
         # self.sigma_data = sigma_data   # B,
         self.sigma_data = torch.tensor(sigma_data, device=device)   # 4,
         self.distillation = distillation
+        self.sigma_min = sigma_min
 
     def get_scalings(self, sigma):   # B,
         sigma_data = self.sigma_data.expand(sigma.shape[0], -1)   # B, 4
         sigma = K.utils.append_dims(sigma, sigma_data.ndim)  # B, 4
         c_skip = sigma_data ** 2 / (sigma ** 2 + sigma_data ** 2)  # B, 4
         c_out = sigma * sigma_data / (sigma ** 2 + sigma_data ** 2) ** 0.5  # B, 4
+        c_in = 1 / (sigma ** 2 + sigma_data ** 2) ** 0.5  # B, 4
+        return c_skip, c_out, c_in
+    
+    def get_scalings_for_boundary_condition(self, sigma):   # B,   # for consistency model
+        sigma_data = self.sigma_data.expand(sigma.shape[0], -1)   # B, 4
+        sigma = K.utils.append_dims(sigma, sigma_data.ndim)  # B, 4
+        c_skip = sigma_data**2 / (
+            (sigma - self.sigma_min) ** 2 + sigma_data**2
+        )   # B, 4
+        c_out = (
+            (sigma - self.sigma_min)
+            * sigma_data
+            / (sigma**2 + sigma_data**2) ** 0.5
+        )   # B, 4
         c_in = 1 / (sigma ** 2 + sigma_data ** 2) ** 0.5  # B, 4
         return c_skip, c_out, c_in
 
