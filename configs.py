@@ -3,10 +3,10 @@ class Configs():
     def __init__(self):
         
     # Experiment Name
-        self.name = 'TEST_'  # options: [TEST_, kCaloClouds_, CaloClouds_, CD_]
-        self.Acomment = 'CD baseline with lat_dim = 256, max_iter 500k, lr=1e-5 fixed'
+        self.name = 'CD_'  # options: [TEST_, kCaloClouds_, CaloClouds_, CD_]
+        self.Acomment = 'CD baseline with lat_dim = 256, max_iter 1M, lr=1e-5 fixed, num_steps=18, bs=256'
         self.comet_project = 'k-CaloClouds'
-        self.log_comet = False
+        self.log_comet = True
 
     # Model arguments
         self.model_name = 'epicVAE_nFlow_kDiffusion'             # choices=['flow', 'AllCond_epicVAE_nFlow_PointDiff', 'epicVAE_nFlow_kDiffusion]
@@ -57,7 +57,7 @@ class Configs():
 
     # Dtataloader
         self.workers = 32
-        self.train_bs = 128
+        self.train_bs = 256
         self.pin_memory = False         # choices=[True, False]
         self.shuffle = True             # choices=[True, False]
         self.max_points = 6_000
@@ -71,7 +71,7 @@ class Configs():
         self.end_lr = 1e-4
         self.sched_start_epoch = 100 * 1e3
         self.sched_end_epoch = 400 * 1e3
-        self.max_iters = 500 * 1e3
+        self.max_iters = 1000 * 1e3
 
     # Others
         self.device = 'cuda'

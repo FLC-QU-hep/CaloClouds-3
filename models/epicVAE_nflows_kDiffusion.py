@@ -232,7 +232,7 @@ class Denoiser(nn.Module):
             d = (x - denoiser) / K.utils.append_dims(t, dims)
             samples = x + d * K.utils.append_dims(next_t - t, dims)
             if teacher_model is None:
-                denoiser = x0
+                denoiser = x0     # but this would not be the correct Heun method any more? anyway, without teacher model it's using Euler
             else:
                 denoiser = teacher_denoise_fn(samples, next_t)
 
