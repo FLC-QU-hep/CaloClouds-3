@@ -66,10 +66,10 @@ def main():
     model_teacher = epicVAE_nFlow_kDiffusion(cfg, distillation = False).to(cfg.device)
 
     # load model
-    checkpoint = torch.load(cfg.logdir + '/' + cfg.model_path)    # EDM BASELINE first training
+    checkpoint = torch.load(cfg.logdir + '/' + cfg.model_path)
     model.load_state_dict(checkpoint['others']['model_ema'])
-    model_teacher.load_state_dict(checkpoint['others']['model_ema'])
     model_ema_target.load_state_dict(checkpoint['others']['model_ema'])
+    model_teacher.load_state_dict(checkpoint['others']['model_ema'])
     print('Model loaded from: ', cfg.logdir + '/' + cfg.model_path)
 
     # set model status

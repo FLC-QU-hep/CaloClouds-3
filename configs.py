@@ -3,10 +3,10 @@ class Configs():
     def __init__(self):
         
     # Experiment Name
-        self.name = 'TEST_'  # options: [TEST_, kCaloClouds_, CaloClouds_, CD_]
-        self.Acomment = 'CD baseline with lat_dim = 256, max_iter 1M, lr=1e-5 fixed, num_steps=18, bs=256'  # bs 128, log 10
+        self.name = 'CD_'  # options: [TEST_, kCaloClouds_, CaloClouds_, CD_]
+        self.Acomment = 'CD baseline with lat_dim = 256, max_iter 1M, lr=1e-3 fixed, num_steps=18, bs=256' 
         self.comet_project = 'k-CaloClouds'
-        self.log_comet = False
+        self.log_comet = True
 
     # Model arguments
         self.model_name = 'epicVAE_nFlow_kDiffusion'             # choices=['flow', 'AllCond_epicVAE_nFlow_PointDiff', 'epicVAE_nFlow_kDiffusion]
@@ -57,7 +57,7 @@ class Configs():
 
     # Dtataloader
         self.workers = 32
-        self.train_bs = 128
+        self.train_bs = 256
         self.pin_memory = False         # choices=[True, False]
         self.shuffle = True             # choices=[True, False]
         self.max_points = 6_000
@@ -65,7 +65,7 @@ class Configs():
 
     # Optimizer and scheduler
         self.optimizer = 'RAdam'         # choices=['Adam', 'RAdam']
-        self.lr = 1e-5              # Caloclouds default: 2e-3
+        self.lr = 1e-3              # Caloclouds default: 2e-3, consistency model default: 1e-5
         self.weight_decay = 0
         self.max_grad_norm = 10
         self.end_lr = 1e-4
