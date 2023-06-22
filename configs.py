@@ -4,7 +4,7 @@ class Configs():
         
     # Experiment Name
         self.name = 'CD_'  # options: [TEST_, kCaloClouds_, CaloClouds_, CD_]
-        self.Acomment = 'CD baseline with lat_dim = 256, max_iter 1M, lr=1e-3 fixed, num_steps=18, bs=256' 
+        self.Acomment = 'CD baseline with lat_dim = 256, max_iter 1M, lr=1e-4 fixed, num_steps=50, bs=256'  # log_iter 100
         self.comet_project = 'k-CaloClouds'
         self.log_comet = True
 
@@ -55,7 +55,7 @@ class Configs():
         # self.dataset_path = '/beegfs/desy/user/akorol/projects/getting_high/ILDConfig/StandardConfig/production/out/photons_50GeV_40k.slcio.hdf5'
         self.quantized_pos = False
 
-    # Dtataloader
+    # Dataloader
         self.workers = 32
         self.train_bs = 256
         self.pin_memory = False         # choices=[True, False]
@@ -65,7 +65,7 @@ class Configs():
 
     # Optimizer and scheduler
         self.optimizer = 'RAdam'         # choices=['Adam', 'RAdam']
-        self.lr = 1e-3              # Caloclouds default: 2e-3, consistency model default: 1e-5
+        self.lr = 1e-4              # Caloclouds default: 2e-3, consistency model paper: approx. 1e-5
         self.weight_decay = 0
         self.max_grad_norm = 10
         self.end_lr = 1e-4
@@ -82,7 +82,7 @@ class Configs():
         self.test_freq = 30 * 1e3
         self.test_size = 400
         self.tag = None
-        self.log_iter = 10   # log every n iterations, default: 100
+        self.log_iter = 100   # log every n iterations, default: 100
 
     # EMA scheduler
         self.ema_type = 'inverse'
@@ -104,7 +104,7 @@ class Configs():
         self.dropout_rate = 0.0       # EDM: approx. 0.1, Caloclouds default: 0.0
 
     # EDM diffusion parameters for sampling    / also used in CM distillation
-        self.num_steps = 18
+        self.num_steps = 50      # EDM paper: 18
         self.sampler = 'heun'
         self.sigma_min = 0.002  # EDM paper: 0.002, k-diffusion config: 0.01
         self.sigma_max = 80.0
@@ -117,5 +117,6 @@ class Configs():
         self.model_path = 'kCaloClouds_2023_05_24__14_54_09/ckpt_0.000000_500000.pt'
         self.start_ema = 0.95
         # self.ema_rate = 0.999943    # decay rate of separately saved EMA model (not implemented yet)
+        self.cm_random_init = False
 
     

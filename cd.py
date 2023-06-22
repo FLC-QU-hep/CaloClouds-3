@@ -72,6 +72,13 @@ def main():
     model_teacher.load_state_dict(checkpoint['others']['model_ema'])
     print('Model loaded from: ', cfg.logdir + '/' + cfg.model_path)
 
+    if cfg.cm_random_init:
+        print('randomly initializing diffusion parameters for online and ema (target) model')
+        random_model = epicVAE_nFlow_kDiffusion(cfg, distillation = True).to(cfg.device)
+        model.diffusion.load_state_dict(random_model.diffusion.state_dict())
+        model_ema_target.diffusion.load_state_dict(random_model.diffusion.state_dict())
+        del random_model
+
     # set model status
     model.diffusion.requires_grad_(True)  # student ("online") model which is actually trained
     model.encoder.requires_grad_(False)   # encoder is not trained
