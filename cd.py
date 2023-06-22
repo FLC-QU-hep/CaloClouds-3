@@ -128,7 +128,7 @@ def main():
 
         # Backward and optimize
         loss.backward()
-        orig_grad_norm = clip_grad_norm_(model.parameters(), cfg.max_grad_norm)
+        orig_grad_norm = clip_grad_norm_(model.diffusion.parameters(), cfg.max_grad_norm)
         optimizer.step()
 
         # Update EMA target model  (necessary for CD, not the same as an EMA decay of the online model itself)
