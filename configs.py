@@ -4,7 +4,7 @@ class Configs():
         
     # Experiment Name
         self.name = 'CD_'  # options: [TEST_, kCaloClouds_, CaloClouds_, CD_]
-        self.Acomment = 'CD baseline with lat_dim = 256, max_iter 1M, lr=1e-4 fixed, num_steps=50, bs=256'  # log_iter 100
+        self.Acomment = 'CD baseline with lat_dim = 256, max_iter 1M, lr=1e-4 fixed, num_steps=50, bs=256, cm_rand=True'  # log_iter 100
         self.comet_project = 'k-CaloClouds'
         self.log_comet = True
 
@@ -117,6 +117,6 @@ class Configs():
         self.model_path = 'kCaloClouds_2023_05_24__14_54_09/ckpt_0.000000_500000.pt'
         self.start_ema = 0.95
         # self.ema_rate = 0.999943    # decay rate of separately saved EMA model (not implemented yet)
-        self.cm_random_init = False
+        self.cm_random_init = True
 
     
