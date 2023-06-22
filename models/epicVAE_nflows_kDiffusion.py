@@ -16,6 +16,7 @@ class epicVAE_nFlow_kDiffusion(Module):
     def __init__(self, args, distillation = False):
         super().__init__()
         self.args = args
+        self.distillation = distillation
         self.encoder = EPiC_encoder_cond(args.latent_dim, input_dim=args.features, cond_features=args.cond_features)
         self.flow = get_flow_model(args)
 
@@ -91,26 +92,32 @@ class epicVAE_nFlow_kDiffusion(Module):
         z = self.flow.sample(context=cond_feats, num_samples=1).view(batch_size, -1)  # B,F
         z = torch.cat([z, cond_feats], -1)   # B, F+C
 
-        sigmas = K.sampling.get_sigmas_karras(config.num_steps, config.sigma_min, config.sigma_max, rho=config.rho, device=z.device)
-
         x_T = torch.randn([z.size(0), num_points, config.features], device=z.device) * config.sigma_max
 
-        if config.sampler == 'euler':
-            x_0 = K.sampling.sample_euler(self.diffusion, x_T, sigmas, extra_args={'context' : z})
-        elif config.sampler == 'heun':
-            x_0 = K.sampling.sample_heun(self.diffusion, x_T, sigmas, extra_args={'context' : z}, s_churn=config.s_churn, s_noise=config.s_noise)
-        elif config.sampler == 'dpmpp_2m':
-            x_0 = K.sampling.sample_dpmpp_2m(self.diffusion, x_T, sigmas, extra_args={'context' : z})
-        elif config.sampler == 'dpmpp_2s_ancestral':
-            x_0 = K.sampling.sample_dpmpp_2s_ancestral(self.diffusion, x_T, sigmas, extra_args={'context' : z})
-        elif config.sampler == 'sample_euler_ancestral':
-            x_0 = K.sampling.sample_euler_ancestral(self.diffusion, x_T, sigmas, extra_args={'context' : z})
-        elif config.sampler == 'sample_lms':
-            x_0 = K.sampling.sample_lms(self.diffusion, x_T, sigmas, extra_args={'context' : z})
-        elif config.sampler == 'sample_dpmpp_2m_sde':
-            x_0 = K.sampling.sample_dpmpp_2m_sde(self.diffusion, x_T, sigmas, extra_args={'context' : z})
-        else:
-            raise NotImplementedError('Sampler not implemented')
+        if not self.distillation:
+
+            sigmas = K.sampling.get_sigmas_karras(config.num_steps, config.sigma_min, config.sigma_max, rho=config.rho, device=z.device)
+
+            if config.sampler == 'euler':
+                x_0 = K.sampling.sample_euler(self.diffusion, x_T, sigmas, extra_args={'context' : z})
+            elif config.sampler == 'heun':
+                x_0 = K.sampling.sample_heun(self.diffusion, x_T, sigmas, extra_args={'context' : z}, s_churn=config.s_churn, s_noise=config.s_noise)
+            elif config.sampler == 'dpmpp_2m':
+                x_0 = K.sampling.sample_dpmpp_2m(self.diffusion, x_T, sigmas, extra_args={'context' : z})
+            elif config.sampler == 'dpmpp_2s_ancestral':
+                x_0 = K.sampling.sample_dpmpp_2s_ancestral(self.diffusion, x_T, sigmas, extra_args={'context' : z})
+            elif config.sampler == 'sample_euler_ancestral':
+                x_0 = K.sampling.sample_euler_ancestral(self.diffusion, x_T, sigmas, extra_args={'context' : z})
+            elif config.sampler == 'sample_lms':
+                x_0 = K.sampling.sample_lms(self.diffusion, x_T, sigmas, extra_args={'context' : z})
+            elif config.sampler == 'sample_dpmpp_2m_sde':
+                x_0 = K.sampling.sample_dpmpp_2m_sde(self.diffusion, x_T, sigmas, extra_args={'context' : z})
+            else:
+                raise NotImplementedError('Sampler not implemented')
+            
+        else:  # one step for consistency model
+            x_0 = self.diffusion.forward(x_T, config.sigma_max, context=z)
+
         return x_0
     
     # def inference(self, num_points, cfg, num_samples=256):
@@ -196,6 +203,12 @@ class Denoiser(nn.Module):
         return (model_output - target).pow(2).flatten(1).mean(1)
 
     def forward(self, input, sigma, **kwargs):   # same as "denoise" in KarrasDenoiser of CM code
+        if isinstance(sigma, float) or isinstance(sigma, int):
+            sigma = (
+                torch.tensor([sigma] * input.shape[0], dtype=torch.float32)
+                .to(input.device)
+                .unsqueeze(1)
+            )
         # c_skip, c_out, c_in = [K.utils.append_dims(x, input.ndim) for x in self.get_scalings(sigma)]
         if not self.distillation:
             c_skip, c_out, c_in = [x.unsqueeze(1) for x in self.get_scalings(sigma)]   # B,1,4
