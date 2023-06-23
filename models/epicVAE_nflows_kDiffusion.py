@@ -226,15 +226,15 @@ class Denoiser(nn.Module):
 
 
         def denoise_fn(x, t):   # t = sigma
-            return self(input, t, **kwargs)
+            return self(x, t, **kwargs)
         
         @torch.no_grad()
         def target_denoise_fn(x, t):
-            return target_model(input, t, **kwargs)
+            return target_model(x, t, **kwargs)
 
         @torch.no_grad()
         def teacher_denoise_fn(x, t):
-            return teacher_model(input, t, **kwargs)
+            return teacher_model(x, t, **kwargs)
 
 
         @torch.no_grad()
