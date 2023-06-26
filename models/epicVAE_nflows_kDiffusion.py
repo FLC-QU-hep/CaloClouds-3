@@ -17,8 +17,9 @@ class epicVAE_nFlow_kDiffusion(Module):
         super().__init__()
         self.args = args
         self.distillation = distillation
-        self.encoder = EPiC_encoder_cond(args.latent_dim, input_dim=args.features, cond_features=args.cond_features)
-        self.flow = get_flow_model(args)
+        if args.latent_dim > 0:
+            self.encoder = EPiC_encoder_cond(args.latent_dim, input_dim=args.features, cond_features=args.cond_features)
+            self.flow = get_flow_model(args)
 
         if args.dropout_rate == 0.0:
             net = PointwiseNet_kDiffusion(point_dim=args.features, context_dim=args.latent_dim+args.cond_features, residual=args.residual)
@@ -50,26 +51,35 @@ class epicVAE_nFlow_kDiffusion(Module):
         """
         # batch_size, _, _ = x.size()
         # VAE encoder
-        z_mu, z_sigma = self.encoder(x, cond_feats)
-        z = reparameterize_gaussian(mean=z_mu, logvar=z_sigma)  # (B, F)
-        
-        # VAE-like loss for encoder
-        loss_kld = self.kld(mu=z_mu, logvar=z_sigma)
-        loss_kld_clamped = torch.clamp(loss_kld, min=kld_min)
 
-        # P(z), Prior probability, parameterized by the flow: z -> w.
-        nll = - self.flow.log_prob(z.detach().clone(), cond_feats)    # detach from computational graph if optimizing encoder+diffuison seperate from flow
-        loss_prior = nll.mean()
+        if self.args.latent_dim > 0:
+            z_mu, z_sigma = self.encoder(x, cond_feats)
+            z = reparameterize_gaussian(mean=z_mu, logvar=z_sigma)  # (B, F)
+            
+            # VAE-like loss for encoder
+            loss_kld = self.kld(mu=z_mu, logvar=z_sigma)
+            loss_kld_clamped = torch.clamp(loss_kld, min=kld_min)
 
-        # Diffusion MSE loss: Negative ELBO of P(X|z)
-        z = torch.cat([z, cond_feats], -1)
+            # P(z), Prior probability, parameterized by the flow: z -> w.
+            nll = - self.flow.log_prob(z.detach().clone(), cond_feats)    # detach from computational graph if optimizing encoder+diffuison seperate from flow
+            loss_prior = nll.mean()
+
+            # Diffusion MSE loss: Negative ELBO of P(X|z)
+            z = torch.cat([z, cond_feats], -1)
+        else:
+            z = cond_feats
         #loss_diffusion = self.diffusion.get_loss(x, z)    # diffusion loss
         loss_diffusion = self.diffusion.loss(x, noise, sigma, context=z).mean()    # diffusion loss
         # print('max values: ', loss_diffusion.max().item(), loss_diffusion.min().item())
         # print('shape of loss_diffusion: ', loss_diffusion.shape)
 
         # Total loss
-        loss = kl_weight*(loss_kld_clamped) + loss_diffusion
+        if self.args.latent_dim > 0:
+            loss = kl_weight*(loss_kld_clamped) + loss_diffusion
+        else:
+            loss_prior = None
+            loss = loss_diffusion
+
         # print(loss_kld_clamped.item(), loss_recons.item())
 
         # if writer is not None:

@@ -97,42 +97,62 @@ if cfg.model_name == 'flow':
 elif cfg.model_name == 'AllCond_epicVAE_nFlow_PointDiff' or cfg.model_name == 'epicVAE_nFlow_kDiffusion':
 
     if cfg.optimizer == 'Adam':
-        optimizer = torch.optim.Adam(   # Consistency Model was trained with Rectified Adam, in k-diffusion AdamW is used, in EDM normal Adam
+
+        if cfg.latent_dim > 0:
+            optimizer = torch.optim.Adam(   # Consistency Model was trained with Rectified Adam, in k-diffusion AdamW is used, in EDM normal Adam
+                    [
+                    {'params': model.encoder.parameters()}, 
+                    {'params': model.diffusion.parameters()},
+                    ], 
+                    lr=cfg.lr,  
+                    weight_decay=cfg.weight_decay
+                )
+            optimizer_flow = torch.optim.Adam(
                 [
-                {'params': model.encoder.parameters()}, 
+                {'params': model.flow.parameters()}, 
+                ], 
+                lr=cfg.lr,  
+                weight_decay=cfg.weight_decay
+            )
+        else:
+            optimizer = torch.optim.Adam(   # Consistency Model was trained with Rectified Adam, in k-diffusion AdamW is used, in EDM normal Adam
+                [
                 {'params': model.diffusion.parameters()},
                 ], 
                 lr=cfg.lr,  
                 weight_decay=cfg.weight_decay
             )
-        optimizer_flow = torch.optim.Adam(
-            [
-            {'params': model.flow.parameters()}, 
-            ], 
-            lr=cfg.lr,  
-            weight_decay=cfg.weight_decay
-        )
     elif cfg.optimizer == 'RAdam':
-        optimizer = torch.optim.RAdam(   # Consistency Model was trained with Rectified Adam, in k-diffusion AdamW is used, in EDM normal Adam
+        if cfg.latent_dim > 0:
+            optimizer = torch.optim.RAdam(   # Consistency Model was trained with Rectified Adam, in k-diffusion AdamW is used, in EDM normal Adam
+                    [
+                    {'params': model.encoder.parameters()}, 
+                    {'params': model.diffusion.parameters()},
+                    ], 
+                    lr=cfg.lr,  
+                    weight_decay=cfg.weight_decay
+                )
+            optimizer_flow = torch.optim.RAdam(
                 [
-                {'params': model.encoder.parameters()}, 
+                {'params': model.flow.parameters()}, 
+                ], 
+                lr=cfg.lr,  
+                weight_decay=cfg.weight_decay
+            )
+        else:
+            optimizer = torch.optim.RAdam(   # Consistency Model was trained with Rectified Adam, in k-diffusion AdamW is used, in EDM normal Adam
+                [
                 {'params': model.diffusion.parameters()},
                 ], 
                 lr=cfg.lr,  
                 weight_decay=cfg.weight_decay
             )
-        optimizer_flow = torch.optim.RAdam(
-            [
-            {'params': model.flow.parameters()}, 
-            ], 
-            lr=cfg.lr,  
-            weight_decay=cfg.weight_decay
-        )
     else: 
         raise NotImplementedError('Optimizer not implemented')
 
     scheduler = get_linear_scheduler(optimizer, start_epoch=cfg.sched_start_epoch, end_epoch=cfg.sched_end_epoch, start_lr=cfg.lr, end_lr=cfg.end_lr)
-    scheduler_flow = get_linear_scheduler(optimizer_flow, start_epoch=cfg.sched_start_epoch, end_epoch=cfg.sched_end_epoch, start_lr=cfg.lr, end_lr=cfg.end_lr)
+    if cfg.latent_dim > 0:
+        scheduler_flow = get_linear_scheduler(optimizer_flow, start_epoch=cfg.sched_start_epoch, end_epoch=cfg.sched_end_epoch, start_lr=cfg.lr, end_lr=cfg.end_lr)
 
 
 # Train, validate and test
@@ -144,7 +164,8 @@ def train(batch, it):
     # Reset grad and model state
     optimizer.zero_grad()
     if cfg.model_name == 'AllCond_epicVAE_nFlow_PointDiff' or cfg.model_name == 'epicVAE_nFlow_kDiffusion':
-        optimizer_flow.zero_grad()
+        if cfg.latent_dim > 0:
+            optimizer_flow.zero_grad()
     model.train()
 
     # Forward
@@ -183,12 +204,14 @@ def train(batch, it):
 
      # Backward and optimize
         loss.backward()
-        loss_flow.backward()
+        if cfg.latent_dim > 0:
+            loss_flow.backward()
         orig_grad_norm = clip_grad_norm_(model.parameters(), cfg.max_grad_norm)
         optimizer.step()
-        optimizer_flow.step()
         scheduler.step()
-        scheduler_flow.step()
+        if cfg.latent_dim > 0:
+            optimizer_flow.step()
+            scheduler_flow.step()
 
     # Update EMA model
         ema_decay = ema_sched.get_value()
@@ -201,12 +224,13 @@ def train(batch, it):
         ))
         if cfg.log_comet:
             experiment.log_metric('train/loss', loss, it)
-            experiment.log_metric('train/loss_flow', loss_flow, it)
             experiment.log_metric('train/kl_weight', cfg.kl_weight, it)
             experiment.log_metric('train/lr', optimizer.param_groups[0]['lr'], it)
-            experiment.log_metric('train/lr_flow', optimizer_flow.param_groups[0]['lr'], it)
             experiment.log_metric('train/grad_norm', orig_grad_norm, it)
             experiment.log_metric('train/ema_decay', ema_decay, it)
+            if cfg.latent_dim > 0:
+                experiment.log_metric('train/loss_flow', loss_flow, it)
+                experiment.log_metric('train/lr_flow', optimizer_flow.param_groups[0]['lr'], it)
 
 # Main loop
 print('Start training...')
@@ -229,9 +253,9 @@ while not stop:
                     'model_ema': model_ema.state_dict(), # save the EMA model
                     'ema_sched': ema_sched.state_dict(),
                     'optimizer': optimizer.state_dict(),
-                    'optimizer_flow': optimizer_flow.state_dict(),
+                    # 'optimizer_flow': optimizer_flow.state_dict(),
                     'scheduler': scheduler.state_dict(),
-                    'scheduler_flow': scheduler_flow.state_dict(),
+                    # 'scheduler_flow': scheduler_flow.state_dict(),
                 }
             ckpt_mgr.save(model, cfg, 0, others=opt_states, step=it)
         if it >= cfg.max_iters:
