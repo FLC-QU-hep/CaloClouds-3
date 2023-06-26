@@ -3,9 +3,9 @@ class Configs():
     def __init__(self):
         
     # Experiment Name
-        self.name = 'CD_'  # options: [TEST_, kCaloClouds_, CaloClouds_, CD_]
-        self.Acomment = 'CD baseline with lat_dim = 256, max_iter 1M, lr=1e-4 fixed, num_steps=40, bs=256'  # log_iter 100
-        self.comet_project = 'calo-consistency'   # options: ['k-CaloClouds', 'calo-consistency']
+        self.name = 'kCaloClouds_'  # options: [TEST_, kCaloClouds_, CaloClouds_, CD_]
+        self.Acomment = 'baseline with lat_dim = 256, max_iter 500k, lr=1e-4 fixed, bs=256, diffusion_loss=l1'  # log_iter 100
+        self.comet_project = 'k-CaloClouds'   # options: ['k-CaloClouds', 'calo-consistency']
         self.log_comet = True
 
     # Model arguments
@@ -71,7 +71,7 @@ class Configs():
         self.end_lr = 1e-4
         self.sched_start_epoch = 100 * 1e3
         self.sched_end_epoch = 400 * 1e3
-        self.max_iters = 1000 * 1e3
+        self.max_iters = 500 * 1e3
 
     # Others
         self.device = 'cuda'
@@ -79,14 +79,14 @@ class Configs():
         self.seed = 42
         self.val_freq =  5000  #  1e3          # saving intervall for checkpoints
 
-        self.test_freq = 30 * 1e3
+        self.test_freq = 30 * 1e3   
         self.test_size = 400
         self.tag = None
         self.log_iter = 100   # log every n iterations, default: 100
 
     # EMA scheduler
         self.ema_type = 'inverse'
-        self.ema_power = 0.6667   # depends on the number of iterations, 2/3=0.6667 good for 1e6 iterations, 3/4=0.75 good for less
+        self.ema_power = 0.75   # depends on the number of iterations, 2/3=0.6667 good for 1e6 iterations, 3/4=0.75 good for less
         self.ema_max_value = 0.9999
         
     # EDM diffusion parameters for training
@@ -102,6 +102,7 @@ class Configs():
                 }
             }
         self.dropout_rate = 0.0       # EDM: approx. 0.1, Caloclouds default: 0.0
+        self.diffusion_loss = 'l1'    # l2 or l1
 
     # EDM diffusion parameters for sampling    / also used in CM distillation
         self.num_steps = 40      # EDM paper: 18

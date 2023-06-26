@@ -25,7 +25,7 @@ class epicVAE_nFlow_kDiffusion(Module):
         else:
             net = PointwiseNet_kDiffusion_Dropout(point_dim=args.features, context_dim=args.latent_dim+args.cond_features, residual=args.residual, dropout_rate=args.dropout_rate)
         if not distillation:
-            self.diffusion = Denoiser(net, sigma_data = args.model['sigma_data'], device=args.device)
+            self.diffusion = Denoiser(net, sigma_data = args.model['sigma_data'], device=args.device, diffusion_loss=args.diffusion_loss)
         else:
             self.diffusion = Denoiser(net, sigma_data = args.model['sigma_data'], device=args.device, distillation=True, sigma_min=args.sigma_min)
         # self.diffusion = K.config.make_denoiser_wrapper(args.__dict__)(net)
@@ -160,7 +160,7 @@ class epicVAE_nFlow_kDiffusion(Module):
 class Denoiser(nn.Module):
     """A Karras et al. preconditioner for denoising diffusion models."""
 
-    def __init__(self, inner_model, sigma_data=0.5, device='cuda', distillation = False, sigma_min = 0.002):
+    def __init__(self, inner_model, sigma_data=0.5, device='cuda', distillation = False, sigma_min = 0.002, diffusion_loss='l2'):
         super().__init__()
         self.inner_model = inner_model
         if isinstance(sigma_data, float):
@@ -171,6 +171,7 @@ class Denoiser(nn.Module):
         self.sigma_data = torch.tensor(sigma_data, device=device)   # 4,
         self.distillation = distillation
         self.sigma_min = sigma_min
+        self.diffusion_loss = diffusion_loss
 
     def get_scalings(self, sigma):   # B,
         sigma_data = self.sigma_data.expand(sigma.shape[0], -1)   # B, 4
@@ -200,7 +201,12 @@ class Denoiser(nn.Module):
         noised_input = input + noise * K.utils.append_dims(sigma, input.ndim)
         model_output = self.inner_model(noised_input * c_in, sigma, **kwargs)
         target = (input - c_skip * noised_input) / c_out
-        return (model_output - target).pow(2).flatten(1).mean(1)
+        if self.diffusion_loss == 'l2':
+            return (model_output - target).pow(2).flatten(1).mean(1)
+        elif self.diffusion_loss == 'l1':
+            return (model_output - target).abs().flatten(1).mean(1)
+        else:
+            raise ValueError('diffusion_loss must be either l1 or l2')
 
     def forward(self, input, sigma, **kwargs):   # same as "denoise" in KarrasDenoiser of CM code
         if isinstance(sigma, float) or isinstance(sigma, int):
