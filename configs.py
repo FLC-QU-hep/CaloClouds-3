@@ -4,7 +4,7 @@ class Configs():
         
     # Experiment Name
         self.name = 'kCaloClouds_'  # options: [TEST_, kCaloClouds_, CaloClouds_, CD_]
-        self.Acomment = 'baseline with lat_dim = 0, max_iter 500k, lr=1e-4 fixed, dropout_mode=mid, dropout_rate=0.025'  # log_iter 100
+        self.Acomment = 'baseline with lat_dim = 0, max_iter 10M, lr=1e-3 fixed, dropout_rate=0.0, ema_power=2/3 (long training)'  # log_iter 100
         self.comet_project = 'k-CaloClouds'   # options: ['k-CaloClouds', 'calo-consistency']
         self.log_comet = True
 
@@ -65,19 +65,19 @@ class Configs():
 
     # Optimizer and scheduler
         self.optimizer = 'RAdam'         # choices=['Adam', 'RAdam']
-        self.lr = 1e-4              # Caloclouds default: 2e-3, consistency model paper: approx. 1e-5
+        self.lr = 1e-3              # Caloclouds default: 2e-3, consistency model paper: approx. 1e-5
         self.weight_decay = 0
         self.max_grad_norm = 10
         self.end_lr = 1e-4
         self.sched_start_epoch = 100 * 1e3
         self.sched_end_epoch = 400 * 1e3
-        self.max_iters = 500 * 1e3
+        self.max_iters = 10 * 1e6
 
     # Others
         self.device = 'cuda'
         self.logdir = '/beegfs/desy/user/buhmae/6_PointCloudDiffusion/log'
         self.seed = 42
-        self.val_freq =  5000  #  1e3          # saving intervall for checkpoints
+        self.val_freq =  10_000  #  1e3          # saving intervall for checkpoints
 
         self.test_freq = 30 * 1e3   
         self.test_size = 400
@@ -86,7 +86,7 @@ class Configs():
 
     # EMA scheduler
         self.ema_type = 'inverse'
-        self.ema_power = 0.75   # depends on the number of iterations, 2/3=0.6667 good for 1e6 iterations, 3/4=0.75 good for less
+        self.ema_power = 0.6667   # depends on the number of iterations, 2/3=0.6667 good for 1e6 iterations, 3/4=0.75 good for less
         self.ema_max_value = 0.9999
         
     # EDM diffusion parameters for training
@@ -101,8 +101,8 @@ class Configs():
                 "std": 1.2
                 }
             }
-        self.dropout_mode = 'mid'     # options: 'all',  'mid'  location of the droput layers
-        self.dropout_rate = 0.025       # EDM: approx. 0.1, Caloclouds default: 0.0
+        self.dropout_mode = 'all'     # options: 'all',  'mid'  location of the droput layers
+        self.dropout_rate = 0.0       # EDM: approx. 0.1, Caloclouds default: 0.0
         self.diffusion_loss = 'l2'    # l2 or l1
 
     # EDM diffusion parameters for sampling    / also used in CM distillation
