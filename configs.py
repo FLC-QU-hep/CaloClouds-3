@@ -4,7 +4,7 @@ class Configs():
         
     # Experiment Name
         self.name = 'kCaloClouds_'  # options: [TEST_, kCaloClouds_, CaloClouds_, CD_]
-        self.Acomment = 'baseline with lat_dim = 0, max_iter 500k, lr=1e-4 fixed, bs=128, diffusion_loss=l2'  # log_iter 100
+        self.Acomment = 'baseline with lat_dim = 0, max_iter 500k, lr=1e-4 fixed, dropout_mode=mid, dropout_rate=0.025'  # log_iter 100
         self.comet_project = 'k-CaloClouds'   # options: ['k-CaloClouds', 'calo-consistency']
         self.log_comet = True
 
@@ -101,11 +101,12 @@ class Configs():
                 "std": 1.2
                 }
             }
-        self.dropout_rate = 0.0       # EDM: approx. 0.1, Caloclouds default: 0.0
+        self.dropout_mode = 'mid'     # options: 'all',  'mid'  location of the droput layers
+        self.dropout_rate = 0.025       # EDM: approx. 0.1, Caloclouds default: 0.0
         self.diffusion_loss = 'l2'    # l2 or l1
 
     # EDM diffusion parameters for sampling    / also used in CM distillation
-        self.num_steps = 40      # EDM paper: 18
+        self.num_steps = 18      # EDM paper: 18
         self.sampler = 'heun'
         self.sigma_min = 0.002  # EDM paper: 0.002, k-diffusion config: 0.01
         self.sigma_max = 80.0

@@ -24,7 +24,12 @@ class epicVAE_nFlow_kDiffusion(Module):
         if args.dropout_rate == 0.0:
             net = PointwiseNet_kDiffusion(point_dim=args.features, context_dim=args.latent_dim+args.cond_features, residual=args.residual)
         else:
-            net = PointwiseNet_kDiffusion_Dropout(point_dim=args.features, context_dim=args.latent_dim+args.cond_features, residual=args.residual, dropout_rate=args.dropout_rate)
+            if args.dropout_mode == 'all':
+                net = PointwiseNet_kDiffusion_Dropout(point_dim=args.features, context_dim=args.latent_dim+args.cond_features, residual=args.residual, dropout_rate=args.dropout_rate)
+            elif args.dropout_mode == 'mid':
+                net = PointwiseNet_kDiffusion_Dropout_mid(point_dim=args.features, context_dim=args.latent_dim+args.cond_features, residual=args.residual, dropout_rate=args.dropout_rate)
+            else: 
+                raise NotImplementedError('dropout mode not implemented')
         if not distillation:
             self.diffusion = Denoiser(net, sigma_data = args.model['sigma_data'], device=args.device, diffusion_loss=args.diffusion_loss)
         else:
@@ -439,3 +444,57 @@ class PointwiseNet_kDiffusion_Dropout(Module):
         else:
             return out
 
+class PointwiseNet_kDiffusion_Dropout_mid(Module):
+
+    def __init__(self, point_dim, context_dim, residual, dropout_rate=0.0):
+        super().__init__()
+        time_dim = 64
+        fourier_scale = 16   # 1 in k-diffusion, 16 in EDM, 30 in Score-based generative modeling
+
+        self.act = F.leaky_relu
+        self.dropout = nn.Dropout(dropout_rate)
+        self.residual = residual
+        self.layers = ModuleList([
+            ConcatSquashLinear(point_dim, 128, context_dim+time_dim),
+            ConcatSquashLinear(128, 256, context_dim+time_dim),
+            ConcatSquashLinear(256, 512, context_dim+time_dim),
+            ConcatSquashLinear(512, 256, context_dim+time_dim),
+            ConcatSquashLinear(256, 128, context_dim+time_dim),
+            ConcatSquashLinear(128, point_dim, context_dim+time_dim)
+        ])
+
+        self.timestep_embed = nn.Sequential(
+            K.layers.FourierFeatures(1, time_dim, std=fourier_scale),   # 1D Fourier features --> with register_buffer, so weights are not trained
+            nn.Linear(time_dim, time_dim), # this is a trainable layer
+        )
+
+    def forward(self, x, sigma, context=None):
+        """
+        Args:
+            x:  Point clouds at some timestep t, (B, N, d).
+            sigma:     Time. (B, ).  --> becomes "sigma" in k-diffusion
+            context:  Shape latents. (B, F). 
+        """
+        batch_size = x.size(0)
+        sigma = sigma.view(batch_size, 1, 1)          # (B, 1, 1)
+        context = context.view(batch_size, 1, -1)   # (B, 1, F)
+
+        # formulation from EDM paper / k-diffusion
+        c_noise = sigma.log() / 4  # (B, 1, 1)
+        time_emb = self.act(self.timestep_embed(c_noise))  # (B, 1, T)
+        
+        # time_emb = torch.cat([beta, torch.sin(beta), torch.cos(beta)], dim=-1)  # (B, 1, 3)
+        ctx_emb = torch.cat([time_emb, context], dim=-1)    # (B, 1, F+T)   # TODO: might want to add additional linear embedding net for context or only cond_feats
+
+        out = x
+        for i, layer in enumerate(self.layers):
+            out = layer(ctx=ctx_emb, x=out)
+            if i < len(self.layers) - 1:    # no activation and dropout after last layer
+                out = self.act(out)
+                if i == len(self.layers) - 3:
+                    out = self.dropout(out)
+
+        if self.residual:
+            return x + out
+        else:
+            return out
