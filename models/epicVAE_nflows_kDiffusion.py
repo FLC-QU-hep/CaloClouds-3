@@ -99,8 +99,11 @@ class epicVAE_nFlow_kDiffusion(Module):
         batch_size, _ = cond_feats.size()
 
         # contect / latent space
-        z = self.flow.sample(context=cond_feats, num_samples=1).view(batch_size, -1)  # B,F
-        z = torch.cat([z, cond_feats], -1)   # B, F+C
+        if self.args.latent_dim > 0:
+            z = self.flow.sample(context=cond_feats, num_samples=1).view(batch_size, -1)  # B,F
+            z = torch.cat([z, cond_feats], -1)   # B, F+C
+        else:
+            z = cond_feats  # B, C
 
         x_T = torch.randn([z.size(0), num_points, config.features], device=z.device) * config.sigma_max
 
