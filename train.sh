@@ -19,7 +19,7 @@ conda activate torch_113
 # cd /beegfs/desy/user/akorol/projects/point-cloud
 cd /home/buhmae/6_PointCloudDiffusion
 
-python main.py
-# python cd.py
+# python main.py
+python cd.py
 
 exit

@@ -67,9 +67,14 @@ def main():
 
     # load model
     checkpoint = torch.load(cfg.logdir + '/' + cfg.model_path)
-    model.load_state_dict(checkpoint['others']['model_ema'])
-    model_ema_target.load_state_dict(checkpoint['others']['model_ema'])
-    model_teacher.load_state_dict(checkpoint['others']['model_ema'])
+    if cfg.use_ema_trainer:
+        model.load_state_dict(checkpoint['others']['model_ema'])
+        model_ema_target.load_state_dict(checkpoint['others']['model_ema'])
+        model_teacher.load_state_dict(checkpoint['others']['model_ema'])
+    else:
+        model.load_state_dict(checkpoint['state_dict'])
+        model_ema_target.load_state_dict(checkpoint['state_dict'])
+        model_teacher.load_state_dict(checkpoint['state_dict'])
     print('Model loaded from: ', cfg.logdir + '/' + cfg.model_path)
 
     if cfg.cm_random_init:

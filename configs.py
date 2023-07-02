@@ -3,14 +3,15 @@ class Configs():
     def __init__(self):
         
     # Experiment Name
-        self.name = 'kCaloClouds_'  # options: [TEST_, kCaloClouds_, CaloClouds_, CD_]
-        self.Acomment = 'baseline with lat_dim = 32, max_iter 10M, lr=1e-4 FIXED, dropout_rate=0.0, ema_power=2/3 (long training)'  # log_iter 100
-        self.comet_project = 'k-CaloClouds'   # options: ['k-CaloClouds', 'calo-consistency']
+        self.name = 'CD_'  # options: [TEST_, kCaloClouds_, CaloClouds_, CD_]
+        self.comet_project = 'calo-consistency'   # options: ['k-CaloClouds', 'calo-consistency']
+        #self.Acomment = 'baseline with lat_dim = 32, max_iter 10M, lr=1e-4 FIXED, dropout_rate=0.0, ema_power=2/3 (long training)'  # log_iter 100
+        self.Acomment = 'long baseline with lat_dim = 256, max_iter 1M, lr=1e-4 fixed, num_steps=18, bs=256, simga_max=10, epoch=1.69M, not EMA'  # log_iter 100
         self.log_comet = True
 
     # Model arguments
         self.model_name = 'epicVAE_nFlow_kDiffusion'             # choices=['flow', 'AllCond_epicVAE_nFlow_PointDiff', 'epicVAE_nFlow_kDiffusion]
-        self.latent_dim = 32     # caloclouds default: 256
+        self.latent_dim = 256     # caloclouds default: 256
         self.beta_1 = 1e-4
         self.beta_T = 0.02
         self.sched_mode = 'quardatic'  # options: ['linear', 'quardatic', 'sigmoid]
@@ -57,7 +58,7 @@ class Configs():
 
     # Dataloader
         self.workers = 32
-        self.train_bs = 128      # k-diffusion: 128 / CD: 256
+        self.train_bs = 256      # k-diffusion: 128 / CD: 256
         self.pin_memory = False         # choices=[True, False]
         self.shuffle = True             # choices=[True, False]
         self.max_points = 6_000
@@ -109,14 +110,16 @@ class Configs():
         self.num_steps = 18      # EDM paper: 18
         self.sampler = 'heun'
         self.sigma_min = 0.002  # EDM paper: 0.002, k-diffusion config: 0.01
-        self.sigma_max = 80.0
+        self.sigma_max = 10.0
         self.rho = 7.0    # exponent in EDM boundaries
         self.s_churn = 0.0
         self.s_noise = 1.0
 
 
     # Consistency Distillation parameters
-        self.model_path = 'kCaloClouds_2023_05_24__14_54_09/ckpt_0.000000_500000.pt'
+        # self.model_path = 'kCaloClouds_2023_05_24__14_54_09/ckpt_0.000000_500000.pt'
+        self.model_path = 'kCaloClouds_2023_05_31__17_57_11/ckpt_0.000000_1690000.pt'
+        self.use_ema_trainer = False
         self.start_ema = 0.95
         # self.ema_rate = 0.999943    # decay rate of separately saved EMA model (not implemented yet)
         self.cm_random_init = False    # kinda like consistency training, but still with a teacher score function
