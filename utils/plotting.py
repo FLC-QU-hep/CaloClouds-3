@@ -325,7 +325,7 @@ def plt_spinal(e_layers, e_layers_list, labels, cfg=cfg, title=r'\textbf{full sp
     plt.ylabel('energy sum [MeV]')
     
     # plt.legend(prop=cfg.font, loc=(0.35, 0.78))
-    plt.legend(prop=cfg.font, loc='best')
+    #plt.legend(prop=cfg.font, loc='best')
     plt.title(title, fontsize=cfg.font.get_size(), loc='right')
     plt.tight_layout()
 
@@ -352,7 +352,7 @@ def plt_occupancy(occ, occ_list, labels, cfg=cfg):
     plt.ylabel('\# showers')
 
     # plt.legend(prop=cfg.font, loc=(0.35, 0.78))
-    plt.legend(prop=cfg.font, loc='best')
+    #plt.legend(prop=cfg.font, loc='best')
     if cfg.plot_text_occupancy:
         plt.text(315, 540, '10 GeV', fontsize=cfg.font.get_size() + 2)
         plt.text(870, 215, '50 GeV', fontsize=cfg.font.get_size() + 2)
@@ -372,7 +372,7 @@ def plt_hit_e(hits, hits_list, labels, cfg=cfg, title=r'\textbf{full spectrum}')
         plt.plot(0, 0, linestyle='-', lw=3, color=cfg.color_lines[i], label=labels[i+1])
     # plt.legend(prop=cfg.font, loc='upper right')
     # plt.legend(prop=cfg.font, loc=(0.35, 0.78))
-    plt.legend(prop=cfg.font, loc='best')
+    #plt.legend(prop=cfg.font, loc='best')
     # plt.title(r'\textbf{validation set, 50 GeV}', fontsize=cfg.font.get_size(), loc='right')
     plt.title(title, fontsize=cfg.font.get_size(), loc='right')
     ########################################################
@@ -425,9 +425,9 @@ def plt_esum(e_sum, e_sum_list, labels, cfg=cfg):
         plt.text(1930, 160, '90 GeV', fontsize=cfg.font.get_size() + 2)
         plt.ylim(0, 799)
 
-    if cfg.plot_legend_e:
+   #if cfg.plot_legend_e:
         # plt.legend(prop=cfg.font, loc=(0.35, 0.78))
-        plt.legend(prop=cfg.font, loc='best')
+        #plt.legend(prop=cfg.font, loc='best')
 
     plt.tight_layout()
     plt.savefig('e_sum.pdf', dpi=100)
