@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH --time 5-00:00:00
+#SBATCH --time 7-00:00:00
 #SBATCH --nodes 1
 #SBATCH --partition maxgpu
 #SBATCH --job-name CCtraining
