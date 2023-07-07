@@ -163,10 +163,13 @@ class epicVAE_nFlow_kDiffusion(Module):
         """
 
         # get latent code from encoder
-        with torch.no_grad():
-            z_mu, z_sigma = self.encoder(x, cond_feats)
-            z = reparameterize_gaussian(mean=z_mu, logvar=z_sigma)  # (B, F)
-            z = torch.cat([z, cond_feats], -1)   # B,F+C
+        if self.args.latent_dim > 0:
+            with torch.no_grad():
+                z_mu, z_sigma = self.encoder(x, cond_feats)
+                z = reparameterize_gaussian(mean=z_mu, logvar=z_sigma)  # (B, F)
+                z = torch.cat([z, cond_feats], -1)   # B,F+C
+        else:
+            z = cond_feats
 
         loss = self.diffusion.consistency_loss(x, model_teacher.diffusion, model_target.diffusion, config, context=z).mean()    # consistency loss
 

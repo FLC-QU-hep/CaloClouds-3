@@ -86,9 +86,10 @@ def main():
 
     # set model status
     model.diffusion.requires_grad_(True)  # student ("online") model which is actually trained
-    model.encoder.requires_grad_(False)   # encoder is not trained
     model.diffusion.train()
-    model.encoder.eval()
+    if cfg.latent_dim > 0:
+        model.encoder.requires_grad_(False)   # encoder is not trained
+        model.encoder.eval()
     model_ema_target.requires_grad_(False) # target model for sampling from consistency model, updated as EMA of student model
     model_ema_target.train() # traget model needs to be in same state as online model, but does not require gradients
     model_teacher.requires_grad_(False) # teacher model used as score function in ODE solver
