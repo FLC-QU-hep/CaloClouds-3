@@ -216,12 +216,14 @@ def get_features(events, thr=0.05):
     e_sum_list = [] # energy per shower
     e_radial = [] # radial profile
     e_layers_list = [] # energy per layer
+    occ_layers_list = [] # occupancy per layer
 
     for layers in tqdm(events):
 
         occ = 0
         e_sum = 0
         e_layers = []
+        occ_layers = []
         y_pos = []
         for l, layer in enumerate(layers):
             layer = layer*1000 # energy rescale
@@ -237,6 +239,7 @@ def get_features(events, thr=0.05):
             hits_list.append(layer_hits)
             e_layers.append(layer.sum())
 
+            occ_layers.append(hit_mask.sum())
 
             # get radial profile #######################
             x_hit_idx, z_hit_idx = np.where(hit_mask)
@@ -249,6 +252,7 @@ def get_features(events, thr=0.05):
 
 
         e_layers_list.append(e_layers)
+        occ_layers_list.append(occ_layers)
 
         occ_list.append(occ)
         e_sum_list.append(e_sum)
@@ -257,9 +261,10 @@ def get_features(events, thr=0.05):
     occ_list = np.array(occ_list)
     e_sum_list = np.array(e_sum_list)
     hits_list = np.concatenate(hits_list)
-    e_layers_list = np.array(e_layers_list).sum(axis=0)/len(events)
+    e_layers_list = np.array(e_layers_list).sum(axis=0)/len(events)  # average energy per layer
+    occ_layers_list = np.array(occ_layers_list)#.sum(axis=0)/len(events)
     
-    return e_radial, occ_list, e_sum_list, hits_list, e_layers_list
+    return e_radial, occ_list, e_sum_list, hits_list, e_layers_list, occ_layers_list
 
 
 def plt_radial(e_radial, e_radial_list, labels, cfg=cfg, title=r'\textbf{full spectrum}'):
@@ -531,12 +536,12 @@ def plt_feats(events, events_list: list, labels, cfg=cfg, title=r'\textbf{full s
 
 def get_plots(events, events_list: list, labels: list = ['1', '2', '3'], thr=0.05, title=r'\textbf{full spectrum}'):
     
-    e_radial_real, occ_real, e_sum_real, hits_real, e_layers_real = get_features(events, thr)
+    e_radial_real, occ_real, e_sum_real, hits_real, e_layers_real, occ_layer_real = get_features(events, thr)
     
     e_radial_list, occ_list, e_sum_list, hits_list, e_layers_list = [], [], [], [], []
     
     for i in range(len(events_list)):
-        e_radial_, occ_real_, e_sum_real_, hits_real_, e_layers_real_ = get_features(events_list[i], thr)
+        e_radial_, occ_real_, e_sum_real_, hits_real_, e_layers_real_, occ_layer_real_ = get_features(events_list[i], thr)
         
         e_radial_list.append(e_radial_)
         occ_list.append(occ_real_)
