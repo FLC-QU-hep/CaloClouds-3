@@ -217,6 +217,7 @@ def get_features(events, thr=0.05):
     e_radial = [] # radial profile
     e_layers_list = [] # energy per layer
     occ_layers_list = [] # occupancy per layer
+    e_radidal_lists = [] # radial profile per layer
 
     for layers in tqdm(events):
 
@@ -225,6 +226,7 @@ def get_features(events, thr=0.05):
         e_layers = []
         occ_layers = []
         y_pos = []
+        e_radial_layers = []
         for l, layer in enumerate(layers):
             layer = layer*1000 # energy rescale  
             layer[layer < thr] = 0
@@ -248,8 +250,8 @@ def get_features(events, thr=0.05):
             e_cell = layer[x_hit_idx, z_hit_idx]
             dist_to_origin = np.sqrt((x_cell_coord - incident_point[0])**2 + (z_cell_coord - incident_point[1])**2)
             e_radial.append([dist_to_origin, e_cell])
+            e_radial_layers.append([dist_to_origin, e_cell])
             ############################################
-
 
         e_layers_list.append(e_layers)
         occ_layers_list.append(occ_layers)
@@ -257,15 +259,18 @@ def get_features(events, thr=0.05):
         occ_list.append(occ)
         e_sum_list.append(e_sum)
 
-    e_radial = np.concatenate(e_radial, axis=1)
+        e_radidal_lists.append(e_radial_layers)
+
+    e_radial = np.concatenate(e_radial, axis=1)  # out shape: [2, flattend hits]
     occ_list = np.array(occ_list)
     e_sum_list = np.array(e_sum_list)
     hits_list = np.concatenate(hits_list)
     e_layers_distibution = np.array(e_layers_list)  # distibution of energy per layer
     e_layers_list = e_layers_distibution.sum(axis=0)/len(events)  # average energy per layer
     occ_layers_list = np.array(occ_layers_list)#.sum(axis=0)/len(events)
+    e_radial_lists = e_radidal_lists  # nested list: e_rad_lst[ EVENTS ][LAYER ] [DIST, E]
     
-    return e_radial, occ_list, e_sum_list, hits_list, e_layers_list, occ_layers_list, e_layers_distibution
+    return e_radial, occ_list, e_sum_list, hits_list, e_layers_list, occ_layers_list, e_layers_distibution, e_radial_lists
 
 
 def plt_radial(e_radial, e_radial_list, labels, cfg=cfg, title=r'\textbf{full spectrum}'):
@@ -537,12 +542,12 @@ def plt_feats(events, events_list: list, labels, cfg=cfg, title=r'\textbf{full s
 
 def get_plots(events, events_list: list, labels: list = ['1', '2', '3'], thr=0.05, title=r'\textbf{full spectrum}'):
     
-    e_radial_real, occ_real, e_sum_real, hits_real, e_layers_real, occ_layer_real = get_features(events, thr)
+    e_radial_real, occ_real, e_sum_real, hits_real, e_layers_real, occ_layer_real, e_layers_distibution_real, e_radial_lists_real = get_features(events, thr)
     
     e_radial_list, occ_list, e_sum_list, hits_list, e_layers_list = [], [], [], [], []
     
     for i in range(len(events_list)):
-        e_radial_, occ_real_, e_sum_real_, hits_real_, e_layers_real_, occ_layer_real_ = get_features(events_list[i], thr)
+        e_radial_, occ_real_, e_sum_real_, hits_real_, e_layers_real_, occ_layer_real_, e_layers_distibution_real_, e_radial_lists_real_ = get_features(events_list[i], thr)
         
         e_radial_list.append(e_radial_)
         occ_list.append(occ_real_)
