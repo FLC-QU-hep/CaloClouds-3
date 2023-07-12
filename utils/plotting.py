@@ -259,6 +259,7 @@ def get_features(events, thr=0.05):
         occ_list.append(occ)
         e_sum_list.append(e_sum)
 
+        e_radial_layers = np.concatenate(e_radial_layers, axis=1)
         e_radidal_lists.append(e_radial_layers)
 
     e_radial = np.concatenate(e_radial, axis=1)  # out shape: [2, flattend hits]
@@ -268,7 +269,7 @@ def get_features(events, thr=0.05):
     e_layers_distibution = np.array(e_layers_list)  # distibution of energy per layer
     e_layers_list = e_layers_distibution.sum(axis=0)/len(events)  # average energy per layer
     occ_layers_list = np.array(occ_layers_list)#.sum(axis=0)/len(events)
-    e_radial_lists = e_radidal_lists  # nested list: e_rad_lst[ EVENTS ][LAYER ] [DIST, E]
+    e_radial_lists = e_radidal_lists  # nested list: e_rad_lst[ EVENTS ][DIST,E ] [ POINTS ]
     
     return e_radial, occ_list, e_sum_list, hits_list, e_layers_list, occ_layers_list, e_layers_distibution, e_radial_lists
 
