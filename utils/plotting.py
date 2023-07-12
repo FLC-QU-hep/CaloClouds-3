@@ -226,10 +226,10 @@ def get_features(events, thr=0.05):
         occ_layers = []
         y_pos = []
         for l, layer in enumerate(layers):
-            layer = layer*1000 # energy rescale
+            layer = layer*1000 # energy rescale  
             layer[layer < thr] = 0
 
-            hit_mask = layer > 0
+            hit_mask = layer > 0    # shape i.e. 82,81
             layer_hits = layer[hit_mask]
             layer_sum = layer.sum()
 
@@ -261,10 +261,11 @@ def get_features(events, thr=0.05):
     occ_list = np.array(occ_list)
     e_sum_list = np.array(e_sum_list)
     hits_list = np.concatenate(hits_list)
-    e_layers_list = np.array(e_layers_list).sum(axis=0)/len(events)  # average energy per layer
+    e_layers_distibution = np.array(e_layers_list)  # distibution of energy per layer
+    e_layers_list = e_layers_distibution.sum(axis=0)/len(events)  # average energy per layer
     occ_layers_list = np.array(occ_layers_list)#.sum(axis=0)/len(events)
     
-    return e_radial, occ_list, e_sum_list, hits_list, e_layers_list, occ_layers_list
+    return e_radial, occ_list, e_sum_list, hits_list, e_layers_list, occ_layers_list, e_layers_distibution
 
 
 def plt_radial(e_radial, e_radial_list, labels, cfg=cfg, title=r'\textbf{full spectrum}'):
