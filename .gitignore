@@ -141,3 +141,4 @@ slurm-*
 joblog/
 *.pdf
 testbed.ipynb
+*old*
