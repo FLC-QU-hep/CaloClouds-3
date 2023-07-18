@@ -117,19 +117,19 @@ class epicVAE_nFlow_kDiffusion(Module):
             sigmas = K.sampling.get_sigmas_karras(config.num_steps, config.sigma_min, config.sigma_max, rho=config.rho, device=z.device)
 
             if config.sampler == 'euler':
-                x_0 = K.sampling.sample_euler(self.diffusion, x_T, sigmas, extra_args={'context' : z})
+                x_0 = K.sampling.sample_euler(self.diffusion, x_T, sigmas, extra_args={'context' : z}, disable=True)
             elif config.sampler == 'heun':
-                x_0 = K.sampling.sample_heun(self.diffusion, x_T, sigmas, extra_args={'context' : z}, s_churn=config.s_churn, s_noise=config.s_noise)
+                x_0 = K.sampling.sample_heun(self.diffusion, x_T, sigmas, extra_args={'context' : z}, s_churn=config.s_churn, s_noise=config.s_noise, disable=True)
             elif config.sampler == 'dpmpp_2m':
-                x_0 = K.sampling.sample_dpmpp_2m(self.diffusion, x_T, sigmas, extra_args={'context' : z})
+                x_0 = K.sampling.sample_dpmpp_2m(self.diffusion, x_T, sigmas, extra_args={'context' : z}, disable=True)
             elif config.sampler == 'dpmpp_2s_ancestral':
-                x_0 = K.sampling.sample_dpmpp_2s_ancestral(self.diffusion, x_T, sigmas, extra_args={'context' : z})
+                x_0 = K.sampling.sample_dpmpp_2s_ancestral(self.diffusion, x_T, sigmas, extra_args={'context' : z}, disable=True)
             elif config.sampler == 'sample_euler_ancestral':
-                x_0 = K.sampling.sample_euler_ancestral(self.diffusion, x_T, sigmas, extra_args={'context' : z})
+                x_0 = K.sampling.sample_euler_ancestral(self.diffusion, x_T, sigmas, extra_args={'context' : z}, disable=True)
             elif config.sampler == 'sample_lms':
-                x_0 = K.sampling.sample_lms(self.diffusion, x_T, sigmas, extra_args={'context' : z})
+                x_0 = K.sampling.sample_lms(self.diffusion, x_T, sigmas, extra_args={'context' : z}, disable=True)
             elif config.sampler == 'sample_dpmpp_2m_sde':
-                x_0 = K.sampling.sample_dpmpp_2m_sde(self.diffusion, x_T, sigmas, extra_args={'context' : z})
+                x_0 = K.sampling.sample_dpmpp_2m_sde(self.diffusion, x_T, sigmas, extra_args={'context' : z}, disable=True)
             else:
                 raise NotImplementedError('Sampler not implemented')
             
