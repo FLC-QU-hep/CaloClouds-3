@@ -29,7 +29,7 @@ from models.allCond_epicVAE_nflow_PointDiff import AllCond_epicVAE_nFlow_PointDi
 ########################
 
 cfg = Configs()
-cfg.device = 'cpu'
+cfg.device = 'cuda'  # 'cuda' or 'cpu'
 #use single thread
 torch.set_num_threads(1)
 
@@ -39,9 +39,9 @@ max_e = 100
 
 num = 2000 # total number of generated events
 
-bs = 1 # batch size   # optimized: bs=64 for GPU, bs=512 for CPU (multi-threaded), bs=1 for CPU (single-threaded)
+bs = 64 # batch size   # optimized: bs=64 for GPU, bs=512 for CPU (multi-threaded), bs=1 for CPU (single-threaded)
 
-iterations = 1 # number of iterations for timing
+iterations = 25 # number of iterations for timing
 
 kdiffusion=True   # EDM vs DDPM diffusion
 
@@ -81,7 +81,7 @@ def main(cfg, min_e, max_e, num, bs, iterations):
                                             num_cond_inputs=1, device=cfg.device)  # num_cond_inputs
 
     #checkpoint = torch.load('/beegfs/desy/user/akorol/chekpoints/ECFlow/EFlow+CFlow_138.pth')
-    checkpoint = torch.load('/beegfs/desy/user/buhmae/6_PointCloudDiffusion/shower_flow/220714_cog_e_layer_ShowerFlow_best.pth')   # trained about 350 epochs
+    checkpoint = torch.load('/beegfs/desy/user/buhmae/6_PointCloudDiffusion/shower_flow/220714_cog_e_layer_ShowerFlow_best.pth', map_location=torch.device(cfg.device))   # trained about 350 epochs
     flow.load_state_dict(checkpoint['model'])
     flow.eval().to(cfg.device)
 
@@ -99,7 +99,7 @@ def main(cfg, min_e, max_e, num, bs, iterations):
     # long baseline with lat_dim = 0, max_iter 1M, lr=1e-4 fixed, num_steps=18, bs=256, simga_max=80, epoch=2M, EMA
     cfg.dropout_rate = 0.0
     cfg.latent_dim = 0
-    checkpoint = torch.load(cfg.logdir + '/' + 'CD_2023_07_07__16_32_09/ckpt_0.000000_1000000.pt')   # max 1200000
+    checkpoint = torch.load(cfg.logdir + '/' + 'CD_2023_07_07__16_32_09/ckpt_0.000000_1000000.pt', map_location=torch.device(cfg.device))   # max 1200000
     model = mdls.epicVAE_nFlow_kDiffusion(cfg, distillation = True).to(cfg.device)
     model.load_state_dict(checkpoint['others']['model_ema'])
 
@@ -112,12 +112,12 @@ def main(cfg, min_e, max_e, num, bs, iterations):
         fake_showers = gen_utils.gen_showers_batch(model, distribution, min_e, max_e, num, bs, kdiffusion=kdiffusion, config=cfg, coef_real=coef_real, coef_fake=coef_fake, n_scaling=n_scaling)
         t = time.time() - s_t
         print(fake_showers.shape)
-        print('total time (seconds): ', t)
-        print('time per shower (seconds): ', t / num)
+        print('total time [seconds]: ', t)
+        print('time per shower [ms]: ', t / num * 1000)
         times_per_shower.append(t / num)
 
-    print('mean time per shower (ms): ', np.mean(times_per_shower) * 1000)
-    print('std time per shower (ms): ', np.std(times_per_shower) * 1000)
+    print('mean time per shower [ms]: ', np.mean(times_per_shower) * 1000)
+    print('std time per shower [ms]: ', np.std(times_per_shower) * 1000)
 
 
 
