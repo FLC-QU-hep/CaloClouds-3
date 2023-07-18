@@ -112,7 +112,7 @@ def gen_showers_batch(model, shower_flow, e_min, e_max, num=2000, bs=32, kdiffus
 
     fake_showers_list = []
     
-    for evt_id in tqdm(range(0, num, bs)):
+    for evt_id in tqdm(range(0, num, bs), disable=False):
         if (num - evt_id) < bs:
             bs = num - evt_id
 #         num = num - 75 # substruct correction factor
