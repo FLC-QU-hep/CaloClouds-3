@@ -72,7 +72,7 @@ class Configs():
         self.color_lines = ['tab:orange', 'tab:blue', 'tab:green', 'tab:red']
         # self.color_lines = ['tab:orange', 'tab:orange', 'tab:orange', 'tab:orange']
 
-        self.include_artifacts = True
+        self.include_artifacts = False   # include_artifacts = True -> keeps points that hit dead material
 
 
 cfg = Configs()
@@ -168,15 +168,13 @@ def create_map(X, Y, Z, dm=3):
 
 
 
-def get_projections(showers, MAP, layer_bottom_pos, return_cell_point_cloud=False):
+def get_projections(showers, MAP, layer_bottom_pos, return_cell_point_cloud=False, max_num_hits=6000):
     events = []
-    
     for shower in tqdm(showers):
         layers = []
         
         x_coord, y_coord, z_coord, e_coord = shower
 
-        
         for l in range(len(MAP)):
             idx = np.where((y_coord <= (layer_bottom_pos[l] + 1)) & (y_coord >= layer_bottom_pos[l] - 0.5 ))
             
@@ -196,7 +194,35 @@ def get_projections(showers, MAP, layer_bottom_pos, return_cell_point_cloud=Fals
         return events
     
     else:
-        pass
+        cell_point_clouds = []
+        for event in tqdm(events):
+            point_cloud = []
+            for l, layer in enumerate(event):
+                
+                xedges = MAP[l]['xedges']
+                zedges = MAP[l]['zedges']
+                
+                x_indx, z_indx = np.where(layer > 0)
+
+                cell_energy = layer[layer > 0]
+                cell_coordinate_x = xedges[x_indx] + half_cell_size
+                cell_coordinate_y = np.repeat(layer_bottom_pos[l] + cell_thickness/2, len(x_indx))
+                cell_coordinate_z = zedges[z_indx] + half_cell_size
+                
+                point_cloud.append(
+                    [cell_coordinate_x, cell_coordinate_y, cell_coordinate_z, cell_energy]
+                )
+                
+            point_cloud = np.concatenate(point_cloud, axis=1)
+            zeros_to_concat = np.zeros((4, max_num_hits-len(point_cloud[0])))
+            point_cloud = np.concatenate((point_cloud, zeros_to_concat), axis=1)
+            
+            
+            cell_point_clouds.append([point_cloud])
+            
+        cell_point_clouds = np.vstack(cell_point_clouds)
+        
+        return events, cell_point_clouds
 
 
 
