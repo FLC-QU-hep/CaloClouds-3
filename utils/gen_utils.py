@@ -54,7 +54,7 @@ def get_shower(model, num_points, energy, cond_N, bs=1, kdiffusion=False, config
 
 
 # batch inference 
-def gen_showers_batch(model, shower_flow, e_min, e_max, num=2000, bs=32, kdiffusion=False, config=None, max_points=6000, coef_real=None, coef_fake=None):
+def gen_showers_batch(model, shower_flow, e_min, e_max, num=2000, bs=32, kdiffusion=False, config=None, max_points=6000, coef_real=None, coef_fake=None, n_scaling = True):
     
     cond_E = torch.FloatTensor(num, 1).uniform_(e_min, e_max).to(config.device)
     samples = shower_flow.condition(cond_E/100).sample(torch.Size([num, ])).cpu().numpy()
@@ -83,9 +83,11 @@ def gen_showers_batch(model, shower_flow, e_min, e_max, num=2000, bs=32, kdiffus
     # rescale number of clusters with polybomial function
     # scale_factor = get_scale_factor(clusters_per_layer_gen.sum(axis=1))   # B,
     # scale_factor = np.expand_dims(scale_factor, axis=1)
-    scale_factor = get_scale_factor(num_clusters, coef_real, coef_fake)   # B,1
-    num_clusters = (num_clusters * scale_factor).astype(int)  # B,1
-    # num_clusters = (num_clusters).astype(int)  # B,1
+    if n_scaling:
+        scale_factor = get_scale_factor(num_clusters, coef_real, coef_fake)   # B,1
+        num_clusters = (num_clusters * scale_factor).astype(int)  # B,1
+    else:
+        num_clusters = (num_clusters).astype(int)  # B,1
     
     # scale relative clusters per layer to actual number of clusters per layer
     clusters_per_layer_gen = (clusters_per_layer_gen / clusters_per_layer_gen.sum(axis=1, keepdims=True) * num_clusters).astype(int) # B,30
