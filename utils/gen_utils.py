@@ -169,6 +169,10 @@ def gen_showers_batch(model, shower_flow, e_min, e_max, num=2000, bs=32, kdiffus
     fake_showers = np.moveaxis(fake_showers, -1, -2)   # (bs, num_points, 4) -> (bs, 4, num_points)
     fake_showers[:, 0, :] = (fake_showers[:, 0, :] + 1) / 2
     fake_showers[:, 2, :] = (fake_showers[:, 2, :] + 1) / 2
+
+    # clip to 0, 1
+    # fake_showers[:, 0, :] = np.clip(fake_showers[:, 0, :], 0, 1)
+    # fake_showers[:, 2, :] = np.clip(fake_showers[:, 2, :], 0, 1)
     
     fake_showers[:, 0] = fake_showers[:, 0] * (Xmin-Xmax) + Xmax
     fake_showers[:, 2] = fake_showers[:, 2] * (Zmin-Zmax) + Zmax
