@@ -12,18 +12,6 @@ def get_cog(x,y,z,e):
 
 def get_scale_factor(num_clusters, coef_real, coef_fake):
     
-    # CaloClouds
-    # coef_real = np.array([ 2.57988645e-09, -2.94056522e-05,  3.42194568e-01,  5.34968378e+01])
-    # coef_fake = np.array([ 3.85057207e-09, -4.16463897e-05,  4.19800713e-01,  5.82246858e+01])
-
-    # kCaloClouds_2023_05_24__14_54_09_heun18
-    # coef_real = np.array([ 2.39735048e-09, -2.69842295e-05,  2.96136986e-01,  4.89770787e+01])
-    # coef_fake = np.array([ 4.45753201e-09, -4.26483492e-05,  4.03632976e-01,  6.31063427e+01])
-
-    # kCaloClouds_2023_05_24__14_54_09_heun13
-    #coef_real = np.array([ 2.39735048e-09, -2.69842295e-05,  2.96136986e-01,  4.89770787e+01])
-    #coef_fake = np.array([ 5.72940149e-09, -4.76120436e-05,  4.37720799e-01,  5.97962496e+01])
-    
     poly_fn_real = np.poly1d(coef_real)
     poly_fn_fake = np.poly1d(coef_fake) 
     
