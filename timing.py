@@ -60,9 +60,9 @@ cfg.rho = 7. # default 7.0
 # coef_real = np.array([ 2.39735048e-09, -2.69842295e-05,  2.96136986e-01,  4.89770787e+01])
 # coef_fake = np.array([ 4.45753201e-09, -4.26483492e-05,  4.03632976e-01,  6.31063427e+01])
 
-# kCaloClouds_2023_05_24__14_54_09_heun13
-coef_real = np.array([ 2.39735048e-09, -2.69842295e-05,  2.96136986e-01,  4.89770787e+01])
-coef_fake = np.array([ 5.72940149e-09, -4.76120436e-05,  4.37720799e-01,  5.97962496e+01])
+# # kCaloClouds_2023_05_24__14_54_09_heun13
+# coef_real = np.array([ 2.39735048e-09, -2.69842295e-05,  2.96136986e-01,  4.89770787e+01])
+# coef_fake = np.array([ 5.72940149e-09, -4.76120436e-05,  4.37720799e-01,  5.97962496e+01])
 
 n_scaling = True
 
@@ -95,6 +95,8 @@ def main(cfg, min_e, max_e, num, bs, iterations):
         model = mdls2.AllCond_epicVAE_nFlow_PointDiff(cfg).to(cfg.device)
         checkpoint = torch.load('/beegfs/desy/user/akorol/logs/point-cloud/AllCond_epicVAE_nFlow_PointDiff_100s_MSE_loss_smired_possitions_quardatic2023_04_06__16_34_39/ckpt_0.000000_837000.pt', map_location=torch.device(cfg.device)) # quadratic
         model.load_state_dict(checkpoint['state_dict'])
+        coef_real = np.array([ 2.50244046e-09, -2.82685784e-05,  3.15731003e-01,  5.08123555e+01])
+        coef_fake = np.array([ 3.72975819e-09, -3.87472364e-05,  3.80314204e-01,  5.30334567e+01])
 
     elif caloclouds == 'edm':
         kdiffusion=True   # EDM vs DDPM diffusion
@@ -105,6 +107,8 @@ def main(cfg, min_e, max_e, num, bs, iterations):
         checkpoint = torch.load(cfg.logdir + '/' + 'kCaloClouds_2023_06_29__23_08_31/ckpt_0.000000_2000000.pt', map_location=torch.device(cfg.device))    # max 5200000
         model = mdls.epicVAE_nFlow_kDiffusion(cfg).to(cfg.device)
         model.load_state_dict(checkpoint['others']['model_ema'])
+        coef_real = np.array([ 2.50244046e-09, -2.82685784e-05,  3.15731003e-01,  5.08123555e+01])
+        coef_fake = np.array([ 5.08021809e-09, -5.26101363e-05,  4.74959822e-01,  5.34314449e+01])
 
     elif caloclouds == 'cm':
         kdiffusion=True   # EDM vs DDPM diffusion
@@ -115,6 +119,8 @@ def main(cfg, min_e, max_e, num, bs, iterations):
         checkpoint = torch.load(cfg.logdir + '/' + 'CD_2023_07_07__16_32_09/ckpt_0.000000_1000000.pt', map_location=torch.device(cfg.device))   # max 1200000
         model = mdls.epicVAE_nFlow_kDiffusion(cfg, distillation = True).to(cfg.device)
         model.load_state_dict(checkpoint['others']['model_ema'])
+        coef_real = np.array([ 2.50244046e-09, -2.82685784e-05,  3.15731003e-01,  5.08123555e+01])
+        coef_fake = np.array([ 4.29894066e-09, -4.61132724e-05,  4.40193379e-01,  6.23006887e+01])
 
     else:
         raise ValueError('caloclouds must be one of: ddpm, edm, cm')
