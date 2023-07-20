@@ -301,27 +301,32 @@ def get_features(events, thr=0.05):
 
 
 def plt_radial(e_radial, e_radial_list, labels, cfg=cfg, title=r'\textbf{full spectrum}'):
-    fig = plt.figure(figsize=(7,7))
+    fig, axs = plt.subplots(2, 1, figsize=(7,9), height_ratios=[3, 1], sharex=True)
 
     ## for legend ##########################################
-    plt.hist(np.zeros(1)+1, label=labels[0], color='lightgrey', edgecolor='dimgrey', lw=2)
+    axs[0].hist(np.zeros(1)+1, label=labels[0], color='lightgrey', edgecolor='dimgrey', lw=2)
     for i in range(len(e_radial_list)):
-        plt.plot(0, 0, linestyle='-', lw=3, color=cfg.color_lines[i], label=labels[i+1])
-    plt.title(title, fontsize=cfg.font.get_size(), loc='right')
+        axs[0].plot(0, 0, linestyle='-', lw=3, color=cfg.color_lines[i], label=labels[i+1])
+    axs[0].set_title(title, fontsize=cfg.font.get_size(), loc='right')
     # plt.legend(prop=cfg.font, loc=(0.35, 0.78))
-    plt.legend(prop=cfg.font, loc='best')
+    axs[0].legend(prop=cfg.font, loc='best')
     ########################################################
 
 
-    h = plt.hist(e_radial[0], bins=cfg.bins_r, weights=e_radial[1], color='lightgrey', rasterized=True)
-    h = plt.hist(e_radial[0], bins=cfg.bins_r, weights=e_radial[1], color='dimgrey', histtype='step', lw=2)
+    h = axs[0].hist(e_radial[0], bins=cfg.bins_r, weights=e_radial[1], color='lightgrey', rasterized=True)
+    h = axs[0].hist(e_radial[0], bins=cfg.bins_r, weights=e_radial[1], color='dimgrey', histtype='step', lw=2)
     
     for i, e_radial_ in enumerate(e_radial_list):
-        h = plt.hist(e_radial_[0], bins=h[1], weights=e_radial_[1], histtype='step', linestyle='-', lw=3, color=cfg.color_lines[i])
+        h1 = axs[0].hist(e_radial_[0], bins=h[1], weights=e_radial_[1], histtype='step', linestyle='-', lw=3, color=cfg.color_lines[i])
+        # ratio plot on the bottom
+        axs[1].plot((h[1][:-1] + h[1][1:])/2, h1[0]/h[0], linestyle='-', lw=2, marker='o', color=cfg.color_lines[i])
+
+    # horizontal line at 1
+    axs[1].axhline(1, linestyle='-', lw=1, color='k')
         
     
     
-    plt.yscale('log')
+    axs[0].set_yscale('log')
 
     # ax2 = ax1.twiny()
     # ax2.set_xticks( ax1.get_xticks() )
@@ -330,44 +335,52 @@ def plt_radial(e_radial, e_radial_list, labels, cfg=cfg, title=r'\textbf{full sp
     # ax2.set_xlabel("radius [cells]")
     
     plt.xlabel("radius [mm]")
-    plt.ylabel('energy sum [MeV]')
+    axs[0].set_ylabel('energy sum [MeV]')
+    axs[1].set_ylabel('ratio')
     
     # ax = plt.gca()
     # plt.text(0.70, 1.02, 'full spectrum', fontsize=cfg.font.get_size(), family='serif', transform=ax.transAxes)
     
+    plt.subplots_adjust(hspace=0.075)
+    # plt.tight_layout()
 
-    plt.tight_layout()
-
-    plt.savefig('radial.pdf', dpi=100)
+    plt.savefig('radial.pdf', dpi=100, bbox_inches='tight')
     plt.show()
     
 def plt_spinal(e_layers, e_layers_list, labels, cfg=cfg, title=r'\textbf{full spectrum}'):
     
-    plt.figure(figsize=(7,7))
+    fig, axs = plt.subplots(2, 1, figsize=(7,9), height_ratios=[3, 1], sharex=True)
 
     ## for legend ##########################################
-    plt.hist(np.zeros(1)+1, label=labels[0], color='lightgrey', edgecolor='dimgrey', lw=2)
+    axs[0].hist(np.zeros(1)+1, label=labels[0], color='lightgrey', edgecolor='dimgrey', lw=2)
     for i in range(len(e_layers_list)):
-        plt.plot(0, 0, linestyle='-', lw=3, color=cfg.color_lines[i], label=labels[i+1])
+        axs[0].plot(0, 0, linestyle='-', lw=3, color=cfg.color_lines[i], label=labels[i+1])
     ########################################################
 
-    plt.hist(np.arange(len(e_layers)), bins=30, weights=e_layers, color='lightgrey', rasterized=True)
-    plt.hist(np.arange(len(e_layers)), bins=30, weights=e_layers, color='dimgrey', histtype='step', lw=2)
+    axs[0].hist(np.arange(len(e_layers))+1.5, bins=30, weights=e_layers, color='lightgrey', rasterized=True)
+    axs[0].hist(np.arange(len(e_layers))+1.5, bins=30, weights=e_layers, color='dimgrey', histtype='step', lw=2)
     
     for i, e_layers_ in enumerate(e_layers_list):
-        plt.hist(np.arange(len(e_layers_)), bins=30, weights=e_layers_, histtype='step', linestyle='-', lw=3, color=cfg.color_lines[i])
+        axs[0].hist(np.arange(len(e_layers_))+1.5, bins=30, weights=e_layers_, histtype='step', linestyle='-', lw=3, color=cfg.color_lines[i])
+        # ratio plot on the bottom
+        axs[1].plot(np.arange(len(e_layers))+1, e_layers_/e_layers, linestyle='-', lw=2, marker='o', color=cfg.color_lines[i])
 
-    plt.yscale('log')
-    plt.ylim(1, 1000)
+    # horizontal line at 1
+    axs[1].axhline(1, linestyle='-', lw=1, color='k')
+
+    axs[0].set_yscale('log')
+    axs[0].set_ylim(1, 1000)
     plt.xlabel('layers')
-    plt.ylabel('energy sum [MeV]')
+    axs[0].set_ylabel('energy sum [MeV]')
+    axs[1].set_ylabel('ratio')
     
     # plt.legend(prop=cfg.font, loc=(0.35, 0.78))
     #plt.legend(prop=cfg.font, loc='best')
-    plt.title(title, fontsize=cfg.font.get_size(), loc='right')
-    plt.tight_layout()
+    axs[0].set_title(title, fontsize=cfg.font.get_size(), loc='right')
+    # plt.tight_layout()
+    plt.subplots_adjust(hspace=0.075)
 
-    plt.savefig('spinal.pdf', dpi=100)
+    plt.savefig('spinal.pdf', dpi=100, bbox_inches='tight')
     plt.show()
     
 def plt_occupancy(occ, occ_list, labels, cfg=cfg):
@@ -402,38 +415,47 @@ def plt_occupancy(occ, occ_list, labels, cfg=cfg):
     plt.show()
     
 def plt_hit_e(hits, hits_list, labels, cfg=cfg, title=r'\textbf{full spectrum}'):
-    plt.figure(figsize=(7,7))
+    fig, axs = plt.subplots(2, 1, figsize=(7,9), height_ratios=[3, 1], sharex=True)
 
     ## for legend ##########################################
-    plt.hist(np.zeros(1)+1, label=labels[0], color='lightgrey', edgecolor='dimgrey', lw=2)
+    axs[0].hist(np.zeros(1)+1, label=labels[0], color='lightgrey', edgecolor='dimgrey', lw=2)
     for i in range(len(hits_list)):
-        plt.plot(0, 0, linestyle='-', lw=3, color=cfg.color_lines[i], label=labels[i+1])
+        axs[0].plot(0, 0, linestyle='-', lw=3, color=cfg.color_lines[i], label=labels[i+1])
     # plt.legend(prop=cfg.font, loc='upper right')
     # plt.legend(prop=cfg.font, loc=(0.35, 0.78))
     #plt.legend(prop=cfg.font, loc='best')
     # plt.title(r'\textbf{validation set, 50 GeV}', fontsize=cfg.font.get_size(), loc='right')
-    plt.title(title, fontsize=cfg.font.get_size(), loc='right')
+    axs[0].set_title(title, fontsize=cfg.font.get_size(), loc='right')
     ########################################################
 
-    h = plt.hist(hits, bins=cfg.hit_bins, color='lightgrey', rasterized=True)
-    h = plt.hist(hits, bins=cfg.hit_bins, histtype='step', color='dimgrey', lw=2)
+    h = axs[0].hist(hits, bins=cfg.hit_bins, color='lightgrey', rasterized=True)
+    h = axs[0].hist(hits, bins=cfg.hit_bins, histtype='step', color='dimgrey', lw=2)
     
     for i, hits_ in enumerate(hits_list):
-        plt.hist(hits_, bins=h[1], histtype='step', linestyle='-', lw=3, color=cfg.color_lines[i])
+        h1 = axs[0].hist(hits_, bins=h[1], histtype='step', linestyle='-', lw=3, color=cfg.color_lines[i])
+        # ratio plot on the bottom
+        axs[1].plot((h[1][:-1] + h[1][1:])/2, h1[0]/h[0], linestyle='-', lw=2, marker='o', color=cfg.color_lines[i])
 
-    plt.axvspan(h[1].min(), 0.1, facecolor='gray', alpha=0.5, hatch= "/", edgecolor='k')
-    plt.xlim(h[1].min(), h[1].max()+0)
-    plt.ylim(cfg.ylim_hits[0], cfg.ylim_hits[1])
+    # horizontal line at 1
+    axs[1].axhline(1, linestyle='-', lw=1, color='k')
 
-    plt.yscale('log')
-    plt.xscale('log')
+    axs[0].axvspan(h[1].min(), 0.1, facecolor='gray', alpha=0.5, hatch= "/", edgecolor='k')
+    axs[0].set_xlim(h[1].min(), h[1].max()+0)
+    axs[0].set_ylim(cfg.ylim_hits[0], cfg.ylim_hits[1])
+    axs[1].set_ylim(0.5, 1.5)
+
+    axs[0].set_yscale('log')
+    axs[0].set_xscale('log')
 
     plt.xlabel('visible cell energy [MeV]')
-    plt.ylabel('\# cells')
+    axs[0].set_ylabel('\# cells')
+    axs[1].set_ylabel('ratio')
 
 
-    plt.tight_layout()
-    plt.savefig('hits.pdf', dpi=100)
+    # plt.tight_layout()
+    plt.subplots_adjust(hspace=0.075)
+
+    plt.savefig('hits.pdf', dpi=100, bbox_inches='tight')
     plt.show()
     
 def plt_esum(e_sum, e_sum_list, labels, cfg=cfg):
@@ -473,46 +495,56 @@ def plt_esum(e_sum, e_sum_list, labels, cfg=cfg):
 
 def plt_cog(cog, cog_list, labels, cfg=cfg, title=r'\textbf{full spectrum}'):
     lables = ["X", "Z", "Y"] # local coordinate system
-    plt.figure(figsize=(21, 7))
+    # plt.figure(figsize=(21, 9))
+    fig, axs = plt.subplots(2, 3, figsize=(25, 9), height_ratios=[3, 1], sharex='col')
+
+    cog_lims_min = [0.5, 0, 0.5]
+    cog_lims_max = [1.5, 3, 1.5]
 
     for k, j in enumerate([0, 2, 1]):
-        plt.subplot(1, 3, k+1)
+        # plt.subplot(1, 3, k+1)
 
-        plt.xlim(cfg.cog_ranges[j])
+        axs[0, k].set_xlim(cfg.cog_ranges[j])
         
-        h = plt.hist(np.array(cog[j]), bins=cfg.bins_cog, color='lightgrey', range=cfg.cog_ranges[j], rasterized=True)
-        h = plt.hist(np.array(cog[j]), bins=h[1], color='dimgrey', histtype='step', lw=2)
+        h = axs[0, k].hist(np.array(cog[j]), bins=cfg.bins_cog, color='lightgrey', range=cfg.cog_ranges[j], rasterized=True)
+        h = axs[0, k].hist(np.array(cog[j]), bins=h[1], color='dimgrey', histtype='step', lw=2)
         
         # for legend ##############################################
         if k == k:
         #     plt.plot(0, 0, lw=2, color='black', label=labels[0])
-            plt.hist(np.zeros(10), label=labels[0], color='lightgrey', edgecolor='dimgrey', lw=2)
+            axs[0, k].hist(np.zeros(10), label=labels[0], color='lightgrey', edgecolor='dimgrey', lw=2)
             for i in range(len(cog_list)):
-                plt.plot(0, 0, linestyle='-', lw=3, color=cfg.color_lines[i], label=labels[i+1])
+                axs[0, k].plot(0, 0, linestyle='-', lw=3, color=cfg.color_lines[i], label=labels[i+1])
         ###########################################################
 
         for i, cog_ in enumerate(cog_list):
-            h2 = plt.hist(np.array(cog_[j]), bins=h[1], histtype='step', linestyle='-', lw=3, color=cfg.color_lines[i], range=cfg.cog_ranges[j])
+            h1 = axs[0, k].hist(np.array(cog_[j]), bins=h[1], histtype='step', linestyle='-', lw=3, color=cfg.color_lines[i], range=cfg.cog_ranges[j])
+            # ratio plot on the bottom
+            axs[1, k].plot((h[1][:-1] + h[1][1:])/2, h1[0]/(h[0]+1e-5), linestyle='-', lw=2, marker='o', color=cfg.color_lines[i])
+
+        # horizontal line at 1
+        axs[1, k].axhline(1, linestyle='-', lw=1, color='k')
 
         # for legend ##############################################
-        if k == 2:
+        if k == 0:
             # plt.legend(prop=cfg.font, loc=(0.37, 0.76))
-            plt.legend(prop=cfg.font, loc='best')
+            axs[0, k].legend(prop=cfg.font, loc='best')
 
-        ax = plt.gca()
-        plt.title(title, fontsize=cfg.font.get_size(), loc='right')
+        # ax = plt.gca()
+        axs[0, k].set_title(title, fontsize=cfg.font.get_size(), loc='right')
 
         ###########################################################
 
+        axs[0, k].set_ylim(0, max(h[0]) + max(h[0])*0.5)
+        axs[1, k].set_ylim(cog_lims_min[k], cog_lims_max[k])
 
-        plt.ylim(0, max(h[0]) + max(h[0])*0.5)
-
-        plt.xlabel(f'center of gravity {lables[j]} [mm]')
-        plt.ylabel('\# showers')
-
+        axs[1, k].set_xlabel(f'center of gravity {lables[j]} [mm]')
+        axs[0, k].set_ylabel('\# showers')
+        axs[1, k].set_ylabel('ratio')
     
-    plt.tight_layout()
-    plt.savefig('cog.pdf', dpi=100)
+    # plt.tight_layout()
+    plt.subplots_adjust(hspace=0.075, wspace=0.3)
+    plt.savefig('cog.pdf', dpi=100, bbox_inches='tight')
     plt.show()
 
 
