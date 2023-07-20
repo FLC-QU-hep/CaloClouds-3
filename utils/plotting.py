@@ -53,14 +53,15 @@ class Configs():
         # self.ylim_hits = (10, 8*1e5)
 
     #CoG
-        self.bins_cog = 50  
+        self.bins_cog = 30  
         # bin ranges for [X, Z, Y] coordinates, in ILD coordinate system [X', Y', Z']
         self.cog_ranges = [(-3.99+1.5, 3.99+1.5), (1861, 1999), (36.01+1.5, 43.99+1.5)]
+        # self.cog_ranges = [(-1.7, 1.2), (1891, 1949), (38.5, 41.99)]
         # self.cog_ranges = [(-3.99, 3.99), (1861, 1999), (36.01, 43.99)]
         # self.cog_ranges = [(33.99, 39.99), (1861, 1999), (-38.9, -32.9)]
 
     # xyz featas
-        self.bins_feats = 30  
+        self.bins_feats = 50  
         # bin ranges for [X, Z, Y] coordinates, in ILD coordinate system [X', Y', Z']
         self.feats_ranges = [(-200, 200), (1811, 2011), (-160, 240)]
         # self.cog_ranges = [(-3.99, 3.99), (1861, 1999), (36.01, 43.99)]
@@ -498,7 +499,7 @@ def plt_cog(cog, cog_list, labels, cfg=cfg, title=r'\textbf{full spectrum}'):
     # plt.figure(figsize=(21, 9))
     fig, axs = plt.subplots(2, 3, figsize=(25, 9), height_ratios=[3, 1], sharex='col')
 
-    cog_lims_min = [0.5, 0, 0.5]
+    cog_lims_min = [0.5, 0.01, 0.5]
     cog_lims_max = [1.5, 3, 1.5]
 
     for k, j in enumerate([0, 2, 1]):
@@ -520,7 +521,15 @@ def plt_cog(cog, cog_list, labels, cfg=cfg, title=r'\textbf{full spectrum}'):
         for i, cog_ in enumerate(cog_list):
             h1 = axs[0, k].hist(np.array(cog_[j]), bins=h[1], histtype='step', linestyle='-', lw=3, color=cfg.color_lines[i], range=cfg.cog_ranges[j])
             # ratio plot on the bottom
-            axs[1, k].plot((h[1][:-1] + h[1][1:])/2, h1[0]/(h[0]+1e-5), linestyle='-', lw=2, marker='o', color=cfg.color_lines[i])
+            eps = 1e-5
+            centers = np.array((h[1][:-1] + h[1][1:])/2)
+            ratios = np.clip(np.array((h1[0]+eps)/(h[0]+eps)), cog_lims_min[k], cog_lims_max[k])
+            mask = (ratios > cog_lims_min[k]) & (ratios < cog_lims_max[k])
+            axs[1, k].plot(centers[mask], ratios[mask], linestyle='', lw=2, marker='o', color=cfg.color_lines[i])
+            mask = (ratios == cog_lims_min[k])
+            axs[1, k].plot(centers[mask], ratios[mask], linestyle='', lw=2, marker='v', color=cfg.color_lines[i], clip_on=False)
+            mask = (ratios == cog_lims_max[k])
+            axs[1, k].plot(centers[mask], ratios[mask], linestyle='', lw=2, marker='^', color=cfg.color_lines[i], clip_on=False)
 
         # horizontal line at 1
         axs[1, k].axhline(1, linestyle='-', lw=1, color='k')
@@ -537,13 +546,14 @@ def plt_cog(cog, cog_list, labels, cfg=cfg, title=r'\textbf{full spectrum}'):
 
         axs[0, k].set_ylim(0, max(h[0]) + max(h[0])*0.5)
         axs[1, k].set_ylim(cog_lims_min[k], cog_lims_max[k])
+        #axs[1, k].set_yscale('log')
 
         axs[1, k].set_xlabel(f'center of gravity {lables[j]} [mm]')
         axs[0, k].set_ylabel('\# showers')
         axs[1, k].set_ylabel('ratio')
     
     # plt.tight_layout()
-    plt.subplots_adjust(hspace=0.075, wspace=0.3)
+    plt.subplots_adjust(left=0, hspace=0.075, wspace=0.2)
     plt.savefig('cog.pdf', dpi=100, bbox_inches='tight')
     plt.show()
 
