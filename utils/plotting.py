@@ -49,13 +49,13 @@ class Configs():
     # hits
         self.hit_bins = np.logspace(np.log10(0.01000001), np.log10(1000), 70)
         # self.hit_bins = np.logspace(np.log10(0.01), np.log10(100), 70)
-        self.ylim_hits = (10, 3*1e7)
+        self.ylim_hits = (10, 1*1e7)
         # self.ylim_hits = (10, 8*1e5)
 
     #CoG
         self.bins_cog = 30  
         # bin ranges for [X, Z, Y] coordinates, in ILD coordinate system [X', Y', Z']
-        self.cog_ranges = [(-3.99+1.5, 3.99+1.5), (1861, 1999), (36.01+1.5, 43.99+1.5)]
+        self.cog_ranges = [(-3.99+1.5, 3.99-1.5), (1861, 1974), (36.01+1.5, 44.99+1.99)]
         # self.cog_ranges = [(-1.7, 1.2), (1891, 1949), (38.5, 41.99)]
         # self.cog_ranges = [(-3.99, 3.99), (1861, 1999), (36.01, 43.99)]
         # self.cog_ranges = [(33.99, 39.99), (1861, 1999), (-38.9, -32.9)]
@@ -310,7 +310,7 @@ def plt_radial(e_radial, e_radial_list, labels, cfg=cfg, title=r'\textbf{full sp
         axs[0].plot(0, 0, linestyle='-', lw=3, color=cfg.color_lines[i], label=labels[i+1])
     axs[0].set_title(title, fontsize=cfg.font.get_size(), loc='right')
     # plt.legend(prop=cfg.font, loc=(0.35, 0.78))
-    axs[0].legend(prop=cfg.font, loc='best')
+    axs[0].legend(prop=cfg.font, loc='upper right')
     ########################################################
 
 
@@ -319,13 +319,34 @@ def plt_radial(e_radial, e_radial_list, labels, cfg=cfg, title=r'\textbf{full sp
     
     for i, e_radial_ in enumerate(e_radial_list):
         h1 = axs[0].hist(e_radial_[0], bins=h[1], weights=e_radial_[1], histtype='step', linestyle='-', lw=3, color=cfg.color_lines[i])
+
         # ratio plot on the bottom
-        axs[1].plot((h[1][:-1] + h[1][1:])/2, h1[0]/h[0], linestyle='-', lw=2, marker='o', color=cfg.color_lines[i])
+        lims_min = 0.5
+        lims_max = 1.9
+        eps = 1e-5
+        centers = np.array((h[1][:-1] + h[1][1:])/2)
+        ratios = np.clip(np.array((h1[0]+eps)/(h[0]+eps)), lims_min, lims_max)
+        mask = (ratios > lims_min) & (ratios < lims_max)  # mask ratios within plotting y range
+        # only connect dots with adjecent points
+        starts = np.argwhere(np.insert(mask[:-1],0,False)<mask)[:,0]
+        ends = np.argwhere(np.append(mask[1:],False)<mask)[:,0]+1
+        indexes = np.stack((starts,ends)).T
+        for idxs in indexes:
+            sub_mask = np.zeros(len(mask), dtype=bool)
+            sub_mask[idxs[0]:idxs[1]] = True
+            axs[1].plot(centers[sub_mask], ratios[sub_mask], linestyle=':', lw=2, marker='o', color=cfg.color_lines[i])
+        # remaining points either above or below plotting y range
+        mask = (ratios == lims_min)
+        axs[1].plot(centers[mask], ratios[mask], linestyle='', lw=2, marker='v', color=cfg.color_lines[i], clip_on=False)
+        mask = (ratios == lims_max)
+        axs[1].plot(centers[mask], ratios[mask], linestyle='', lw=2, marker='^', color=cfg.color_lines[i], clip_on=False)
+
+    axs[1].set_ylim(lims_min, lims_max)
 
     # horizontal line at 1
     axs[1].axhline(1, linestyle='-', lw=1, color='k')
         
-    
+    axs[0].set_ylim(1,2e9)
     
     axs[0].set_yscale('log')
 
@@ -337,7 +358,7 @@ def plt_radial(e_radial, e_radial_list, labels, cfg=cfg, title=r'\textbf{full sp
     
     plt.xlabel("radius [mm]")
     axs[0].set_ylabel('energy sum [MeV]')
-    axs[1].set_ylabel('ratio')
+    axs[1].set_ylabel('ratio to MC')
     
     # ax = plt.gca()
     # plt.text(0.70, 1.02, 'full spectrum', fontsize=cfg.font.get_size(), family='serif', transform=ax.transAxes)
@@ -363,17 +384,38 @@ def plt_spinal(e_layers, e_layers_list, labels, cfg=cfg, title=r'\textbf{full sp
     
     for i, e_layers_ in enumerate(e_layers_list):
         axs[0].hist(np.arange(len(e_layers_))+1.5, bins=30, weights=e_layers_, histtype='step', linestyle='-', lw=3, color=cfg.color_lines[i])
+
         # ratio plot on the bottom
-        axs[1].plot(np.arange(len(e_layers))+1, e_layers_/e_layers, linestyle='-', lw=2, marker='o', color=cfg.color_lines[i])
+        lims_min = 0.8
+        lims_max = 1.2
+        eps = 1e-5
+        centers = np.arange(len(e_layers))+1
+        ratios = np.clip((e_layers_+eps)/(e_layers+eps), lims_min, lims_max)
+        mask = (ratios > lims_min) & (ratios < lims_max)  # mask ratios within plotting y range
+        # only connect dots with adjecent points
+        starts = np.argwhere(np.insert(mask[:-1],0,False)<mask)[:,0]
+        ends = np.argwhere(np.append(mask[1:],False)<mask)[:,0]+1
+        indexes = np.stack((starts,ends)).T
+        for idxs in indexes:
+            sub_mask = np.zeros(len(mask), dtype=bool)
+            sub_mask[idxs[0]:idxs[1]] = True
+            axs[1].plot(centers[sub_mask], ratios[sub_mask], linestyle=':', lw=2, marker='o', color=cfg.color_lines[i])
+        # remaining points either above or below plotting y range
+        mask = (ratios == lims_min)
+        axs[1].plot(centers[mask], ratios[mask], linestyle='', lw=2, marker='v', color=cfg.color_lines[i], clip_on=False)
+        mask = (ratios == lims_max)
+        axs[1].plot(centers[mask], ratios[mask], linestyle='', lw=2, marker='^', color=cfg.color_lines[i], clip_on=False)
+
+    axs[1].set_ylim(lims_min, lims_max)
 
     # horizontal line at 1
     axs[1].axhline(1, linestyle='-', lw=1, color='k')
 
     axs[0].set_yscale('log')
-    axs[0].set_ylim(1, 1000)
+    axs[0].set_ylim(1, 2e2)
     plt.xlabel('layers')
     axs[0].set_ylabel('energy sum [MeV]')
-    axs[1].set_ylabel('ratio')
+    axs[1].set_ylabel('ratio to MC')
     
     # plt.legend(prop=cfg.font, loc=(0.35, 0.78))
     #plt.legend(prop=cfg.font, loc='best')
@@ -435,7 +477,29 @@ def plt_hit_e(hits, hits_list, labels, cfg=cfg, title=r'\textbf{full spectrum}')
     for i, hits_ in enumerate(hits_list):
         h1 = axs[0].hist(hits_, bins=h[1], histtype='step', linestyle='-', lw=3, color=cfg.color_lines[i])
         # ratio plot on the bottom
-        axs[1].plot((h[1][:-1] + h[1][1:])/2, h1[0]/h[0], linestyle='-', lw=2, marker='o', color=cfg.color_lines[i])
+        # axs[1].plot((h[1][:-1] + h[1][1:])/2, h1[0]/h[0], linestyle='-', lw=2, marker='o', color=cfg.color_lines[i])
+        # ratio plot on the bottom
+        lims_min = 0.5
+        lims_max = 1.9
+        eps = 1e-5
+        centers = np.array((h[1][:-1] + h[1][1:])/2)
+        ratios = np.clip(np.array((h1[0]+eps)/(h[0]+eps)), lims_min, lims_max)
+        mask = (ratios > lims_min) & (ratios < lims_max)  # mask ratios within plotting y range
+        # only connect dots with adjecent points
+        starts = np.argwhere(np.insert(mask[:-1],0,False)<mask)[:,0]
+        ends = np.argwhere(np.append(mask[1:],False)<mask)[:,0]+1
+        indexes = np.stack((starts,ends)).T
+        for idxs in indexes:
+            sub_mask = np.zeros(len(mask), dtype=bool)
+            sub_mask[idxs[0]:idxs[1]] = True
+            axs[1].plot(centers[sub_mask], ratios[sub_mask], linestyle=':', lw=2, marker='o', color=cfg.color_lines[i])
+        # remaining points either above or below plotting y range
+        mask = (ratios == lims_min)
+        axs[1].plot(centers[mask], ratios[mask], linestyle='', lw=2, marker='v', color=cfg.color_lines[i], clip_on=False)
+        mask = (ratios == lims_max)
+        axs[1].plot(centers[mask], ratios[mask], linestyle='', lw=2, marker='^', color=cfg.color_lines[i], clip_on=False)
+
+    axs[1].set_ylim(lims_min, lims_max)
 
     # horizontal line at 1
     axs[1].axhline(1, linestyle='-', lw=1, color='k')
@@ -443,14 +507,13 @@ def plt_hit_e(hits, hits_list, labels, cfg=cfg, title=r'\textbf{full spectrum}')
     axs[0].axvspan(h[1].min(), 0.1, facecolor='gray', alpha=0.5, hatch= "/", edgecolor='k')
     axs[0].set_xlim(h[1].min(), h[1].max()+0)
     axs[0].set_ylim(cfg.ylim_hits[0], cfg.ylim_hits[1])
-    axs[1].set_ylim(0.5, 1.5)
 
     axs[0].set_yscale('log')
     axs[0].set_xscale('log')
 
     plt.xlabel('visible cell energy [MeV]')
     axs[0].set_ylabel('\# cells')
-    axs[1].set_ylabel('ratio')
+    axs[1].set_ylabel('ratio to MC')
 
 
     # plt.tight_layout()
@@ -499,9 +562,6 @@ def plt_cog(cog, cog_list, labels, cfg=cfg, title=r'\textbf{full spectrum}'):
     # plt.figure(figsize=(21, 9))
     fig, axs = plt.subplots(2, 3, figsize=(25, 9), height_ratios=[3, 1], sharex='col')
 
-    cog_lims_min = [0.5, 0.01, 0.5]
-    cog_lims_max = [1.5, 3, 1.5]
-
     for k, j in enumerate([0, 2, 1]):
         # plt.subplot(1, 3, k+1)
 
@@ -520,22 +580,34 @@ def plt_cog(cog, cog_list, labels, cfg=cfg, title=r'\textbf{full spectrum}'):
 
         for i, cog_ in enumerate(cog_list):
             h1 = axs[0, k].hist(np.array(cog_[j]), bins=h[1], histtype='step', linestyle='-', lw=3, color=cfg.color_lines[i], range=cfg.cog_ranges[j])
+
             # ratio plot on the bottom
+            lims_min = [0.5, 0.01, 0.5]
+            lims_max = [1.5, 3, 1.5]
+            marker_styles = ['o', 's', 'X']
             eps = 1e-5
             centers = np.array((h[1][:-1] + h[1][1:])/2)
-            ratios = np.clip(np.array((h1[0]+eps)/(h[0]+eps)), cog_lims_min[k], cog_lims_max[k])
-            mask = (ratios > cog_lims_min[k]) & (ratios < cog_lims_max[k])
-            axs[1, k].plot(centers[mask], ratios[mask], linestyle='', lw=2, marker='o', color=cfg.color_lines[i])
-            mask = (ratios == cog_lims_min[k])
+            ratios = np.clip(np.array((h1[0]+eps)/(h[0]+eps)), lims_min[k], lims_max[k])
+            mask = (ratios > lims_min[k]) & (ratios < lims_max[k])  # mask ratios within plotting y range
+            # only connect dots with adjecent points
+            starts = np.argwhere(np.insert(mask[:-1],0,False)<mask)[:,0]
+            ends = np.argwhere(np.append(mask[1:],False)<mask)[:,0]+1
+            indexes = np.stack((starts,ends)).T
+            for idxs in indexes:
+                sub_mask = np.zeros(len(mask), dtype=bool)
+                sub_mask[idxs[0]:idxs[1]] = True
+                axs[1, k].plot(centers[sub_mask], ratios[sub_mask], linestyle=':', lw=2, marker='o', color=cfg.color_lines[i])
+            # remaining points either above or below plotting y range
+            mask = (ratios == lims_min[k])
             axs[1, k].plot(centers[mask], ratios[mask], linestyle='', lw=2, marker='v', color=cfg.color_lines[i], clip_on=False)
-            mask = (ratios == cog_lims_max[k])
+            mask = (ratios == lims_max[k])
             axs[1, k].plot(centers[mask], ratios[mask], linestyle='', lw=2, marker='^', color=cfg.color_lines[i], clip_on=False)
 
         # horizontal line at 1
         axs[1, k].axhline(1, linestyle='-', lw=1, color='k')
 
         # for legend ##############################################
-        if k == 0:
+        if k == 1:
             # plt.legend(prop=cfg.font, loc=(0.37, 0.76))
             axs[0, k].legend(prop=cfg.font, loc='best')
 
@@ -545,12 +617,12 @@ def plt_cog(cog, cog_list, labels, cfg=cfg, title=r'\textbf{full spectrum}'):
         ###########################################################
 
         axs[0, k].set_ylim(0, max(h[0]) + max(h[0])*0.5)
-        axs[1, k].set_ylim(cog_lims_min[k], cog_lims_max[k])
+        axs[1, k].set_ylim(lims_min[k], lims_max[k])
         #axs[1, k].set_yscale('log')
 
         axs[1, k].set_xlabel(f'center of gravity {lables[j]} [mm]')
         axs[0, k].set_ylabel('\# showers')
-        axs[1, k].set_ylabel('ratio')
+        axs[1, k].set_ylabel('ratio to MC')
     
     # plt.tight_layout()
     plt.subplots_adjust(left=0, hspace=0.075, wspace=0.2)
@@ -632,4 +704,43 @@ def get_plots(events, events_list: list, labels: list = ['1', '2', '3'], thr=0.0
     plt_esum(e_sum_real, e_sum_list, labels=labels)
 
 
+def get_observables_for_plotting(events, events_list: list, thr=0.05):
+    
+    e_radial_real, occ_real, e_sum_real, hits_real, e_layers_real, occ_layer_real, e_layers_distibution_real, e_radial_lists_real = get_features(events, thr)
+    real_list = [e_radial_real, occ_real, e_sum_real, hits_real, e_layers_real, occ_layer_real, e_layers_distibution_real, e_radial_lists_real]
+    
+    e_radial_list, occ_list, e_sum_list, hits_list, e_layers_list = [], [], [], [], []
+    
+    for i in range(len(events_list)):
+        e_radial_, occ_real_, e_sum_real_, hits_real_, e_layers_real_, occ_layer_real_, e_layers_distibution_real_, e_radial_lists_real_ = get_features(events_list[i], thr)
+        
+        e_radial_list.append(e_radial_)
+        occ_list.append(occ_real_)
+        e_sum_list.append(e_sum_real_)
+        hits_list.append(hits_real_)
+        e_layers_list.append(e_layers_real_)
+        
+    fakes_list = [e_radial_list, occ_list, e_sum_list, hits_list, e_layers_list]
+    
+    return real_list, fakes_list
+
+
+
+def get_plots_from_observables(real_list: list, fakes_list: list, labels: list = ['1', '2', '3'], title=r'\textbf{full spectrum}'):
+    
+    e_radial_real, occ_real, e_sum_real, hits_real, e_layers_real, occ_layer_real, e_layers_distibution_real, e_radial_lists_real = real_list
+    
+    e_radial_list, occ_list, e_sum_list, hits_list, e_layers_list = fakes_list        
+    
+    plt_radial(e_radial_real, e_radial_list, labels=labels, title=title)
+    plt_spinal(e_layers_real, e_layers_list, labels=labels, title=title)
+    plt_hit_e(hits_real, hits_list, labels=labels, title=title)
+    plt_occupancy(occ_real, occ_list, labels=labels)
+    plt_esum(e_sum_real, e_sum_list, labels=labels)
+
+
+
+
+
 MAP, offset = create_map(X, Y, Z, dm=1)
+
