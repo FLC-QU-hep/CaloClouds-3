@@ -47,8 +47,8 @@ def gen_showers_batch(model, shower_flow, e_min, e_max, num=2000, bs=32, kdiffus
     cond_E = torch.FloatTensor(num, 1).uniform_(e_min, e_max).to(config.device)
     samples = shower_flow.condition(cond_E/100).sample(torch.Size([num, ])).cpu().numpy()
 
-    num_clusters = np.clip((samples[:, 0] * 5000).reshape(num, 1), 0, max_points)
-    energies = np.clip((samples[:, 1] * 2.5 * 1000).reshape(num, 1), 0, None)
+    num_clusters = np.clip((samples[:, 0] * 5000).reshape(num, 1), 1, max_points)
+    energies = np.clip((samples[:, 1] * 2.5 * 1000).reshape(num, 1), 0.04*1000, None)   # in MeV  (clip to a minimum energy of 40 MeV)
     cog_x = samples[:, 2] * 25
     cog_y = samples[:, 3] * 15 + 15
     cog_z = samples[:, 4] * 20 + 40
