@@ -1,0 +1,157 @@
+import sys
+sys.path.append('../')
+
+# import math
+# import argparse
+# import h5py
+# import importlib
+import numpy as np
+import torch
+import time
+import sys
+# from torch.utils.data import DataLoader
+# from torch.nn.utils import clip_grad_norm_
+# from tqdm import tqdm
+# import pickle
+
+from models.vae_flow import *
+# from models.flow import add_spectral_norm, spectral_norm_power_iteration
+from models.shower_flow import compile_HybridTanH_model
+from configs import Configs
+# from utils.plotting import get_projections, get_plots, MAP, offset, layer_bottom_pos, cell_thickness, Xmax, Xmin, Zmax, Zmin
+import utils.gen_utils as gen_utils
+
+import models.epicVAE_nflows_kDiffusion as mdls
+import models.allCond_epicVAE_nflow_PointDiff as mdls2
+
+import k_diffusion as K
+
+cfg = Configs()
+
+# print(cfg.__dict__)
+
+###############################################  PARAMS
+
+caloclouds_list = ['ddpm', 'edm', 'cm']   # 'ddpm, 'edm', 'cm'
+seed_list = [12345, 123456, 1234567]
+min_energy_list = [10, 50, 90]
+max_energy_list = [10, 50, 90]
+
+n_events = 2000
+n_scaling = True
+batch_size = 16
+out_path = '/beegfs/desy/user/buhmae/6_PointCloudDiffusion/output/singleE/'
+
+###############################################
+
+for i in range(len(caloclouds_list)):
+    caloclouds = caloclouds_list[i]
+    seed = seed_list[i]
+
+    for j in range(len(min_energy_list)):
+        min_energy = min_energy_list[j]
+        max_energy = max_energy_list[j]
+
+        torch.manual_seed(seed)
+
+        ### load shower flow model
+        flow, distribution = compile_HybridTanH_model(num_blocks=10, 
+                                                #    num_inputs=32, ### when 'condioning' on additional Esum, Nhits etc add them on as inputs rather than 
+                                                #  num_inputs=35, ### when 'condioning' on additional Esum, Nhits etc add them on as inputs rather than 
+                                                num_inputs=65, ### adding 30 e layers 
+                                                num_cond_inputs=1, device=cfg.device)  # num_cond_inputs
+
+        # checkpoint = torch.load('/beegfs/desy/user/akorol/chekpoints/ECFlow/EFlow+CFlow_138.pth')
+        # checkpoint = torch.load('/beegfs/desy/user/buhmae/6_PointCloudDiffusion/shower_flow/220706_cog_ShowerFlow_350.pth')
+        # checkpoint = torch.load('/beegfs/desy/user/buhmae/6_PointCloudDiffusion/shower_flow/220707_cog_ShowerFlow_500.pth')  # max 730
+        # checkpoint = torch.load('/beegfs/desy/user/buhmae/6_PointCloudDiffusion/shower_flow/220713_cog_e_layer_ShowerFlow_best.pth') 
+        checkpoint = torch.load('/beegfs/desy/user/buhmae/6_PointCloudDiffusion/shower_flow/220714_cog_e_layer_ShowerFlow_best.pth')   # trained about 350 epochs
+        flow.load_state_dict(checkpoint['model'])
+        flow.eval().to(cfg.device)
+
+        print('flow model loaded')
+
+
+        # load diffusion model and weights
+
+        # caloclouds baseline
+        if caloclouds == 'ddpm':
+            # cfg = Configs()
+            kdiffusion=False   # EDM vs DDPM diffusion
+            cfg.sched_mode = 'quardatic'
+            cfg.num_steps = 100
+            cfg.residual = True
+            cfg.latent_dim = 256
+            cfg.dropout_rate = 0.0
+            model = mdls2.AllCond_epicVAE_nFlow_PointDiff(cfg).to(cfg.device)
+            checkpoint = torch.load('/beegfs/desy/user/akorol/logs/point-cloud/AllCond_epicVAE_nFlow_PointDiff_100s_MSE_loss_smired_possitions_quardatic2023_04_06__16_34_39/ckpt_0.000000_837000.pt', map_location=torch.device(cfg.device)) # quadratic
+            model.load_state_dict(checkpoint['state_dict'])
+            # coef_real = np.array([ 2.50244046e-09, -2.82685784e-05,  3.15731003e-01,  5.08123555e+01])
+            # coef_fake = np.array([ 3.72975819e-09, -3.87472364e-05,  3.80314204e-01,  5.30334567e+01])
+            coef_real = np.array([ 2.42091454e-09, -2.72191705e-05,  2.95613817e-01,  4.88328360e+01])
+            coef_fake = np.array([ 3.26839258e-09, -3.34485096e-05,  3.35514492e-01,  5.21262922e+01])
+
+        # caloclouds EDM
+        elif caloclouds == 'edm':
+            # cfg = Configs()
+            kdiffusion=True   # EDM vs DDPM diffusion
+            cfg.num_steps = 13
+            cfg.sampler = 'heun'   # default 'heun'
+            cfg.s_churn =  0.0     # stochasticity, default 0.0  (if s_churn more than num_steps, it will be clamped to max value)
+            cfg.s_noise = 1.0    # default 1.0   # noise added when s_churn > 0
+            cfg.sigma_max = 80.0 #  5.3152e+00  # default 80.0
+            cfg.sigma_min = 0.002   # default 0.002
+            cfg.rho = 7. # default 7.0
+            # # # baseline with lat_dim = 0, max_iter 10M, lr=1e-4 fixed, dropout_rate=0.0, ema_power=2/3 (long training)            USING THIS TRAINING
+            cfg.dropout_rate = 0.0
+            cfg.latent_dim = 0
+            cfg.residual = False
+            checkpoint = torch.load(cfg.logdir + '/' + 'kCaloClouds_2023_06_29__23_08_31/ckpt_0.000000_2000000.pt', map_location=torch.device(cfg.device))    # max 5200000
+            model = mdls.epicVAE_nFlow_kDiffusion(cfg).to(cfg.device)
+            model.load_state_dict(checkpoint['others']['model_ema'])
+            # coef_real = np.array([ 2.50244046e-09, -2.82685784e-05,  3.15731003e-01,  5.08123555e+01])
+            # coef_fake = np.array([ 5.08021809e-09, -5.26101363e-05,  4.74959822e-01,  5.34314449e+01])
+            coef_real = np.array([ 2.42091454e-09, -2.72191705e-05,  2.95613817e-01,  4.88328360e+01])
+            coef_fake = np.array([ 4.68671594e-09, -4.83679440e-05,  4.30093515e-01,  4.92378621e+01])
+
+        # condsistency model
+        elif caloclouds == 'cm':
+            # cfg = Configs()
+            kdiffusion=True   # EDM vs DDPM diffusion
+            cfg.num_steps = 1
+            cfg.sigma_max = 80.0 #  5.3152e+00  # default 80.0
+            # long baseline with lat_dim = 0, max_iter 1M, lr=1e-4 fixed, num_steps=18, bs=256, simga_max=80, epoch=2M, EMA
+            cfg.dropout_rate = 0.0
+            cfg.latent_dim = 0
+            cfg.residual = False
+            checkpoint = torch.load(cfg.logdir + '/' + 'CD_2023_07_07__16_32_09/ckpt_0.000000_1000000.pt', map_location=torch.device(cfg.device))   # max 1200000
+            model = mdls.epicVAE_nFlow_kDiffusion(cfg, distillation = True).to(cfg.device)
+            model.load_state_dict(checkpoint['others']['model_ema'])
+            # coef_real = np.array([ 2.50244046e-09, -2.82685784e-05,  3.15731003e-01,  5.08123555e+01])
+            # coef_fake = np.array([ 4.29894066e-09, -4.61132724e-05,  4.40193379e-01,  6.23006887e+01])
+            coef_real = np.array([ 2.42091454e-09, -2.72191705e-05,  2.95613817e-01,  4.88328360e+01])
+            coef_fake = np.array([ 4.10401929e-09, -4.34978084e-05,  4.00683098e-01,  5.60974626e+01])
+
+        else:
+            raise ValueError('caloclouds must be one of: ddpm, edm, cm')
+
+        model.eval()
+
+        print(caloclouds, ' model loaded')
+
+
+        ### GENERATE EVENTS
+
+        s_t = time.time()
+        fake_showers = gen_utils.gen_showers_batch(model, distribution, min_energy, max_energy, n_events, bs=batch_size, kdiffusion=kdiffusion, config=cfg, coef_real=coef_real, coef_fake=coef_fake, n_scaling=n_scaling)
+        t = time.time() - s_t
+        print(fake_showers.shape)
+        print(t)
+        print('time per shower: (s)', t / n_events)
+
+
+        #### save fake showers
+        f = out_path + '{}-{}GeV_{}_{}_seed{}.npy'.format(str(min_energy), str(max_energy), str(n_events), caloclouds, str(seed))
+        np.save(f, fake_showers)
+
+        print('fake showers (energy in MeV) saved in ', f)
