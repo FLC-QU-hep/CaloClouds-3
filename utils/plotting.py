@@ -49,7 +49,7 @@ class Configs():
     # hits
         self.hit_bins = np.logspace(np.log10(0.01000001), np.log10(1000), 70)
         # self.hit_bins = np.logspace(np.log10(0.01), np.log10(100), 70)
-        self.ylim_hits = (10, 1*1e7)
+        self.ylim_hits = (1, 1*1e7)
         # self.ylim_hits = (10, 8*1e5)
 
     #CoG
@@ -69,6 +69,7 @@ class Configs():
 
 
     # all
+        self.threshold = 0.1   # MeV / half a MIP
         #self.color_lines = ['tab:blue', 'tab:orange', 'tab:green', 'tab:red']
         self.color_lines = ['tab:orange', 'tab:blue', 'tab:green', 'tab:red']
         # self.color_lines = ['tab:orange', 'tab:orange', 'tab:orange', 'tab:orange']
@@ -228,13 +229,26 @@ def get_projections(showers, MAP, layer_bottom_pos, return_cell_point_cloud=Fals
 
 
 
-def get_cog(x, y, z, e):
+def get_cog(cloud, thr=cfg.threshold):  # expects shape [events, 4, points]
+    cloud = cloud.copy()
+    # set all pionts with energy below threshold to zero
+    mask = cloud[:, -1, :] < thr
+    mask = np.repeat(mask[:, np.newaxis, :], 4, axis=1)
+    cloud[mask] = 0
+
+    x, y, z, e = cloud[:, 0], cloud[:, 1], cloud[:, 2], cloud[:, 3],
+
+    # mask out events with zero or negative e sum
+    mask = e.sum(axis=1) > 0
+    x, y, z, e = x[mask], y[mask], z[mask], e[mask]
+
     x_cog = np.sum((x * e), axis=1) / e.sum(axis=1)
     y_cog = np.sum((y * e), axis=1) / e.sum(axis=1)
     z_cog = np.sum((z * e), axis=1) / e.sum(axis=1)
     return x_cog, y_cog, z_cog
 
-def get_features(events, thr=0.05):
+
+def get_features(events):
     
     incident_point = cfg.origin
     
@@ -245,6 +259,7 @@ def get_features(events, thr=0.05):
     e_layers_list = [] # energy per layer
     occ_layers_list = [] # occupancy per layer
     e_radidal_lists = [] # radial profile per layer
+    hits_noThreshold_list = [] # energy per cell without threshold
 
     for layers in tqdm(events):
 
@@ -255,8 +270,10 @@ def get_features(events, thr=0.05):
         y_pos = []
         e_radial_layers = []
         for l, layer in enumerate(layers):
-            layer = layer*1000 # energy rescale  
-            layer[layer < thr] = 0
+            # layer = layer*1000 # energy rescale to MeV
+            layer = layer.copy()   # for following inplace operations
+            layer_noThreshold = layer.copy()
+            layer[layer < cfg.threshold] = 0
 
             hit_mask = layer > 0    # shape i.e. 82,81
             layer_hits = layer[hit_mask]
@@ -266,6 +283,7 @@ def get_features(events, thr=0.05):
             e_sum += layer.sum()
 
             hits_list.append(layer_hits)
+            hits_noThreshold_list.append(layer_noThreshold[layer_noThreshold > 0])
             e_layers.append(layer.sum())
 
             occ_layers.append(hit_mask.sum())
@@ -292,13 +310,14 @@ def get_features(events, thr=0.05):
     e_radial = np.concatenate(e_radial, axis=1)  # out shape: [2, flattend hits]
     occ_list = np.array(occ_list)
     e_sum_list = np.array(e_sum_list)
-    hits_list = np.concatenate(hits_list)
+    hits_list = np.concatenate(hits_list)   # hit energies
     e_layers_distibution = np.array(e_layers_list)  # distibution of energy per layer
     e_layers_list = e_layers_distibution.sum(axis=0)/len(events)  # average energy per layer
     occ_layers_list = np.array(occ_layers_list)#.sum(axis=0)/len(events)
     e_radial_lists = e_radidal_lists  # nested list: e_rad_lst[ EVENTS ][DIST,E ] [ POINTS ]
+    hits_noThreshold_list = np.concatenate(hits_noThreshold_list)  # hit energies without threshold
     
-    return e_radial, occ_list, e_sum_list, hits_list, e_layers_list, occ_layers_list, e_layers_distibution, e_radial_lists
+    return e_radial, occ_list, e_sum_list, hits_list, e_layers_list, occ_layers_list, e_layers_distibution, e_radial_lists, hits_noThreshold_list
 
 
 def plt_radial(e_radial, e_radial_list, labels, cfg=cfg, title=r'\textbf{full spectrum}'):
@@ -363,7 +382,7 @@ def plt_radial(e_radial, e_radial_list, labels, cfg=cfg, title=r'\textbf{full sp
     # ax = plt.gca()
     # plt.text(0.70, 1.02, 'full spectrum', fontsize=cfg.font.get_size(), family='serif', transform=ax.transAxes)
     
-    plt.subplots_adjust(hspace=0.075)
+    plt.subplots_adjust(hspace=0.1)
     # plt.tight_layout()
 
     plt.savefig('radial.pdf', dpi=100, bbox_inches='tight')
@@ -374,22 +393,25 @@ def plt_spinal(e_layers, e_layers_list, labels, cfg=cfg, title=r'\textbf{full sp
     fig, axs = plt.subplots(2, 1, figsize=(7,9), height_ratios=[3, 1], sharex=True)
 
     ## for legend ##########################################
-    axs[0].hist(np.zeros(1)+1, label=labels[0], color='lightgrey', edgecolor='dimgrey', lw=2)
+    axs[0].hist(np.zeros(1)-10, label=labels[0], color='lightgrey', edgecolor='dimgrey', lw=2)
     for i in range(len(e_layers_list)):
         axs[0].plot(0, 0, linestyle='-', lw=3, color=cfg.color_lines[i], label=labels[i+1])
     ########################################################
 
-    axs[0].hist(np.arange(len(e_layers))+1.5, bins=30, weights=e_layers, color='lightgrey', rasterized=True)
-    axs[0].hist(np.arange(len(e_layers))+1.5, bins=30, weights=e_layers, color='dimgrey', histtype='step', lw=2)
+    pos = np.arange(1, len(e_layers)+1)
+    bins = np.arange(0.5, len(e_layers)+1.5)
+
+    axs[0].hist(pos, bins=bins, weights=e_layers, color='lightgrey', rasterized=True)
+    axs[0].hist(pos, bins=bins, weights=e_layers, color='dimgrey', histtype='step', lw=2)
     
     for i, e_layers_ in enumerate(e_layers_list):
-        axs[0].hist(np.arange(len(e_layers_))+1.5, bins=30, weights=e_layers_, histtype='step', linestyle='-', lw=3, color=cfg.color_lines[i])
+        axs[0].hist(pos, bins=bins, weights=e_layers_, histtype='step', linestyle='-', lw=3, color=cfg.color_lines[i])
 
         # ratio plot on the bottom
         lims_min = 0.8
-        lims_max = 1.2
+        lims_max = 1.02
         eps = 1e-5
-        centers = np.arange(len(e_layers))+1
+        centers = pos
         ratios = np.clip((e_layers_+eps)/(e_layers+eps), lims_min, lims_max)
         mask = (ratios > lims_min) & (ratios < lims_max)  # mask ratios within plotting y range
         # only connect dots with adjecent points
@@ -412,7 +434,8 @@ def plt_spinal(e_layers, e_layers_list, labels, cfg=cfg, title=r'\textbf{full sp
     axs[1].axhline(1, linestyle='-', lw=1, color='k')
 
     axs[0].set_yscale('log')
-    axs[0].set_ylim(1, 2e2)
+    axs[0].set_ylim(1.1e-1, 2e2)
+    axs[0].set_xlim(0, 31)
     plt.xlabel('layers')
     axs[0].set_ylabel('energy sum [MeV]')
     axs[1].set_ylabel('ratio to MC')
@@ -421,7 +444,7 @@ def plt_spinal(e_layers, e_layers_list, labels, cfg=cfg, title=r'\textbf{full sp
     #plt.legend(prop=cfg.font, loc='best')
     axs[0].set_title(title, fontsize=cfg.font.get_size(), loc='right')
     # plt.tight_layout()
-    plt.subplots_adjust(hspace=0.075)
+    plt.subplots_adjust(hspace=0.1)
 
     plt.savefig('spinal.pdf', dpi=100, bbox_inches='tight')
     plt.show()
@@ -504,8 +527,10 @@ def plt_hit_e(hits, hits_list, labels, cfg=cfg, title=r'\textbf{full spectrum}')
     # horizontal line at 1
     axs[1].axhline(1, linestyle='-', lw=1, color='k')
 
-    axs[0].axvspan(h[1].min(), 0.1, facecolor='gray', alpha=0.5, hatch= "/", edgecolor='k')
-    axs[0].set_xlim(h[1].min(), h[1].max()+0)
+    axs[0].axvspan(h[1].min(), cfg.threshold, facecolor='gray', alpha=0.5, hatch= "/", edgecolor='k')
+    axs[1].axvspan(h[1].min(), cfg.threshold, facecolor='gray', alpha=0.5, hatch= "/", edgecolor='k')
+    # axs[0].set_xlim(h[1].min(), h[1].max()+0)
+    axs[0].set_xlim(h[1].min(), 3e2)
     axs[0].set_ylim(cfg.ylim_hits[0], cfg.ylim_hits[1])
 
     axs[0].set_yscale('log')
@@ -517,7 +542,7 @@ def plt_hit_e(hits, hits_list, labels, cfg=cfg, title=r'\textbf{full spectrum}')
 
 
     # plt.tight_layout()
-    plt.subplots_adjust(hspace=0.075)
+    plt.subplots_adjust(hspace=0.1)
 
     plt.savefig('hits.pdf', dpi=100, bbox_inches='tight')
     plt.show()
@@ -573,7 +598,7 @@ def plt_cog(cog, cog_list, labels, cfg=cfg, title=r'\textbf{full spectrum}'):
         # for legend ##############################################
         if k == k:
         #     plt.plot(0, 0, lw=2, color='black', label=labels[0])
-            axs[0, k].hist(np.zeros(10), label=labels[0], color='lightgrey', edgecolor='dimgrey', lw=2)
+            axs[0, k].hist(np.zeros(1)-10, label=labels[0], color='lightgrey', edgecolor='dimgrey', lw=2)
             for i in range(len(cog_list)):
                 axs[0, k].plot(0, 0, linestyle='-', lw=3, color=cfg.color_lines[i], label=labels[i+1])
         ###########################################################
@@ -625,7 +650,7 @@ def plt_cog(cog, cog_list, labels, cfg=cfg, title=r'\textbf{full spectrum}'):
         axs[1, k].set_ylabel('ratio to MC')
     
     # plt.tight_layout()
-    plt.subplots_adjust(left=0, hspace=0.075, wspace=0.2)
+    plt.subplots_adjust(left=0, hspace=0.1, wspace=0.25)
     plt.savefig('cog.pdf', dpi=100, bbox_inches='tight')
     plt.show()
 
@@ -680,44 +705,76 @@ def plt_feats(events, events_list: list, labels, cfg=cfg, title=r'\textbf{full s
     plt.show()
 
 
+def plt_occupancy_singleE(occ_list, occ_list_list, labels, cfg=cfg):
+    plt.figure(figsize=(9,9))
 
-def get_plots(events, events_list: list, labels: list = ['1', '2', '3'], thr=0.05, title=r'\textbf{full spectrum}'):
+    ## for legend ##########################################
+    plt.hist(np.zeros(1)+1, label=labels[0], color='lightgrey', edgecolor='dimgrey', lw=2)
+    for i in range(len(occ_list_list[0])):
+        plt.plot(0, 0, linestyle='-', lw=3, color=cfg.color_lines[i], label=labels[i+1])
+    ########################################################
+
+    for _, (occ, occ_list) in enumerate(zip(occ_list, occ_list_list)):
+
+        h = plt.hist(occ, bins=cfg.occup_bins, color='lightgrey', rasterized=True)
+        h = plt.hist(occ, bins=cfg.occup_bins, color='dimgrey', histtype='step', lw=2)
+        
+        for i, occ_ in enumerate(occ_list):
+            plt.hist(occ_, bins=h[1], histtype='step', linestyle='-', lw=2.5, color=cfg.color_lines[i])
+
+    plt.xlim(cfg.occup_bins.min() - cfg.occ_indent, cfg.occup_bins.max() + cfg.occ_indent)
+    plt.xlabel('number of hits')
+    plt.ylabel('\# showers')
+
+    # plt.legend(prop=cfg.font, loc=(0.35, 0.78))
+    plt.legend(prop=cfg.font, loc='best')
+    # if cfg.plot_text_occupancy:
+    plt.text(315, 540, '10 GeV', fontsize=cfg.font.get_size() + 2)
+    plt.text(870, 215, '50 GeV', fontsize=cfg.font.get_size() + 2)
+    plt.text(1230, 170, '90 GeV', fontsize=cfg.font.get_size() + 2)
+
+
+    plt.tight_layout()
+    plt.savefig('occ_singleE.pdf', dpi=100)
+    plt.show()
+
+
+def get_plots(events, events_list: list, labels: list = ['1', '2', '3'], title=r'\textbf{full spectrum}'):
     
-    e_radial_real, occ_real, e_sum_real, hits_real, e_layers_real, occ_layer_real, e_layers_distibution_real, e_radial_lists_real = get_features(events, thr)
+    e_radial_real, occ_real, e_sum_real, hits_real, e_layers_real, occ_layer_real, e_layers_distibution_real, e_radial_lists_real, hits_noThreshold_list_real = get_features(events)
     
     e_radial_list, occ_list, e_sum_list, hits_list, e_layers_list = [], [], [], [], []
     
     for i in range(len(events_list)):
-        e_radial_, occ_real_, e_sum_real_, hits_real_, e_layers_real_, occ_layer_real_, e_layers_distibution_real_, e_radial_lists_real_ = get_features(events_list[i], thr)
+        e_radial_, occ_real_, e_sum_real_, hits_real_, e_layers_real_, occ_layer_real_, e_layers_distibution_real_, e_radial_lists_real_, hits_noThreshold_list_real_ = get_features(events_list[i])
         
         e_radial_list.append(e_radial_)
         occ_list.append(occ_real_)
         e_sum_list.append(e_sum_real_)
-        hits_list.append(hits_real_)
+        hits_list.append(hits_noThreshold_list_real_)
         e_layers_list.append(e_layers_real_)
         
     
     plt_radial(e_radial_real, e_radial_list, labels=labels, title=title)
     plt_spinal(e_layers_real, e_layers_list, labels=labels, title=title)
-    plt_hit_e(hits_real, hits_list, labels=labels, title=title)
+    plt_hit_e(hits_noThreshold_list_real, hits_list, labels=labels, title=title)
     plt_occupancy(occ_real, occ_list, labels=labels)
     plt_esum(e_sum_real, e_sum_list, labels=labels)
 
 
-def get_observables_for_plotting(events, events_list: list, thr=0.05):
+def get_observables_for_plotting(events, events_list: list):
     
-    e_radial_real, occ_real, e_sum_real, hits_real, e_layers_real, occ_layer_real, e_layers_distibution_real, e_radial_lists_real = get_features(events, thr)
-    real_list = [e_radial_real, occ_real, e_sum_real, hits_real, e_layers_real, occ_layer_real, e_layers_distibution_real, e_radial_lists_real]
+    real_list = get_features(events)
     
     e_radial_list, occ_list, e_sum_list, hits_list, e_layers_list = [], [], [], [], []
     
     for i in range(len(events_list)):
-        e_radial_, occ_real_, e_sum_real_, hits_real_, e_layers_real_, occ_layer_real_, e_layers_distibution_real_, e_radial_lists_real_ = get_features(events_list[i], thr)
+        e_radial_, occ_real_, e_sum_real_, hits_real_, e_layers_real_, occ_layer_real_, e_layers_distibution_real_, e_radial_lists_real_, hits_noThreshold_list_real_ = get_features(events_list[i])
         
         e_radial_list.append(e_radial_)
         occ_list.append(occ_real_)
         e_sum_list.append(e_sum_real_)
-        hits_list.append(hits_real_)
+        hits_list.append(hits_noThreshold_list_real_)
         e_layers_list.append(e_layers_real_)
         
     fakes_list = [e_radial_list, occ_list, e_sum_list, hits_list, e_layers_list]
@@ -725,19 +782,30 @@ def get_observables_for_plotting(events, events_list: list, thr=0.05):
     return real_list, fakes_list
 
 
-
 def get_plots_from_observables(real_list: list, fakes_list: list, labels: list = ['1', '2', '3'], title=r'\textbf{full spectrum}'):
     
-    e_radial_real, occ_real, e_sum_real, hits_real, e_layers_real, occ_layer_real, e_layers_distibution_real, e_radial_lists_real = real_list
+    e_radial_real, occ_real, e_sum_real, hits_real, e_layers_real, occ_layer_real, e_layers_distibution_real, e_radial_lists_real, hits_noThreshold_list_real = real_list
     
     e_radial_list, occ_list, e_sum_list, hits_list, e_layers_list = fakes_list        
     
     plt_radial(e_radial_real, e_radial_list, labels=labels, title=title)
     plt_spinal(e_layers_real, e_layers_list, labels=labels, title=title)
-    plt_hit_e(hits_real, hits_list, labels=labels, title=title)
+    plt_hit_e(hits_noThreshold_list_real, hits_list, labels=labels, title=title)
     plt_occupancy(occ_real, occ_list, labels=labels)
     plt_esum(e_sum_real, e_sum_list, labels=labels)
 
+
+def get_plots_from_observables_singleE(real_list_list: list, fakes_list_list: list, labels: list = ['1', '2', '3']):
+    
+    occ_real_list, occ_fake_list_list = [], []
+    for i in range(len(real_list_list)):  # observables for certain single energy
+        e_radial_real, occ_real, e_sum_real, hits_real, e_layers_real, occ_layer_real, e_layers_distibution_real, e_radial_lists_real, hits_noThreshold_list_real = real_list_list[i]
+        occ_real_list.append(occ_real)
+
+        e_radial_list, occ_list, e_sum_list, hits_list, e_layers_list = fakes_list_list[i]
+        occ_fake_list_list.append(occ_list)
+    
+    plt_occupancy_singleE(occ_real_list, occ_fake_list_list, labels=labels)
 
 
 
