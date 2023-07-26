@@ -72,10 +72,7 @@ def gen_showers_batch(model, shower_flow, e_min, e_max, num=2000, bs=32, kdiffus
     # scale_factor = get_scale_factor(clusters_per_layer_gen.sum(axis=1))   # B,
     # scale_factor = np.expand_dims(scale_factor, axis=1)
     if n_scaling:
-        print('number of cluster: ', num_clusters[0:10])
         scale_factor = get_scale_factor(num_clusters, coef_real, coef_fake)   # B,1
-        # scale_factor *= 0.9
-        print(scale_factor[0:10])
         num_clusters = (num_clusters * scale_factor).astype(int)  # B,1
     else:
         num_clusters = (num_clusters).astype(int)  # B,1
