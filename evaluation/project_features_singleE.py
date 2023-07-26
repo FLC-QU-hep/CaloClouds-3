@@ -33,6 +33,10 @@ min_energy_list = [10, 50, 90]
 max_energy_list = [10, 50, 90]
 n_events = 2000
 
+# seed_list = [12345, 123456, 12345]
+# min_energy_list = [50]
+# max_energy_list = [50]
+
 for j in range(len(min_energy_list)):
     dict = {}
     min_energy = min_energy_list[j]
