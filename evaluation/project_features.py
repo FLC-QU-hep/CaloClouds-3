@@ -18,24 +18,29 @@ from utils.plotting import get_projections, MAP, layer_bottom_pos
 # print(cfg.__dict__)
 
 
+###############################################  PARAMS
 
-
-
-# number of events to be processed
-n = 2000   # default 2000
-out_path = '/beegfs/desy/user/buhmae/6_PointCloudDiffusion/output/singleE/'
-pickle_path = out_path + 'pickle/'
-
-
-caloclouds_list = ['ddpm', 'edm', 'cm']   # 'ddpm, 'edm', 'cm'
-seed_list = [12345, 123456, 1234567]
+### SINGLE ENERGY PARAMS
 min_energy_list = [10, 50, 90]
 max_energy_list = [10, 50, 90]
 n_events = 2000
+out_path = '/beegfs/desy/user/buhmae/6_PointCloudDiffusion/output/singleE/'
 
-# seed_list = [12345, 123456, 12345]
-# min_energy_list = [50]
-# max_energy_list = [50]
+# FULL SPECTRUM PARAMS
+### SINGLE ENERGY PARAMS
+# min_energy_list = [10]
+# max_energy_list = [90]
+# n_events = 40000
+# out_path = '/beegfs/desy/user/buhmae/6_PointCloudDiffusion/output/full/'
+
+
+## COMMON PARAMETERS
+caloclouds_list = ['ddpm', 'edm', 'cm']   # 'ddpm, 'edm', 'cm'
+seed_list = [12345, 123456, 1234567]
+pickle_path = out_path + 'pickle/'
+n = n_events   # for debugging --> not projecting all events
+
+###############################################
 
 for j in range(len(min_energy_list)):
     dict = {}

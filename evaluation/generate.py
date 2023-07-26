@@ -22,20 +22,24 @@ cfg = Configs()
 
 ###############################################  PARAMS
 
-caloclouds_list = ['ddpm', 'edm', 'cm']   # 'ddpm, 'edm', 'cm'
-seed_list = [12345, 123456, 1234567]
+## SINGLE ENERGY GENERATION
 min_energy_list = [10, 50, 90]
 max_energy_list = [10, 50, 90]
-
-# caloclouds_list = ['cm']   # 'ddpm, 'edm', 'cm'
-# seed_list = [12345]
-# min_energy_list = [50]
-# max_energy_list = [50]
-
 n_events = 2000
+out_path = '/beegfs/desy/user/buhmae/6_PointCloudDiffusion/output/singleE/'
+
+### FULL SPECTRUM GENERATION
+# min_energy_list = [10]
+# max_energy_list = [90]
+# n_events = 40000
+# out_path = '/beegfs/desy/user/buhmae/6_PointCloudDiffusion/output/full/'
+
+
+### COMMMONG PARAMETERS
+caloclouds_list = ['ddpm', 'edm', 'cm']   # 'ddpm, 'edm', 'cm'
+seed_list = [12345, 123456, 1234567]
 n_scaling = True
 batch_size = 16
-out_path = '/beegfs/desy/user/buhmae/6_PointCloudDiffusion/output/singleE/'
 
 ###############################################
 
@@ -79,10 +83,8 @@ for i in range(len(caloclouds_list)):
             model = mdls2.AllCond_epicVAE_nFlow_PointDiff(cfg).to(cfg.device)
             checkpoint = torch.load('/beegfs/desy/user/akorol/logs/point-cloud/AllCond_epicVAE_nFlow_PointDiff_100s_MSE_loss_smired_possitions_quardatic2023_04_06__16_34_39/ckpt_0.000000_837000.pt', map_location=torch.device(cfg.device)) # quadratic
             model.load_state_dict(checkpoint['state_dict'])
-            # coef_real = np.array([ 2.50244046e-09, -2.82685784e-05,  3.15731003e-01,  5.08123555e+01])   # 0.05 GeV threshold
-            # coef_fake = np.array([ 3.72975819e-09, -3.87472364e-05,  3.80314204e-01,  5.30334567e+01])
-            coef_real = np.array([ 2.42091454e-09, -2.72191705e-05,  2.95613817e-01,  4.88328360e+01])     # 0.1 GeV threshold
-            coef_fake = np.array([ 3.26839258e-09, -3.34485096e-05,  3.35514492e-01,  5.21262922e+01])
+            coef_real = np.array([ 2.42091454e-09, -2.72191705e-05,  2.95613817e-01,  4.88328360e+01])   # fixed coeff at 0.1 threshold
+            coef_fake = np.array([-2.03879741e-06,  4.93529413e-03,  5.11518795e-01,  3.14176987e+02])
 
         # caloclouds EDM
         elif caloclouds == 'edm':
@@ -102,10 +104,8 @@ for i in range(len(caloclouds_list)):
             checkpoint = torch.load(cfg.logdir + '/' + 'kCaloClouds_2023_06_29__23_08_31/ckpt_0.000000_2000000.pt', map_location=torch.device(cfg.device))    # max 5200000
             model = mdls.epicVAE_nFlow_kDiffusion(cfg).to(cfg.device)
             model.load_state_dict(checkpoint['others']['model_ema'])
-            # coef_real = np.array([ 2.50244046e-09, -2.82685784e-05,  3.15731003e-01,  5.08123555e+01])  # 0.05 GeV threshold
-            # coef_fake = np.array([ 5.08021809e-09, -5.26101363e-05,  4.74959822e-01,  5.34314449e+01])
-            coef_real = np.array([ 2.42091454e-09, -2.72191705e-05,  2.95613817e-01,  4.88328360e+01])    # 0.1 GeV threshold
-            coef_fake = np.array([ 4.68671594e-09, -4.83679440e-05,  4.30093515e-01,  4.92378621e+01])
+            coef_real = np.array([ 2.42091454e-09, -2.72191705e-05,  2.95613817e-01,  4.88328360e+01])  # fixed coeff at 0.1 threshold
+            coef_fake = np.array([-7.68614180e-07,  2.49613388e-03,  1.00790407e+00,  1.63126644e+02])
 
         # condsistency model
         elif caloclouds == 'cm':
@@ -120,10 +120,8 @@ for i in range(len(caloclouds_list)):
             checkpoint = torch.load(cfg.logdir + '/' + 'CD_2023_07_07__16_32_09/ckpt_0.000000_1000000.pt', map_location=torch.device(cfg.device))   # max 1200000
             model = mdls.epicVAE_nFlow_kDiffusion(cfg, distillation = True).to(cfg.device)
             model.load_state_dict(checkpoint['others']['model_ema'])
-            # coef_real = np.array([ 2.50244046e-09, -2.82685784e-05,  3.15731003e-01,  5.08123555e+01])  # 0.05 GeV threshold
-            # coef_fake = np.array([ 4.29894066e-09, -4.61132724e-05,  4.40193379e-01,  6.23006887e+01])
-            coef_real = np.array([ 2.42091454e-09, -2.72191705e-05,  2.95613817e-01,  4.88328360e+01])    # 0.1 GeV threshold
-            coef_fake = np.array([ 4.10401929e-09, -4.34978084e-05,  4.00683098e-01,  5.60974626e+01])
+            coef_real = np.array([ 2.42091454e-09, -2.72191705e-05,  2.95613817e-01,  4.88328360e+01])  # fixed coeff at 0.1 threshold
+            coef_fake = np.array([-9.02997505e-07,  2.82747963e-03,  1.01417267e+00,  1.64829018e+02])
 
         else:
             raise ValueError('caloclouds must be one of: ddpm, edm, cm')
