@@ -52,8 +52,6 @@ for i in range(len(caloclouds_list)):
         min_energy = min_energy_list[j]
         max_energy = max_energy_list[j]
 
-        torch.manual_seed(seed)
-
         ### load shower flow model
         flow, distribution = compile_HybridTanH_model(num_blocks=10, 
                                                 #    num_inputs=32, ### when 'condioning' on additional Esum, Nhits etc add them on as inputs rather than 
@@ -136,11 +134,11 @@ for i in range(len(caloclouds_list)):
             raise ValueError('caloclouds must be one of: ddpm, edm, cm')
 
         model.eval()
-
         print(caloclouds, ' model loaded')
-
+        
 
         ### GENERATE EVENTS
+        torch.manual_seed(seed)
 
         s_t = time.time()
         fake_showers = gen_utils.gen_showers_batch(model, distribution, min_energy, max_energy, n_events, bs=batch_size, kdiffusion=kdiffusion, config=cfg, coef_real=coef_real, coef_fake=coef_fake, n_scaling=n_scaling)
