@@ -10,14 +10,19 @@ def get_cog(x,y,z,e):
     return np.sum((x * e), axis=1) / e.sum(axis=1), np.sum((y * e), axis=1) / e.sum(axis=1), np.sum((z * e), axis=1) / e.sum(axis=1)
 
 
-def get_scale_factor(num_clusters, coef_real, coef_fake):
+def get_scale_factor(num_clusters, coef_real, coef_fake, n_splines):  # num_clusters: (bs, 1)
     
-    poly_fn_real = np.poly1d(coef_real)
-    poly_fn_fake = np.poly1d(coef_fake) 
-    
-    scale_factor = poly_fn_fake(poly_fn_real(num_clusters)) / num_clusters
+    if n_splines is not None:
+        spline_real = n_splines['spline_real']
+        spline_fake = n_splines['spline_fake']
+        scale_factor = spline_fake.predict(spline_real.predict(num_clusters).reshape(-1,1)) .reshape(-1,1) / num_clusters
+    else:
+        poly_fn_real = np.poly1d(coef_real)
+        poly_fn_fake = np.poly1d(coef_fake) 
+        scale_factor = poly_fn_fake(poly_fn_real(num_clusters)) / num_clusters
 
-    return scale_factor
+    scale_factor = np.clip(scale_factor, 0., None)  # cannot be negative
+    return scale_factor  # (bs, 1)
 
 
 def get_shower(model, num_points, energy, cond_N, bs=1, kdiffusion=False, config=None):
@@ -42,7 +47,7 @@ def get_shower(model, num_points, energy, cond_N, bs=1, kdiffusion=False, config
 
 
 # batch inference 
-def gen_showers_batch(model, shower_flow, e_min, e_max, num=2000, bs=32, kdiffusion=False, config=None, max_points=6000, coef_real=None, coef_fake=None, n_scaling = True):
+def gen_showers_batch(model, shower_flow, e_min, e_max, num=2000, bs=32, kdiffusion=False, config=None, max_points=6000, coef_real=None, coef_fake=None, n_scaling = True, n_splines=None):
     
     cond_E = torch.FloatTensor(num, 1).uniform_(e_min, e_max).to(config.device)
     samples = shower_flow.condition(cond_E/100).sample(torch.Size([num, ])).cpu().numpy()
@@ -72,7 +77,7 @@ def gen_showers_batch(model, shower_flow, e_min, e_max, num=2000, bs=32, kdiffus
     # scale_factor = get_scale_factor(clusters_per_layer_gen.sum(axis=1))   # B,
     # scale_factor = np.expand_dims(scale_factor, axis=1)
     if n_scaling:
-        scale_factor = get_scale_factor(num_clusters, coef_real, coef_fake)   # B,1
+        scale_factor = get_scale_factor(num_clusters, coef_real, coef_fake, n_splines)   # B,1
         num_clusters = (num_clusters * scale_factor).astype(int)  # B,1
     else:
         num_clusters = (num_clusters).astype(int)  # B,1

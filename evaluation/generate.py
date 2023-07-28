@@ -5,6 +5,7 @@ import numpy as np
 import torch
 import time
 import sys
+import joblib
 
 from models.vae_flow import *
 from models.shower_flow import compile_HybridTanH_model
@@ -23,23 +24,26 @@ cfg = Configs()
 ###############################################  PARAMS
 
 ## SINGLE ENERGY GENERATION
-min_energy_list = [10, 50, 90]
-max_energy_list = [10, 50, 90]
-n_events = 2000
-out_path = '/beegfs/desy/user/buhmae/6_PointCloudDiffusion/output/singleE/'
+# min_energy_list = [10, 50, 90]
+# max_energy_list = [10, 50, 90]
+# n_events = 2000
+# out_path = '/beegfs/desy/user/buhmae/6_PointCloudDiffusion/output/singleE/'
 
 ### FULL SPECTRUM GENERATION
-# min_energy_list = [10]
-# max_energy_list = [90]
-# n_events = 40000
-# out_path = '/beegfs/desy/user/buhmae/6_PointCloudDiffusion/output/full/'
+min_energy_list = [10]
+max_energy_list = [90]
+n_events = 100_000
+out_path = '/beegfs/desy/user/buhmae/6_PointCloudDiffusion/output/full/'
 
 
 ### COMMMONG PARAMETERS
-caloclouds_list = ['ddpm', 'edm', 'cm']   # 'ddpm, 'edm', 'cm'
-seed_list = [12345, 123456, 1234567]
-n_scaling = True
+# caloclouds_list = ['ddpm', 'edm', 'cm']   # 'ddpm, 'edm', 'cm'
+# seed_list = [12345, 123456, 1234567]
+caloclouds_list = ['cm']   # 'ddpm, 'edm', 'cm'
+seed_list = [1234]
+n_scaling = False
 batch_size = 16
+prefix = 'no_scaling_'   # default ''
 
 ###############################################
 
@@ -85,6 +89,7 @@ for i in range(len(caloclouds_list)):
             model.load_state_dict(checkpoint['state_dict'])
             coef_real = np.array([ 2.42091454e-09, -2.72191705e-05,  2.95613817e-01,  4.88328360e+01])   # fixed coeff at 0.1 threshold
             coef_fake = np.array([-2.03879741e-06,  4.93529413e-03,  5.11518795e-01,  3.14176987e+02])
+            n_splines = None #joblib.load('/beegfs/desy/user/buhmae/6_PointCloudDiffusion/n_spline/spline_ddpm.joblib')
 
         # caloclouds EDM
         elif caloclouds == 'edm':
@@ -106,6 +111,7 @@ for i in range(len(caloclouds_list)):
             model.load_state_dict(checkpoint['others']['model_ema'])
             coef_real = np.array([ 2.42091454e-09, -2.72191705e-05,  2.95613817e-01,  4.88328360e+01])  # fixed coeff at 0.1 threshold
             coef_fake = np.array([-7.68614180e-07,  2.49613388e-03,  1.00790407e+00,  1.63126644e+02])
+            n_splines = None # joblib.load('/beegfs/desy/user/buhmae/6_PointCloudDiffusion/n_spline/spline_edm.joblib')
 
         # condsistency model
         elif caloclouds == 'cm':
@@ -122,6 +128,7 @@ for i in range(len(caloclouds_list)):
             model.load_state_dict(checkpoint['others']['model_ema'])
             coef_real = np.array([ 2.42091454e-09, -2.72191705e-05,  2.95613817e-01,  4.88328360e+01])  # fixed coeff at 0.1 threshold
             coef_fake = np.array([-9.02997505e-07,  2.82747963e-03,  1.01417267e+00,  1.64829018e+02])
+            n_splines = None # joblib.load('/beegfs/desy/user/buhmae/6_PointCloudDiffusion/n_spline/spline_cm.joblib')
 
         else:
             raise ValueError('caloclouds must be one of: ddpm, edm, cm')
@@ -135,7 +142,7 @@ for i in range(len(caloclouds_list)):
         print(' one random torch number: ', torch.rand(1))
 
         s_t = time.time()
-        fake_showers = gen_utils.gen_showers_batch(model, distribution, min_energy, max_energy, n_events, bs=batch_size, kdiffusion=kdiffusion, config=cfg, coef_real=coef_real, coef_fake=coef_fake, n_scaling=n_scaling)
+        fake_showers = gen_utils.gen_showers_batch(model, distribution, min_energy, max_energy, n_events, bs=batch_size, kdiffusion=kdiffusion, config=cfg, coef_real=coef_real, coef_fake=coef_fake, n_scaling=n_scaling, n_splines=n_splines)
         t = time.time() - s_t
         print(fake_showers.shape)
         print(t)
@@ -144,7 +151,7 @@ for i in range(len(caloclouds_list)):
 
 
         #### save fake showers
-        f = out_path + '{}-{}GeV_{}_{}_seed{}.npy'.format(str(min_energy), str(max_energy), str(n_events), caloclouds, str(seed))
+        f = out_path + prefix + '{}-{}GeV_{}_{}_seed{}.npy'.format(str(min_energy), str(max_energy), str(n_events), caloclouds, str(seed))
         np.save(f, fake_showers)
 
         print('fake showers (energy in MeV) saved in ', f)
