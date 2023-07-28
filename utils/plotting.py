@@ -706,36 +706,74 @@ def plt_feats(events, events_list: list, labels, cfg=cfg, title=r'\textbf{full s
 
 
 def plt_occupancy_singleE(occ_list, occ_list_list, labels, cfg=cfg):
-    plt.figure(figsize=(9,9))
+    fig, axs = plt.subplots(2, 1, figsize=(9,12), height_ratios=[3, 1], sharex=True)
 
     ## for legend ##########################################
-    plt.hist(np.zeros(1)+1, label=labels[0], color='lightgrey', edgecolor='dimgrey', lw=2)
+    axs[0].hist(np.zeros(1)+1, label=labels[0], color='lightgrey', edgecolor='dimgrey', lw=2)
     for i in range(len(occ_list_list[0])):
-        plt.plot(0, 0, linestyle='-', lw=3, color=cfg.color_lines[i], label=labels[i+1])
+        axs[0].plot(0, 0, linestyle='-', lw=3, color=cfg.color_lines[i], label=labels[i+1])
     ########################################################
 
-    for _, (occ, occ_list) in enumerate(zip(occ_list, occ_list_list)):
+    for j, (occ, occ_list) in enumerate(zip(occ_list, occ_list_list)):   # loop over energyies
 
-        h = plt.hist(occ, bins=cfg.occup_bins, color='lightgrey', rasterized=True)
-        h = plt.hist(occ, bins=cfg.occup_bins, color='dimgrey', histtype='step', lw=2)
+        h = axs[0].hist(occ, bins=cfg.occup_bins, color='lightgrey', rasterized=True)
+        h = axs[0].hist(occ, bins=cfg.occup_bins, color='dimgrey', histtype='step', lw=2)
         
-        for i, occ_ in enumerate(occ_list):
-            plt.hist(occ_, bins=h[1], histtype='step', linestyle='-', lw=2.5, color=cfg.color_lines[i])
+        for i, occ_ in enumerate(occ_list):   # loop over models
+            h1 = axs[0].hist(occ_, bins=h[1], histtype='step', linestyle='-', lw=2.5, color=cfg.color_lines[i])
 
-    plt.xlim(cfg.occup_bins.min() - cfg.occ_indent, cfg.occup_bins.max() + cfg.occ_indent)
+            # ratio plot on the bottom
+            lims_min = 0.5
+            lims_max = 1.5
+            eps = 1e-5
+            
+            x_nhits_range = [cfg.occup_bins.min() - cfg.occ_indent, 400, 1000, cfg.occup_bins.max() + cfg.occ_indent]
+
+            centers = np.array((h[1][:-1] + h[1][1:])/2)
+            x_mask = (centers >= x_nhits_range[j]) & (centers < x_nhits_range[j+1])
+
+            centers = centers[x_mask]
+            ratios = np.clip(np.array((h1[0]+eps)/(h[0]+eps)), lims_min, lims_max)[x_mask]
+            mask = (ratios > lims_min) & (ratios < lims_max)  # mask ratios within plotting y range
+            # only connect dots with adjecent points
+            starts = np.argwhere(np.insert(mask[:-1],0,False)<mask)[:,0]
+            ends = np.argwhere(np.append(mask[1:],False)<mask)[:,0]+1
+            indexes = np.stack((starts,ends)).T
+            for idxs in indexes:
+                sub_mask = np.zeros(len(mask), dtype=bool)
+                sub_mask[idxs[0]:idxs[1]] = True
+                axs[1].plot(centers[sub_mask], ratios[sub_mask], linestyle=':', lw=2, marker='o', color=cfg.color_lines[i])
+            # remaining points either above or below plotting y range
+            mask = (ratios == lims_min)
+            axs[1].plot(centers[mask], ratios[mask], linestyle='', lw=2, marker='v', color=cfg.color_lines[i], clip_on=False)
+            mask = (ratios == lims_max)
+            axs[1].plot(centers[mask], ratios[mask], linestyle='', lw=2, marker='^', color=cfg.color_lines[i], clip_on=False)
+
+
+    # horizontal line at 1
+    axs[1].axhline(1, linestyle='-', lw=1, color='k')
+    axs[1].axvline(x_nhits_range[1], linestyle='-', lw=2, color='k')
+    axs[1].axvline(x_nhits_range[2], linestyle='-', lw=2, color='k')
+
+    axs[0].set_xlim(cfg.occup_bins.min() - cfg.occ_indent, cfg.occup_bins.max() + cfg.occ_indent)
     plt.xlabel('number of hits')
-    plt.ylabel('\# showers')
+    axs[0].set_ylabel('\# showers')
+    axs[1].set_ylabel('ratio to MC')
 
     # plt.legend(prop=cfg.font, loc=(0.35, 0.78))
-    plt.legend(prop=cfg.font, loc='best')
+    axs[0].legend(prop=cfg.font, loc='best')
     # if cfg.plot_text_occupancy:
-    plt.text(315, 540, '10 GeV', fontsize=cfg.font.get_size() + 2)
-    plt.text(870, 215, '50 GeV', fontsize=cfg.font.get_size() + 2)
-    plt.text(1230, 170, '90 GeV', fontsize=cfg.font.get_size() + 2)
+    # axs[0].text(315, 540, '10 GeV', fontsize=cfg.font.get_size() + 2)
+    # axs[0].text(870, 215, '50 GeV', fontsize=cfg.font.get_size() + 2)
+    # axs[0].text(1230, 170, '90 GeV', fontsize=cfg.font.get_size() + 2)
+    plt.text(190, 1.6, '10 GeV', fontsize=cfg.font.get_size() + 2)
+    plt.text(650, 1.6, '50 GeV', fontsize=cfg.font.get_size() + 2)
+    plt.text(1100, 1.6, '90 GeV', fontsize=cfg.font.get_size() + 2)
 
 
-    plt.tight_layout()
-    plt.savefig('occ_singleE.pdf', dpi=100)
+    # plt.tight_layout()
+    plt.subplots_adjust(hspace=0.1)
+    plt.savefig('occ_singleE.pdf', dpi=100, bbox_inches='tight')
     plt.show()
 
 
