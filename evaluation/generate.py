@@ -24,16 +24,16 @@ cfg = Configs()
 ###############################################  PARAMS
 
 ## SINGLE ENERGY GENERATION
-# min_energy_list = [10, 50, 90]
-# max_energy_list = [10, 50, 90]
-# n_events = 2000
-# out_path = '/beegfs/desy/user/buhmae/6_PointCloudDiffusion/output/singleE/'
+min_energy_list = [10, 50, 90]
+max_energy_list = [10, 50, 90]
+n_events = 2000
+out_path = '/beegfs/desy/user/buhmae/6_PointCloudDiffusion/output/singleE/'
 
 ### FULL SPECTRUM GENERATION
-min_energy_list = [10]
-max_energy_list = [90]
-n_events = 40_000
-out_path = '/beegfs/desy/user/buhmae/6_PointCloudDiffusion/output/full/'
+# min_energy_list = [10]
+# max_energy_list = [90]
+# n_events = 40_000
+# out_path = '/beegfs/desy/user/buhmae/6_PointCloudDiffusion/output/full/'
 
 
 ### COMMMONG PARAMETERS

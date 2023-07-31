@@ -36,12 +36,12 @@ class Configs():
         
 
     # occupancy
-        self.occup_bins = np.linspace(150, 1419, 100)
+        self.occup_bins = np.linspace(150, 1419, 50)
         self.plot_text_occupancy = False
         self.occ_indent = 20
 
     # e_sum
-        self.e_sum_bins = np.linspace(20.01, 2200, 100)
+        self.e_sum_bins = np.linspace(20.01, 2200, 50)
         self.plot_text_e = False
         self.plot_legend_e = True
         self.e_indent = 20
@@ -260,6 +260,7 @@ def get_features(events):
     occ_layers_list = [] # occupancy per layer
     e_radidal_lists = [] # radial profile per layer
     hits_noThreshold_list = [] # energy per cell without threshold
+    dict = {}
 
     for layers in tqdm(events):
 
@@ -307,17 +308,18 @@ def get_features(events):
         e_radial_layers = np.concatenate(e_radial_layers, axis=1)
         e_radidal_lists.append(e_radial_layers)
 
-    e_radial = np.concatenate(e_radial, axis=1)  # out shape: [2, flattend hits]
-    occ_list = np.array(occ_list)
-    e_sum_list = np.array(e_sum_list)
-    hits_list = np.concatenate(hits_list)   # hit energies
-    e_layers_distibution = np.array(e_layers_list)  # distibution of energy per layer
-    e_layers_list = e_layers_distibution.sum(axis=0)/len(events)  # average energy per layer
-    occ_layers_list = np.array(occ_layers_list)#.sum(axis=0)/len(events)
-    e_radial_lists = e_radidal_lists  # nested list: e_rad_lst[ EVENTS ][DIST,E ] [ POINTS ]
-    hits_noThreshold_list = np.concatenate(hits_noThreshold_list)  # hit energies without threshold
+    dict['e_radial'] = np.concatenate(e_radial, axis=1)  # out shape: [2, flattend hits]
+    dict['e_sum'] = np.array(e_sum_list)
+    dict['hits'] = np.concatenate(hits_list)   # hit energies
+    dict['occ'] = np.array(occ_list)
+    dict['e_layers_distibution'] = np.array(e_layers_list)  # distibution of energy per layer
+    dict['e_layers'] = np.array(e_layers_list).sum(axis=0)/len(events)  # average energy per layer
+    dict['occ_layers'] = np.array(occ_layers_list)#.sum(axis=0)/len(events)
+    dict['e_radial'] = e_radidal_lists  # nested list: e_rad_lst[ EVENTS ][DIST,E ] [ POINTS ]
+    dict['hits_noThreshold'] = np.concatenate(hits_noThreshold_list)  # hit energies without threshold
     
-    return e_radial, occ_list, e_sum_list, hits_list, e_layers_list, occ_layers_list, e_layers_distibution, e_radial_lists, hits_noThreshold_list
+    # return e_radial, occ_list, e_sum_list, hits_list, e_layers_list, occ_layers_list, e_layers_distibution, e_radial_lists, hits_noThreshold_list
+    return dict
 
 
 def plt_radial(e_radial, e_radial_list, labels, cfg=cfg, title=r'\textbf{full spectrum}'):
@@ -838,62 +840,78 @@ def plt_esum_singleE(e_sum_list, e_sum_list_list, labels, cfg=cfg):
 
     # plt.tight_layout()
     plt.subplots_adjust(hspace=0.1)
-    plt.savefig('e_sum_singleE.pdf', dpi=100)
+    plt.savefig('e_sum_singleE.pdf', dpi=100, bbox_inches='tight')
     plt.show()
 
 
 def get_plots(events, events_list: list, labels: list = ['1', '2', '3'], title=r'\textbf{full spectrum}'):
     
-    e_radial_real, occ_real, e_sum_real, hits_real, e_layers_real, occ_layer_real, e_layers_distibution_real, e_radial_lists_real, hits_noThreshold_list_real = get_features(events)
+    #e_radial_real, occ_real, e_sum_real, hits_real, e_layers_real, occ_layer_real, e_layers_distibution_real, e_radial_lists_real, hits_noThreshold_list_real = get_features(events)
+    dict_real = get_features(events)
+    e_radial_real = dict_real['e_radial']
+    occ_real = dict_real['occ']
+    e_sum_real = dict_real['e_sum']
+    hits_real = dict_real['hits_noThreshold']
+    e_layers_real = dict_real['e_layers']
     
     e_radial_list, occ_list, e_sum_list, hits_list, e_layers_list = [], [], [], [], []
     
     for i in range(len(events_list)):
-        e_radial_, occ_real_, e_sum_real_, hits_real_, e_layers_real_, occ_layer_real_, e_layers_distibution_real_, e_radial_lists_real_, hits_noThreshold_list_real_ = get_features(events_list[i])
+        dict_fake = get_features(events_list[i])
         
-        e_radial_list.append(e_radial_)
-        occ_list.append(occ_real_)
-        e_sum_list.append(e_sum_real_)
-        hits_list.append(hits_noThreshold_list_real_)
-        e_layers_list.append(e_layers_real_)
+        e_radial_list.append(dict_fake['e_radial'])
+        occ_list.append(dict_fake['occ'])
+        e_sum_list.append(dict_fake['e_sum'])
+        hits_list.append(dict_fake['hits_noThreshold'])
+        e_layers_list.append(dict_fake['e_layers'])
         
     
     plt_radial(e_radial_real, e_radial_list, labels=labels, title=title)
     plt_spinal(e_layers_real, e_layers_list, labels=labels, title=title)
-    plt_hit_e(hits_noThreshold_list_real, hits_list, labels=labels, title=title)
+    plt_hit_e(hits_real, hits_list, labels=labels, title=title)
     plt_occupancy(occ_real, occ_list, labels=labels)
     plt_esum(e_sum_real, e_sum_list, labels=labels)
 
 
 def get_observables_for_plotting(events, events_list: list):
     
-    real_list = get_features(events)
+    dict_real = get_features(events)
+    e_radial_real = dict_real['e_radial']
+    occ_real = dict_real['occ']
+    e_sum_real = dict_real['e_sum']
+    hits_real = dict_real['hits_noThreshold']
+    e_layers_real = dict_real['e_layers']
     
     e_radial_list, occ_list, e_sum_list, hits_list, e_layers_list = [], [], [], [], []
     
     for i in range(len(events_list)):
-        e_radial_, occ_real_, e_sum_real_, hits_real_, e_layers_real_, occ_layer_real_, e_layers_distibution_real_, e_radial_lists_real_, hits_noThreshold_list_real_ = get_features(events_list[i])
+        dict_fake = get_features(events_list[i])
         
-        e_radial_list.append(e_radial_)
-        occ_list.append(occ_real_)
-        e_sum_list.append(e_sum_real_)
-        hits_list.append(hits_noThreshold_list_real_)
-        e_layers_list.append(e_layers_real_)
+        e_radial_list.append(dict_fake['e_radial'])
+        occ_list.append(dict_fake['occ'])
+        e_sum_list.append(dict_fake['e_sum'])
+        hits_list.append(dict_fake['hits_noThreshold'])
+        e_layers_list.append(dict_fake['e_layers'])
         
     fakes_list = [e_radial_list, occ_list, e_sum_list, hits_list, e_layers_list]
+
+    real_list = [e_radial_real, occ_real, e_sum_real, hits_real, e_layers_real]
     
     return real_list, fakes_list
 
 
 def get_plots_from_observables(real_list: list, fakes_list: list, labels: list = ['1', '2', '3'], title=r'\textbf{full spectrum}'):
     
-    e_radial_real, occ_real, e_sum_real, hits_real, e_layers_real, occ_layer_real, e_layers_distibution_real, e_radial_lists_real, hits_noThreshold_list_real = real_list
+    if len(real_list) != len(fakes_list):
+        e_radial_real, occ_real, e_sum_real, hits_real, e_layers_real, occ_layer_real, e_layers_distibution_real, e_radial_lists_real, hits_noThreshold_list_real = real_list
+    else:
+        e_radial_real, occ_real, e_sum_real, hits_real, e_layers_real = real_list
     
     e_radial_list, occ_list, e_sum_list, hits_list, e_layers_list = fakes_list        
     
     plt_radial(e_radial_real, e_radial_list, labels=labels, title=title)
     plt_spinal(e_layers_real, e_layers_list, labels=labels, title=title)
-    plt_hit_e(hits_noThreshold_list_real, hits_list, labels=labels, title=title)
+    plt_hit_e(hits_real, hits_list, labels=labels, title=title)
     plt_occupancy(occ_real, occ_list, labels=labels)
     plt_esum(e_sum_real, e_sum_list, labels=labels)
 
@@ -903,7 +921,7 @@ def get_plots_from_observables_singleE(real_list_list: list, fakes_list_list: li
     occ_real_list, occ_fake_list_list = [], []
     e_sum_real_list, e_sum_fake_list_list = [], []
     for i in range(len(real_list_list)):  # observables for certain single energy
-        e_radial_real, occ_real, e_sum_real, hits_real, e_layers_real, occ_layer_real, e_layers_distibution_real, e_radial_lists_real, hits_noThreshold_list_real = real_list_list[i]
+        e_radial_real, occ_real, e_sum_real, hits_real, e_layers_real = real_list_list[i]
         occ_real_list.append(occ_real)
         e_sum_real_list.append(e_sum_real)
 
