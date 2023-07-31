@@ -21,17 +21,17 @@ from utils.plotting import get_projections, MAP, layer_bottom_pos
 ###############################################  PARAMS
 
 ### SINGLE ENERGY PARAMS
-min_energy_list = [10, 50, 90]
-max_energy_list = [10, 50, 90]
-n_events = 2000
-out_path = '/beegfs/desy/user/buhmae/6_PointCloudDiffusion/output/singleE/'
+# min_energy_list = [10, 50, 90]
+# max_energy_list = [10, 50, 90]
+# n_events = 2000
+# out_path = '/beegfs/desy/user/buhmae/6_PointCloudDiffusion/output/singleE/'
 
-# FULL SPECTRUM PARAMS
-### SINGLE ENERGY PARAMS
-# min_energy_list = [10]
-# max_energy_list = [90]
-# n_events = 40000
-# out_path = '/beegfs/desy/user/buhmae/6_PointCloudDiffusion/output/full/'
+### FULL SPECTRUM PARAMS
+full_spectrum = True
+min_energy_list = [10]
+max_energy_list = [90]
+n_events = 40_000
+out_path = '/beegfs/desy/user/buhmae/6_PointCloudDiffusion/output/full/'
 
 
 ## COMMON PARAMETERS
@@ -48,8 +48,10 @@ for j in range(len(min_energy_list)):
     max_energy = max_energy_list[j]
 
     #### load save data
-
-    path = '/beegfs/desy/user/akorol/data/calo-clouds/hdf5/all_steps/validation/photon-showers_{}GeV_A90_Zpos4.slcio.hdf5'.format(min_energy)
+    if full_spectrum:
+        path = '/beegfs/desy/user/akorol/data/calo-clouds/hdf5/all_steps/validation/photon-showers_10-90GeV_A90_Zpos4.slcio.hdf5'
+    else:
+        path = '/beegfs/desy/user/akorol/data/calo-clouds/hdf5/all_steps/validation/photon-showers_{}GeV_A90_Zpos4.slcio.hdf5'.format(min_energy)
     real_showers = h5py.File(path, 'r')['events'][:]
     real_showers[:, -1] = real_showers[:, -1] * 1000   # GeV to MeV
     print('real showers shape: ', real_showers.shape)
