@@ -55,7 +55,7 @@ class Configs():
     #CoG
         self.bins_cog = 30  
         # bin ranges for [X, Z, Y] coordinates, in ILD coordinate system [X', Y', Z']
-        self.cog_ranges = [(-3.99+1.5, 3.99-1.5), (1861, 1974), (36.01+1.5, 44.99+1.99)]
+        self.cog_ranges = [(-3.99+1.5, 3.99-1.5), (1861, 2001), (37.99, 39.99+1.99)]
         # self.cog_ranges = [(-1.7, 1.2), (1891, 1949), (38.5, 41.99)]
         # self.cog_ranges = [(-3.99, 3.99), (1861, 1999), (36.01, 43.99)]
         # self.cog_ranges = [(33.99, 39.99), (1861, 1999), (-38.9, -32.9)]
@@ -411,7 +411,7 @@ def plt_spinal(e_layers, e_layers_list, labels, cfg=cfg, title=r'\textbf{full sp
 
         # ratio plot on the bottom
         lims_min = 0.8
-        lims_max = 1.02
+        lims_max = 1.05
         eps = 1e-5
         centers = pos
         ratios = np.clip((e_layers_+eps)/(e_layers+eps), lims_min, lims_max)
@@ -634,7 +634,7 @@ def plt_cog(cog, cog_list, labels, cfg=cfg, title=r'\textbf{full spectrum}'):
         axs[1, k].axhline(1, linestyle='-', lw=1, color='k')
 
         # for legend ##############################################
-        if k == 1:
+        if k == 2:
             # plt.legend(prop=cfg.font, loc=(0.37, 0.76))
             axs[0, k].legend(prop=cfg.font, loc='best')
 
@@ -726,7 +726,7 @@ def plt_occupancy_singleE(occ_list, occ_list_list, labels, cfg=cfg):
 
             # ratio plot on the bottom
             lims_min = 0.5
-            lims_max = 1.5
+            lims_max = 1.7
             eps = 1e-5
             x_nhits_range = [cfg.occup_bins.min() - cfg.occ_indent, 400, 950, cfg.occup_bins.max() + cfg.occ_indent]
 
@@ -766,9 +766,10 @@ def plt_occupancy_singleE(occ_list, occ_list_list, labels, cfg=cfg):
     # axs[0].text(315, 540, '10 GeV', fontsize=cfg.font.get_size() + 2)
     # axs[0].text(870, 215, '50 GeV', fontsize=cfg.font.get_size() + 2)
     # axs[0].text(1230, 170, '90 GeV', fontsize=cfg.font.get_size() + 2)
-    plt.text(190, 1.55, '10 GeV', fontsize=cfg.font.get_size() + 2)
-    plt.text(650, 1.55, '50 GeV', fontsize=cfg.font.get_size() + 2)
-    plt.text(1100, 1.55, '90 GeV', fontsize=cfg.font.get_size() + 2)
+    y = 1.75
+    plt.text(190, y, '10 GeV', fontsize=cfg.font.get_size() + 2)
+    plt.text(650, y, '50 GeV', fontsize=cfg.font.get_size() + 2)
+    plt.text(1100, y, '90 GeV', fontsize=cfg.font.get_size() + 2)
 
     # plt.tight_layout()
     plt.subplots_adjust(hspace=0.1)
@@ -794,7 +795,7 @@ def plt_esum_singleE(e_sum_list, e_sum_list_list, labels, cfg=cfg):
             
             # ratio plot on the bottom
             lims_min = 0.5
-            lims_max = 1.5
+            lims_max = 2.0
             eps = 1e-5
             x_nhits_range = [cfg.e_sum_bins.min() - cfg.e_indent, 500, 1300, cfg.e_sum_bins.max() + cfg.e_indent]
 
@@ -829,10 +830,10 @@ def plt_esum_singleE(e_sum_list, e_sum_list_list, labels, cfg=cfg):
     axs[0].set_ylabel('\# showers')
     axs[1].set_ylabel('ratio to MC')
     
-
-    plt.text(150, 1.55, '10 GeV', fontsize=cfg.font.get_size() + 2)
-    plt.text(750, 1.55, '50 GeV', fontsize=cfg.font.get_size() + 2)
-    plt.text(1700, 1.55, '90 GeV', fontsize=cfg.font.get_size() + 2)
+    y = 2.05
+    plt.text(150, y, '10 GeV', fontsize=cfg.font.get_size() + 2)
+    plt.text(750, y, '50 GeV', fontsize=cfg.font.get_size() + 2)
+    plt.text(1700, y, '90 GeV', fontsize=cfg.font.get_size() + 2)
 
    #if cfg.plot_legend_e:
         # plt.legend(prop=cfg.font, loc=(0.35, 0.78))
@@ -911,7 +912,10 @@ def get_plots_from_observables(real_list: list, fakes_list: list, labels: list =
     
     plt_radial(e_radial_real, e_radial_list, labels=labels, title=title)
     plt_spinal(e_layers_real, e_layers_list, labels=labels, title=title)
-    plt_hit_e(hits_real, hits_list, labels=labels, title=title)
+    if len(real_list) != len(fakes_list):
+        plt_hit_e(hits_noThreshold_list_real, hits_list, labels=labels, title=title)
+    else:
+        plt_hit_e(hits_real, hits_list, labels=labels, title=title)
     plt_occupancy(occ_real, occ_list, labels=labels)
     plt_esum(e_sum_real, e_sum_list, labels=labels)
 
