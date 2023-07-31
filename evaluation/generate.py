@@ -32,18 +32,18 @@ cfg = Configs()
 ### FULL SPECTRUM GENERATION
 min_energy_list = [10]
 max_energy_list = [90]
-n_events = 100_000
+n_events = 40_000
 out_path = '/beegfs/desy/user/buhmae/6_PointCloudDiffusion/output/full/'
 
 
 ### COMMMONG PARAMETERS
-# caloclouds_list = ['ddpm', 'edm', 'cm']   # 'ddpm, 'edm', 'cm'
-# seed_list = [12345, 123456, 1234567]
-caloclouds_list = ['cm']   # 'ddpm, 'edm', 'cm'
-seed_list = [1234]
-n_scaling = False
+caloclouds_list = ['ddpm', 'edm', 'cm']   # 'ddpm, 'edm', 'cm'
+seed_list = [12345, 123456, 1234567]
+# caloclouds_list = ['cm']   # 'ddpm, 'edm', 'cm'
+# seed_list = [1234]
+n_scaling = True     # default True
 batch_size = 16
-prefix = 'no_scaling_'   # default ''
+prefix = ''   # default ''
 
 ###############################################
 
