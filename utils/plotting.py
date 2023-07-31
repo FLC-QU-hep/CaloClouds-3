@@ -36,12 +36,12 @@ class Configs():
         
 
     # occupancy
-        self.occup_bins = np.linspace(150, 1479, 100)
+        self.occup_bins = np.linspace(150, 1419, 100)
         self.plot_text_occupancy = False
         self.occ_indent = 20
 
     # e_sum
-        self.e_sum_bins = np.linspace(20.01, 2400, 150)
+        self.e_sum_bins = np.linspace(20.01, 2200, 100)
         self.plot_text_e = False
         self.plot_legend_e = True
         self.e_indent = 20
@@ -726,8 +726,7 @@ def plt_occupancy_singleE(occ_list, occ_list_list, labels, cfg=cfg):
             lims_min = 0.5
             lims_max = 1.5
             eps = 1e-5
-            
-            x_nhits_range = [cfg.occup_bins.min() - cfg.occ_indent, 400, 1000, cfg.occup_bins.max() + cfg.occ_indent]
+            x_nhits_range = [cfg.occup_bins.min() - cfg.occ_indent, 400, 950, cfg.occup_bins.max() + cfg.occ_indent]
 
             centers = np.array((h[1][:-1] + h[1][1:])/2)
             x_mask = (centers >= x_nhits_range[j]) & (centers < x_nhits_range[j+1])
@@ -749,31 +748,97 @@ def plt_occupancy_singleE(occ_list, occ_list_list, labels, cfg=cfg):
             mask = (ratios == lims_max)
             axs[1].plot(centers[mask], ratios[mask], linestyle='', lw=2, marker='^', color=cfg.color_lines[i], clip_on=False)
 
-
     # horizontal line at 1
     axs[1].axhline(1, linestyle='-', lw=1, color='k')
     axs[1].axvline(x_nhits_range[1], linestyle='-', lw=2, color='k')
     axs[1].axvline(x_nhits_range[2], linestyle='-', lw=2, color='k')
 
     axs[0].set_xlim(cfg.occup_bins.min() - cfg.occ_indent, cfg.occup_bins.max() + cfg.occ_indent)
+    axs[1].set_ylim(lims_min, lims_max)
     plt.xlabel('number of hits')
     axs[0].set_ylabel('\# showers')
     axs[1].set_ylabel('ratio to MC')
 
     # plt.legend(prop=cfg.font, loc=(0.35, 0.78))
     axs[0].legend(prop=cfg.font, loc='best')
-    # if cfg.plot_text_occupancy:
     # axs[0].text(315, 540, '10 GeV', fontsize=cfg.font.get_size() + 2)
     # axs[0].text(870, 215, '50 GeV', fontsize=cfg.font.get_size() + 2)
     # axs[0].text(1230, 170, '90 GeV', fontsize=cfg.font.get_size() + 2)
-    plt.text(190, 1.6, '10 GeV', fontsize=cfg.font.get_size() + 2)
-    plt.text(650, 1.6, '50 GeV', fontsize=cfg.font.get_size() + 2)
-    plt.text(1100, 1.6, '90 GeV', fontsize=cfg.font.get_size() + 2)
-
+    plt.text(190, 1.55, '10 GeV', fontsize=cfg.font.get_size() + 2)
+    plt.text(650, 1.55, '50 GeV', fontsize=cfg.font.get_size() + 2)
+    plt.text(1100, 1.55, '90 GeV', fontsize=cfg.font.get_size() + 2)
 
     # plt.tight_layout()
     plt.subplots_adjust(hspace=0.1)
     plt.savefig('occ_singleE.pdf', dpi=100, bbox_inches='tight')
+    plt.show()
+
+
+def plt_esum_singleE(e_sum_list, e_sum_list_list, labels, cfg=cfg):
+    fig, axs = plt.subplots(2, 1, figsize=(9,12), height_ratios=[3, 1], sharex=True)
+
+    ## for legend ##########################################
+    axs[0].hist(np.zeros(10), label=labels[0], color='lightgrey', edgecolor='dimgrey', lw=2)
+    for i in range(len(e_sum_list)):
+        axs[0].plot(0, 0, linestyle='-', lw=3, color=cfg.color_lines[i], label=labels[i+1])
+    ########################################################
+
+    for j, (e_sum, e_sum_list) in enumerate(zip(e_sum_list, e_sum_list_list)):   # loop over energyies
+        h = axs[0].hist(np.array(e_sum), bins=cfg.e_sum_bins, color='lightgrey', rasterized=True)
+        h = axs[0].hist(np.array(e_sum), bins=cfg.e_sum_bins,  histtype='step', color='dimgrey', lw=2)
+        
+        for i, e_sum_ in enumerate(e_sum_list):
+            h1 = axs[0].hist(np.array(e_sum_), bins=h[1], histtype='step', linestyle='-', lw=2.5, color=cfg.color_lines[i])
+            
+            # ratio plot on the bottom
+            lims_min = 0.5
+            lims_max = 1.5
+            eps = 1e-5
+            x_nhits_range = [cfg.e_sum_bins.min() - cfg.e_indent, 500, 1300, cfg.e_sum_bins.max() + cfg.e_indent]
+
+            centers = np.array((h[1][:-1] + h[1][1:])/2)
+            x_mask = (centers >= x_nhits_range[j]) & (centers < x_nhits_range[j+1])
+
+            centers = centers[x_mask]
+            ratios = np.clip(np.array((h1[0]+eps)/(h[0]+eps)), lims_min, lims_max)[x_mask]
+            mask = (ratios > lims_min) & (ratios < lims_max)  # mask ratios within plotting y range
+            # only connect dots with adjecent points
+            starts = np.argwhere(np.insert(mask[:-1],0,False)<mask)[:,0]
+            ends = np.argwhere(np.append(mask[1:],False)<mask)[:,0]+1
+            indexes = np.stack((starts,ends)).T
+            for idxs in indexes:
+                sub_mask = np.zeros(len(mask), dtype=bool)
+                sub_mask[idxs[0]:idxs[1]] = True
+                axs[1].plot(centers[sub_mask], ratios[sub_mask], linestyle=':', lw=2, marker='o', color=cfg.color_lines[i])
+            # remaining points either above or below plotting y range
+            mask = (ratios == lims_min)
+            axs[1].plot(centers[mask], ratios[mask], linestyle='', lw=2, marker='v', color=cfg.color_lines[i], clip_on=False)
+            mask = (ratios == lims_max)
+            axs[1].plot(centers[mask], ratios[mask], linestyle='', lw=2, marker='^', color=cfg.color_lines[i], clip_on=False)
+    
+    # horizontal line at 1
+    axs[1].axhline(1, linestyle='-', lw=1, color='k')
+    axs[1].axvline(x_nhits_range[1], linestyle='-', lw=2, color='k')
+    axs[1].axvline(x_nhits_range[2], linestyle='-', lw=2, color='k')
+
+    axs[0].set_xlim(cfg.e_sum_bins.min() - cfg.e_indent, cfg.e_sum_bins.max() + cfg.e_indent)
+    axs[1].set_ylim(lims_min, lims_max)
+    plt.xlabel('energy sum [MeV]')
+    axs[0].set_ylabel('\# showers')
+    axs[1].set_ylabel('ratio to MC')
+    
+
+    plt.text(150, 1.55, '10 GeV', fontsize=cfg.font.get_size() + 2)
+    plt.text(750, 1.55, '50 GeV', fontsize=cfg.font.get_size() + 2)
+    plt.text(1700, 1.55, '90 GeV', fontsize=cfg.font.get_size() + 2)
+
+   #if cfg.plot_legend_e:
+        # plt.legend(prop=cfg.font, loc=(0.35, 0.78))
+    axs[0].legend(prop=cfg.font, loc='best')
+
+    # plt.tight_layout()
+    plt.subplots_adjust(hspace=0.1)
+    plt.savefig('e_sum_singleE.pdf', dpi=100)
     plt.show()
 
 
@@ -836,15 +901,18 @@ def get_plots_from_observables(real_list: list, fakes_list: list, labels: list =
 def get_plots_from_observables_singleE(real_list_list: list, fakes_list_list: list, labels: list = ['1', '2', '3']):
     
     occ_real_list, occ_fake_list_list = [], []
+    e_sum_real_list, e_sum_fake_list_list = [], []
     for i in range(len(real_list_list)):  # observables for certain single energy
         e_radial_real, occ_real, e_sum_real, hits_real, e_layers_real, occ_layer_real, e_layers_distibution_real, e_radial_lists_real, hits_noThreshold_list_real = real_list_list[i]
         occ_real_list.append(occ_real)
+        e_sum_real_list.append(e_sum_real)
 
         e_radial_list, occ_list, e_sum_list, hits_list, e_layers_list = fakes_list_list[i]
         occ_fake_list_list.append(occ_list)
+        e_sum_fake_list_list.append(e_sum_list)
     
     plt_occupancy_singleE(occ_real_list, occ_fake_list_list, labels=labels)
-
+    plt_esum_singleE(e_sum_real_list, e_sum_fake_list_list, labels=labels)
 
 
 
