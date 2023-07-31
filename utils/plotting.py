@@ -5,6 +5,8 @@ import matplotlib as mpl
 import matplotlib.pyplot as plt
 import matplotlib.font_manager as font_manager
 
+import utils.metrics as metrics
+
 mpl.rcParams['xtick.labelsize'] = 25    
 mpl.rcParams['ytick.labelsize'] = 25
 # mpl.rcParams['font.size'] = 28
@@ -76,6 +78,9 @@ class Configs():
 
         self.include_artifacts = False   # include_artifacts = True -> keeps points that hit dead material
 
+    # percentile edges for occupancy based metrics
+        self.layer_edges = [0, 8, 11, 13, 15, 16, 18, 19, 21, 24, 29]
+        self.radial_edges = [0, 6.558, 9.849, 12.96, 17.028, 23.434, 33.609, 40.119, 48.491, 68.808, 300]
 
 cfg = Configs()
 
@@ -317,6 +322,10 @@ def get_features(events):
     dict['occ_layers'] = np.array(occ_layers_list)#.sum(axis=0)/len(events)
     dict['e_radial'] = e_radidal_lists  # nested list: e_rad_lst[ EVENTS ][DIST,E ] [ POINTS ]
     dict['hits_noThreshold'] = np.concatenate(hits_noThreshold_list)  # hit energies without threshold
+
+    # add binned layer and radial energy metrics
+    dict['binned_layer_e'] = metrics.binned_layer_energy(dict['e_layers_distibution'], bin_edges=cfg.layer_edges)  # shape: [bin_centeres, events]
+    dict['binned_radial_e'] = metrics.binned_radial_energy(dict['e_radial'], bin_edges=cfg.radial_edges)           # shape: [bin_centeres, events]
     
     # return e_radial, occ_list, e_sum_list, hits_list, e_layers_list, occ_layers_list, e_layers_distibution, e_radial_lists, hits_noThreshold_list
     return dict
