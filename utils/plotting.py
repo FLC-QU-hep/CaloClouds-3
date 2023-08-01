@@ -320,12 +320,12 @@ def get_features(events):
     dict['e_layers_distibution'] = np.array(e_layers_list)  # distibution of energy per layer
     dict['e_layers'] = np.array(e_layers_list).sum(axis=0)/len(events)  # average energy per layer
     dict['occ_layers'] = np.array(occ_layers_list)#.sum(axis=0)/len(events)
-    dict['e_radial'] = e_radidal_lists  # nested list: e_rad_lst[ EVENTS ][DIST,E ] [ POINTS ]
+    dict['e_radial_lists'] = e_radidal_lists  # nested list: e_rad_lst[ EVENTS ][DIST,E ] [ POINTS ]
     dict['hits_noThreshold'] = np.concatenate(hits_noThreshold_list)  # hit energies without threshold
 
     # add binned layer and radial energy metrics
     dict['binned_layer_e'] = metrics.binned_layer_energy(dict['e_layers_distibution'], bin_edges=cfg.layer_edges)  # shape: [bin_centeres, events]
-    dict['binned_radial_e'] = metrics.binned_radial_energy(dict['e_radial'], bin_edges=cfg.radial_edges)           # shape: [bin_centeres, events]
+    dict['binned_radial_e'] = metrics.binned_radial_energy(dict['e_radial_lists'], bin_edges=cfg.radial_edges)           # shape: [bin_centeres, events]
     
     # return e_radial, occ_list, e_sum_list, hits_list, e_layers_list, occ_layers_list, e_layers_distibution, e_radial_lists, hits_noThreshold_list
     return dict
@@ -342,7 +342,6 @@ def plt_radial(e_radial, e_radial_list, labels, cfg=cfg, title=r'\textbf{full sp
     # plt.legend(prop=cfg.font, loc=(0.35, 0.78))
     axs[0].legend(prop=cfg.font, loc='upper right')
     ########################################################
-
 
     h = axs[0].hist(e_radial[0], bins=cfg.bins_r, weights=e_radial[1], color='lightgrey', rasterized=True)
     h = axs[0].hist(e_radial[0], bins=cfg.bins_r, weights=e_radial[1], color='dimgrey', histtype='step', lw=2)
