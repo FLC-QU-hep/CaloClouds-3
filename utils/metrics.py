@@ -8,7 +8,7 @@ import numpy as np
 # cog z
 # hit energy  (not using all hits)
 # occupancy
-# energy sum
+# energy sum or sampling fraction
 # energy sum per layer (10 bins) --> mean
 # radial energy (10 bins) --> mean
 
