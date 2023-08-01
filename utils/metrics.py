@@ -126,3 +126,23 @@ def binned_radial_energy(e_radial, bin_edges = [0, 300]):   # just for debugging
         binned_e_radial.append(layer_radial)
     binned_radial_e = np.vstack(binned_e_radial)
     return binned_radial_e 
+
+
+def merge_dicts(dict_list, key_exceptions=[]):
+    merged_dict = {}
+    for d in dict_list:
+        for key, value in d.items():
+            if key not in key_exceptions:
+                if key in merged_dict:
+                    # Assuming you want to concatenate lists or concatenate numpy arrays for duplicate keys.
+                    if isinstance(merged_dict[key], list):
+                        merged_dict[key].extend(value)
+                    elif isinstance(merged_dict[key], np.ndarray):
+                        if len(merged_dict[key].shape) == 1:
+                            merged_dict[key] = np.concatenate((merged_dict[key], value), axis=0)
+                        elif len(merged_dict[key].shape) == 2:
+                            merged_dict[key] = np.concatenate((merged_dict[key], value), axis=1)
+                    # Add other cases for specific data types if needed.
+                else:
+                    merged_dict[key] = value
+    return merged_dict
