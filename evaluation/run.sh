@@ -19,6 +19,6 @@ conda activate torch_113
 # cd /beegfs/desy/user/akorol/projects/point-cloud
 cd /home/buhmae/6_PointCloudDiffusion/evaluation
 
-python generate_for_metrics.py -cc ddpm
+python generate_for_metrics.py -cc cm
 
 exit

@@ -1,5 +1,6 @@
 import argparse
 import sys
+import gc
 sys.path.append('../')
 
 import numpy as np
@@ -30,8 +31,8 @@ cfg = Configs()
 ###############################################  PARAMS
 
 
-total_events = 500_000   # total events to process
-n_events = 50_000    # in chunks of n_events
+total_events = 10_000   # total events to process
+n_events = 5_000    # in chunks of n_events
 
 ### FULL SPECTRUM GENERATION
 min_energy= 10
@@ -161,7 +162,7 @@ i = 0
 for _ in range(int(total_events / n_events)):
 
     if args.caloclouds == 'g4':
-        print('loading real showers')
+        print('loading Geant4 showers')
         showers, cond_E = all_events[i:i+n_events], all_energy[i:i+n_events]
         print(showers.shape)
         showers[:, -1] = showers[:, -1] * 1000   # GeV to MeV
@@ -177,11 +178,15 @@ for _ in range(int(total_events / n_events)):
         print('time per shower: (s)', t / n_events)
 
     print('projecting showers')
-    events = get_projections(showers, MAP, layer_bottom_pos, max_num_hits=6000, return_cell_point_cloud=False)
+    events, clouds  = get_projections(showers, MAP, layer_bottom_pos, max_num_hits=6000, return_cell_point_cloud=True)
 
-    print('get features')
+    print('get features and center of gravities')
     dict = plotting.get_features(events)
     dict['incident_energy'] = cond_E
+    cog_list = plotting.get_cog(clouds)
+    dict['cog_x'] = cog_list[0]
+    dict['cog_y'] = cog_list[1]
+    dict['cog_z'] = cog_list[2]
 
     print('merging dicts')
     merge_dict = metrics.merge_dicts([merge_dict, dict], key_exceptions=key_exceptions)
@@ -192,5 +197,9 @@ for _ in range(int(total_events / n_events)):
     with open(pickle_path+'merge_dict_{}-{}GeV_{}_{}.pickle'.format(str(min_energy), str(max_energy), str(total_events), args.caloclouds), 'wb') as f:
         pickle.dump(merge_dict, f)
     print('merge_dict saved in pickle file')
+
+    del showers, events, dict
+    gc.collect()
+
 
 
