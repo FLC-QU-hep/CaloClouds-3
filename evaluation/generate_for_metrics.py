@@ -30,8 +30,8 @@ cfg = Configs()
 ###############################################  PARAMS
 
 
-total_events = 10_000   # total events to process
-n_events = 5_000    # in chunks of n_events
+total_events = 500_000   # total events to process
+n_events = 50_000    # in chunks of n_events
 
 ### FULL SPECTRUM GENERATION
 min_energy= 10
