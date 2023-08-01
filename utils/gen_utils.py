@@ -187,4 +187,4 @@ def gen_showers_batch(model, shower_flow, e_min, e_max, num=2000, bs=32, kdiffus
     fake_showers[:, 0] -= (cog[0] - cog_x)[:,None]
     fake_showers[:, 2] -= (cog[2] - cog_z)[:,None]
     
-    return fake_showers
+    return fake_showers, cond_E.detach().cpu().numpy()

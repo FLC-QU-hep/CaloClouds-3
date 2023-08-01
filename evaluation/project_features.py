@@ -58,20 +58,20 @@ for j in range(len(min_energy_list)):
     print('real showers shape: ', real_showers.shape)
 
     i = 0
-    f = out_path + '{}-{}GeV_{}_{}_seed{}.npy'.format(str(min_energy), str(max_energy), str(n_events), caloclouds_list[i], str(seed_list[i]))
-    fake_showers = np.load(f)
+    f = out_path + '{}-{}GeV_{}_{}_seed{}.npz'.format(str(min_energy), str(max_energy), str(n_events), caloclouds_list[i], str(seed_list[i]))
+    fake_showers = np.load(f)['fake_showers']
     print(f, ' loaded')
     print('fake showers shape: ', fake_showers.shape)
 
     i = 1
-    f = out_path + '{}-{}GeV_{}_{}_seed{}.npy'.format(str(min_energy), str(max_energy), str(n_events), caloclouds_list[i], str(seed_list[i]))
-    fake_showers_2 = np.load(f)
+    f = out_path + '{}-{}GeV_{}_{}_seed{}.npz'.format(str(min_energy), str(max_energy), str(n_events), caloclouds_list[i], str(seed_list[i]))
+    fake_showers_2 = np.load(f)['fake_showers']
     print(f, ' loaded')
     print('fake showers shape: ', fake_showers_2.shape)
 
     i = 2
-    f = out_path + '{}-{}GeV_{}_{}_seed{}.npy'.format(str(min_energy), str(max_energy), str(n_events), caloclouds_list[i], str(seed_list[i]))
-    fake_showers_3 = np.load(f)
+    f = out_path + '{}-{}GeV_{}_{}_seed{}.npz'.format(str(min_energy), str(max_energy), str(n_events), caloclouds_list[i], str(seed_list[i]))
+    fake_showers_3 = np.load(f)['fake_showers']
     print(f, ' loaded')
     print('fake showers shape: ', fake_showers_3.shape)
 

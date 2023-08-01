@@ -24,16 +24,16 @@ cfg = Configs()
 ###############################################  PARAMS
 
 ## SINGLE ENERGY GENERATION
-min_energy_list = [10, 50, 90]
-max_energy_list = [10, 50, 90]
-n_events = 2000
-out_path = '/beegfs/desy/user/buhmae/6_PointCloudDiffusion/output/singleE/'
+# min_energy_list = [10, 50, 90]
+# max_energy_list = [10, 50, 90]
+# n_events = 2000
+# out_path = '/beegfs/desy/user/buhmae/6_PointCloudDiffusion/output/singleE/'
 
 ### FULL SPECTRUM GENERATION
-# min_energy_list = [10]
-# max_energy_list = [90]
-# n_events = 40_000
-# out_path = '/beegfs/desy/user/buhmae/6_PointCloudDiffusion/output/full/'
+min_energy_list = [10]
+max_energy_list = [90]
+n_events = 40_000
+out_path = '/beegfs/desy/user/buhmae/6_PointCloudDiffusion/output/full/'
 
 
 ### COMMMONG PARAMETERS
@@ -142,7 +142,7 @@ for i in range(len(caloclouds_list)):
         print(' one random torch number: ', torch.rand(1))
 
         s_t = time.time()
-        fake_showers = gen_utils.gen_showers_batch(model, distribution, min_energy, max_energy, n_events, bs=batch_size, kdiffusion=kdiffusion, config=cfg, coef_real=coef_real, coef_fake=coef_fake, n_scaling=n_scaling, n_splines=n_splines)
+        fake_showers, cond_E = gen_utils.gen_showers_batch(model, distribution, min_energy, max_energy, n_events, bs=batch_size, kdiffusion=kdiffusion, config=cfg, coef_real=coef_real, coef_fake=coef_fake, n_scaling=n_scaling, n_splines=n_splines)
         t = time.time() - s_t
         print(fake_showers.shape)
         print(t)
@@ -151,7 +151,7 @@ for i in range(len(caloclouds_list)):
 
 
         #### save fake showers
-        f = out_path + prefix + '{}-{}GeV_{}_{}_seed{}.npy'.format(str(min_energy), str(max_energy), str(n_events), caloclouds, str(seed))
-        np.save(f, fake_showers)
+        f = out_path + prefix + '{}-{}GeV_{}_{}_seed{}.npz'.format(str(min_energy), str(max_energy), str(n_events), caloclouds, str(seed))
+        np.savez(f, fake_showers=fake_showers, energy=cond_E)
 
         print('fake showers (energy in MeV) saved in ', f)
