@@ -11,7 +11,7 @@ class Configs():
 
     # Model arguments
         self.model_name = 'epicVAE_nFlow_kDiffusion'             # choices=['flow', 'AllCond_epicVAE_nFlow_PointDiff', 'epicVAE_nFlow_kDiffusion]
-        self.latent_dim = 0     # caloclouds default: 256
+        self.latent_dim = 32     # caloclouds default: 256
         self.beta_1 = 1e-4
         self.beta_T = 0.02
         self.sched_mode = 'quardatic'  # options: ['linear', 'quardatic', 'sigmoid]
