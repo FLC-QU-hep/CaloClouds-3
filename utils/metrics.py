@@ -1,4 +1,5 @@
 import numpy as np
+from scipy.stats import wasserstein_distance
 
 # metrics needed:
 # threshold applied for all, at hit/cell level
@@ -146,3 +147,36 @@ def merge_dicts(dict_list, key_exceptions=[]):
                 else:
                     merged_dict[key] = value
     return merged_dict
+
+
+def get_event_observables_from_dict(dict):
+    cog_x = dict['cog_x'].reshape(-1,1)   # 0
+    cog_y = dict['cog_y'].reshape(-1,1)   # 1
+    cog_z = dict['cog_z'].reshape(-1,1)   # 2
+    occ = dict['occ'].reshape(-1,1)       # 3
+    sampling_fraction = (dict['e_sum'] / (dict['incident_energy']*1000)).reshape(-1,1)  # 4
+    hits = dict['hits'][0:len(cog_x)].reshape(-1,1)   # only use the first X hits       # 5
+    binned_layer_e = dict['binned_layer_e'].T                                           # 6-15
+    binned_radial_e = dict['binned_radial_e'].T                                         # 16-25
+    return np.hstack([cog_x, cog_y, cog_z, occ, sampling_fraction, hits, binned_layer_e, binned_radial_e])
+
+
+def calc_wdist(obs_real, obs_model, iterations=5, batch_size=10_000):
+    means, stds = [], []
+    for i in range(obs_real.shape[1]):
+        j = 0
+        wdists = []
+        for _ in range(iterations):
+            wdist = wasserstein_distance(obs_real[j:j+batch_size,i], obs_model[j:j+batch_size,i])
+            wdists.append(wdist)
+            j += batch_size
+        # print(f'feature {i}: {np.mean(wdists)} +- {np.std(wdists)}')
+        means.append(np.mean(wdists))
+        stds.append(np.std(wdists))
+    return np.array(means), np.array(stds)
+
+
+def combine_scores(means, stds):
+    mean = np.mean(means)
+    std = np.sqrt(np.sum(stds**2))  # error propagation
+    return mean, std
