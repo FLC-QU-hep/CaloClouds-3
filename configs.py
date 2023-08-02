@@ -6,7 +6,7 @@ class Configs():
         self.name = 'CD_'  # options: [TEST_, kCaloClouds_, CaloClouds_, CD_]
         self.comet_project = 'calo-consistency'   # options: ['k-CaloClouds', 'calo-consistency']
         #self.Acomment = 'baseline with lat_dim = 32, max_iter 10M, lr=1e-4 FIXED, dropout_rate=0.0, ema_power=2/3 (long training)'  # log_iter 100
-        self.Acomment = 'long baseline with lat_dim = 0, max_iter 1M, lr=1e-4 fixed, num_steps=18, bs=256, simga_max=80, epoch=2M, EMA'  # log_iter 100
+        self.Acomment = 'long baseline with lat_dim = 32, max_iter 10M, lr=1e-4 fixed, num_steps=18, bs=256, simga_max=80, epoch=2M, EMA'  # log_iter 100
         self.log_comet = True
 
     # Model arguments
@@ -119,7 +119,8 @@ class Configs():
     # Consistency Distillation parameters
         # self.model_path = 'kCaloClouds_2023_05_24__14_54_09/ckpt_0.000000_500000.pt'
         # self.model_path = 'kCaloClouds_2023_05_31__17_57_11/ckpt_0.000000_1690000.pt'
-        self.model_path = 'kCaloClouds_2023_06_29__23_08_31/ckpt_0.000000_2000000.pt'
+        # self.model_path = 'kCaloClouds_2023_06_29__23_08_31/ckpt_0.000000_2000000.pt'   # lat 0
+        self.model_path = 'kCaloClouds_2023_07_02__20_30_03/ckpt_0.000000_2000000.pt'     # lat 32
         self.use_ema_trainer = True
         self.start_ema = 0.95
         # self.ema_rate = 0.999943    # decay rate of separately saved EMA model (not implemented yet)
