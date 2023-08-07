@@ -171,10 +171,14 @@ def main():
 
     it = 1
     start_time = time.time()
+    st = time.time()
     while(it <= cfg.max_iters):
         for batch in dataloader:
             it += 1
             train(batch, it)
+            if it % cfg.log_iter == 0:
+                print('Time for %d iterations: %.2f' % (cfg.log_iter, time.time() - st))
+                st = time.time()
             if it % cfg.val_freq == 0 or it == cfg.max_iters:
                 opt_states = {
                     'model_ema': model_ema_target.state_dict(), # save the EMA model
