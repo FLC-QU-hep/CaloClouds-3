@@ -142,3 +142,5 @@ joblog/
 *.pdf
 testbed.ipynb
 *old*
+*.pth
+*.npy
