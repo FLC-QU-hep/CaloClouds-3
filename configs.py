@@ -6,7 +6,7 @@ class Configs():
         self.name = 'CD_'  # options: [TEST_, kCaloClouds_, CaloClouds_, CD_]
         self.comet_project = 'calo-consistency'   # options: ['k-CaloClouds', 'calo-consistency']
         #self.Acomment = 'baseline with lat_dim = 32, max_iter 10M, lr=1e-4 FIXED, dropout_rate=0.0, ema_power=2/3 (long training)'  # log_iter 100
-        self.Acomment = 'long baseline with lat_dim = 32, max_iter 10M, lr=1e-4 fixed, num_steps=18, bs=256, simga_max=80, epoch=2M, EMA'  # log_iter 100
+        self.Acomment = 'long baseline with lat_dim = 32, max_iter 10M, lr=2e-4 fixed, num_steps=18, bs=64, simga_max=80, epoch=2M, EMA'  # log_iter 100
         self.log_comet = True
 
     # Model arguments
@@ -58,7 +58,7 @@ class Configs():
 
     # Dataloader
         self.workers = 32
-        self.train_bs = 256      # k-diffusion: 128 / CD: 256
+        self.train_bs = 64      # k-diffusion: 128 / CD: 256
         self.pin_memory = False         # choices=[True, False]
         self.shuffle = True             # choices=[True, False]
         self.max_points = 6_000
@@ -66,8 +66,8 @@ class Configs():
 
     # Optimizer and scheduler
         self.optimizer = 'RAdam'         # choices=['Adam', 'RAdam']
-        self.lr = 1e-4              # Caloclouds default: 2e-3, consistency model paper: approx. 1e-5
-        self.end_lr = 1e-4
+        self.lr = 2e-4              # Caloclouds default: 2e-3, consistency model paper: approx. 1e-5
+        self.end_lr = 2e-4
         self.weight_decay = 0
         self.max_grad_norm = 10
         self.sched_start_epoch = 100 * 1e3
