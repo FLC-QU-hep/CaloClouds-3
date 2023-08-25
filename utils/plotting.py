@@ -331,7 +331,7 @@ def get_features(events):
     return dict
 
 
-def plt_radial(e_radial, e_radial_list, labels, cfg=cfg, title=r'\textbf{full spectrum}'):
+def plt_radial(e_radial, e_radial_list, labels, cfg=cfg, title=r'\textbf{full spectrum}', events=40_000):
     fig, axs = plt.subplots(2, 1, figsize=(7,9), height_ratios=[3, 1], sharex=True)
 
     ## for legend ##########################################
@@ -343,11 +343,11 @@ def plt_radial(e_radial, e_radial_list, labels, cfg=cfg, title=r'\textbf{full sp
     axs[0].legend(prop=cfg.font, loc='upper right')
     ########################################################
 
-    h = axs[0].hist(e_radial[0], bins=cfg.bins_r, weights=e_radial[1], color='lightgrey', rasterized=True)
-    h = axs[0].hist(e_radial[0], bins=cfg.bins_r, weights=e_radial[1], color='dimgrey', histtype='step', lw=2)
+    h = axs[0].hist(e_radial[0], bins=cfg.bins_r, weights=e_radial[1]/events, color='lightgrey', rasterized=True)
+    h = axs[0].hist(e_radial[0], bins=cfg.bins_r, weights=e_radial[1]/events, color='dimgrey', histtype='step', lw=2)
     
     for i, e_radial_ in enumerate(e_radial_list):
-        h1 = axs[0].hist(e_radial_[0], bins=h[1], weights=e_radial_[1], histtype='step', linestyle='-', lw=3, color=cfg.color_lines[i])
+        h1 = axs[0].hist(e_radial_[0], bins=h[1], weights=e_radial_[1]/events, histtype='step', linestyle='-', lw=3, color=cfg.color_lines[i])
 
         # ratio plot on the bottom
         lims_min = 0.5
@@ -375,7 +375,7 @@ def plt_radial(e_radial, e_radial_list, labels, cfg=cfg, title=r'\textbf{full sp
     # horizontal line at 1
     axs[1].axhline(1, linestyle='-', lw=1, color='k')
         
-    axs[0].set_ylim(1,2e9)
+    axs[0].set_ylim(1.1e-4,5e4)
     
     axs[0].set_yscale('log')
 
@@ -386,7 +386,7 @@ def plt_radial(e_radial, e_radial_list, labels, cfg=cfg, title=r'\textbf{full sp
     # ax2.set_xlabel("radius [cells]")
     
     plt.xlabel("radius [mm]")
-    axs[0].set_ylabel('energy sum [MeV]')
+    axs[0].set_ylabel('mean energy [MeV]')
     axs[1].set_ylabel('ratio to MC')
     
     # ax = plt.gca()
@@ -447,7 +447,7 @@ def plt_spinal(e_layers, e_layers_list, labels, cfg=cfg, title=r'\textbf{full sp
     axs[0].set_ylim(1.1e-1, 2e2)
     axs[0].set_xlim(0, 31)
     plt.xlabel('layers')
-    axs[0].set_ylabel('energy sum [MeV]')
+    axs[0].set_ylabel('mean energy [MeV]')
     axs[1].set_ylabel('ratio to MC')
     
     # plt.legend(prop=cfg.font, loc=(0.35, 0.78))
@@ -918,7 +918,7 @@ def get_observables_for_plotting(events, events_list: list):
     return real_list, fakes_list
 
 
-def get_plots_from_observables(real_list: list, fakes_list: list, labels: list = ['1', '2', '3'], title=r'\textbf{full spectrum}'):
+def get_plots_from_observables(real_list: list, fakes_list: list, labels: list = ['1', '2', '3'], title=r'\textbf{full spectrum}', events=40_000):
     
     if len(real_list) != len(fakes_list):
         e_radial_real, occ_real, e_sum_real, hits_real, e_layers_real, occ_layer_real, e_layers_distibution_real, e_radial_lists_real, hits_noThreshold_list_real = real_list
@@ -927,7 +927,7 @@ def get_plots_from_observables(real_list: list, fakes_list: list, labels: list =
     
     e_radial_list, occ_list, e_sum_list, hits_list, e_layers_list = fakes_list        
     
-    plt_radial(e_radial_real, e_radial_list, labels=labels, title=title)
+    plt_radial(e_radial_real, e_radial_list, labels=labels, title=title, events=events)
     plt_spinal(e_layers_real, e_layers_list, labels=labels, title=title)
     if len(real_list) != len(fakes_list):
         plt_hit_e(hits_noThreshold_list_real, hits_list, labels=labels, title=title)
