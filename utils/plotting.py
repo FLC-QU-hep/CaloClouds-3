@@ -774,10 +774,15 @@ def plt_occupancy_singleE(occ_list, occ_list_list, labels, cfg=cfg):
     # axs[0].text(315, 540, '10 GeV', fontsize=cfg.font.get_size() + 2)
     # axs[0].text(870, 215, '50 GeV', fontsize=cfg.font.get_size() + 2)
     # axs[0].text(1230, 170, '90 GeV', fontsize=cfg.font.get_size() + 2)
-    y = 1.75
-    plt.text(190, y, '10 GeV', fontsize=cfg.font.get_size() + 2)
-    plt.text(650, y, '50 GeV', fontsize=cfg.font.get_size() + 2)
-    plt.text(1100, y, '90 GeV', fontsize=cfg.font.get_size() + 2)
+
+    # y = 1.75
+    # plt.text(190, y, '10 GeV', fontsize=cfg.font.get_size() + 2)
+    # plt.text(650, y, '50 GeV', fontsize=cfg.font.get_size() + 2)
+    # plt.text(1100, y, '90 GeV', fontsize=cfg.font.get_size() + 2)
+
+    plt.text(350, 4, '10 GeV', fontsize=cfg.font.get_size() + 2)
+    plt.text(800, 3.5, '50 GeV', fontsize=cfg.font.get_size() + 2)
+    plt.text(1150, 3.1, '90 GeV', fontsize=cfg.font.get_size() + 2)
 
     # plt.tight_layout()
     plt.subplots_adjust(hspace=0.1)
@@ -838,10 +843,14 @@ def plt_esum_singleE(e_sum_list, e_sum_list_list, labels, cfg=cfg):
     axs[0].set_ylabel('\# showers')
     axs[1].set_ylabel('ratio to MC')
     
-    y = 2.05
-    plt.text(150, y, '10 GeV', fontsize=cfg.font.get_size() + 2)
-    plt.text(750, y, '50 GeV', fontsize=cfg.font.get_size() + 2)
-    plt.text(1700, y, '90 GeV', fontsize=cfg.font.get_size() + 2)
+    # y = 2.05
+    # plt.text(150, y, '10 GeV', fontsize=cfg.font.get_size() + 2)
+    # plt.text(750, y, '50 GeV', fontsize=cfg.font.get_size() + 2)
+    # plt.text(1700, y, '90 GeV', fontsize=cfg.font.get_size() + 2)
+
+    plt.text(320, 5, '10 GeV', fontsize=cfg.font.get_size() + 2)
+    plt.text(880, 4, '50 GeV', fontsize=cfg.font.get_size() + 2)
+    plt.text(1750, 3.3, '90 GeV', fontsize=cfg.font.get_size() + 2)
 
    #if cfg.plot_legend_e:
         # plt.legend(prop=cfg.font, loc=(0.35, 0.78))
