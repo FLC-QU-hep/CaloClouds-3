@@ -781,8 +781,8 @@ def plt_occupancy_singleE(occ_list, occ_list_list, labels, cfg=cfg):
     # plt.text(1100, y, '90 GeV', fontsize=cfg.font.get_size() + 2)
 
     plt.text(350, 4, '10 GeV', fontsize=cfg.font.get_size() + 2)
-    plt.text(800, 3.5, '50 GeV', fontsize=cfg.font.get_size() + 2)
-    plt.text(1150, 3.1, '90 GeV', fontsize=cfg.font.get_size() + 2)
+    plt.text(750, 3.6, '50 GeV', fontsize=cfg.font.get_size() + 2)
+    plt.text(1150, 3.2, '90 GeV', fontsize=cfg.font.get_size() + 2)
 
     # plt.tight_layout()
     plt.subplots_adjust(hspace=0.1)
@@ -849,8 +849,8 @@ def plt_esum_singleE(e_sum_list, e_sum_list_list, labels, cfg=cfg):
     # plt.text(1700, y, '90 GeV', fontsize=cfg.font.get_size() + 2)
 
     plt.text(320, 5, '10 GeV', fontsize=cfg.font.get_size() + 2)
-    plt.text(880, 4, '50 GeV', fontsize=cfg.font.get_size() + 2)
-    plt.text(1750, 3.3, '90 GeV', fontsize=cfg.font.get_size() + 2)
+    plt.text(880, 4.1, '50 GeV', fontsize=cfg.font.get_size() + 2)
+    plt.text(1750, 3.4, '90 GeV', fontsize=cfg.font.get_size() + 2)
 
    #if cfg.plot_legend_e:
         # plt.legend(prop=cfg.font, loc=(0.35, 0.78))
