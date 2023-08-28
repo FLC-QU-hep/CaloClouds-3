@@ -2,27 +2,27 @@
 import os
 os.environ['OPENBLAS_NUM_THREADS'] = '1'    # to run numpy single threaded
 
-import sys
-sys.path.append('/beegfs/desy/user/akorol/projects/point-cloud-diffusion/')
+# import sys
+# sys.path.append('/beegfs/desy/user/akorol/projects/point-cloud-diffusion/')
 
-from tqdm import tqdm
+# from tqdm import tqdm
 
 import torch
 import time
-from torch.utils.data import DataLoader
-from torch.nn.utils import clip_grad_norm_
+# from torch.utils.data import DataLoader
+# from torch.nn.utils import clip_grad_norm_
 
 from models.vae_flow import *
-from models.flow import add_spectral_norm, spectral_norm_power_iteration
+# from models.flow import add_spectral_norm, spectral_norm_power_iteration
 from configs import Configs
 
-from utils.plotting import get_projections, get_plots, MAP, offset, layer_bottom_pos, cell_thickness, Xmax, Xmin, Zmax, Zmin
+# from utils.plotting import get_projections, get_plots, MAP, offset, layer_bottom_pos, cell_thickness, Xmax, Xmin, Zmax, Zmin
 
 import utils.gen_utils as gen_utils
 
-import k_diffusion as K
+# import k_diffusion as K
 
-from models.shower_flow import compile_HybridTanH_model
+from models.shower_flow import compile_HybridTanH_model, compile_HybridTanH_model_s
 import models.epicVAE_nflows_kDiffusion as mdls
 import models.allCond_epicVAE_nflow_PointDiff as mdls2
 
@@ -31,7 +31,7 @@ import models.allCond_epicVAE_nflow_PointDiff as mdls2
 ### PARAMS #############
 ########################
 
-caloclouds = 'ddpm'   # 'ddpm, 'edm', 'cm'
+caloclouds = 'cm'   # 'ddpm, 'edm', 'cm'
 
 cfg = Configs()
 cfg.device = 'cpu'  # 'cuda' or 'cpu'
@@ -40,7 +40,7 @@ torch.set_num_threads(1)   # also comment out os.environ['OPENBLAS_NUM_THREADS']
 
 # min and max energy of the generated events
 min_e = 10
-max_e = 100
+max_e = 90
 
 num = 2000 # total number of generated events
 
@@ -82,9 +82,13 @@ def main(cfg, min_e, max_e, num, bs, iterations):
     flow, distribution = compile_HybridTanH_model(num_blocks, 
                                             num_inputs=65, ### when 'condioning' on additional Esum, Nhits etc add them on as inputs rather than 
                                             num_cond_inputs=1, device=cfg.device)  # num_cond_inputs
-
-    #checkpoint = torch.load('/beegfs/desy/user/akorol/chekpoints/ECFlow/EFlow+CFlow_138.pth')
     checkpoint = torch.load('/beegfs/desy/user/buhmae/6_PointCloudDiffusion/shower_flow/220714_cog_e_layer_ShowerFlow_best.pth', map_location=torch.device(cfg.device))   # trained about 350 epochs
+
+    # flow, distribution = compile_HybridTanH_model_s(num_blocks=8, 
+    #                                         num_inputs=65, ### when 'condioning' on additional Esum, Nhits etc add them on as inputs rather than 
+    #                                         num_cond_inputs=1, device=cfg.device, input_dim_multiplier=10)  # num_cond_inputs
+    # checkpoint = torch.load('/beegfs/desy/user/akorol/logs/220714_cog_e_layer_ShowerFlow_best.pth', map_location=torch.device(cfg.device))   # trained about 350 epochs
+    
     flow.load_state_dict(checkpoint['model'])
     flow.eval().to(cfg.device)
 
@@ -126,7 +130,8 @@ def main(cfg, min_e, max_e, num, bs, iterations):
         model = mdls.epicVAE_nFlow_kDiffusion(cfg, distillation = True).to(cfg.device)
         model.load_state_dict(checkpoint['others']['model_ema'])
         coef_real = np.array([ 2.42091454e-09, -2.72191705e-05,  2.95613817e-01,  4.88328360e+01])  # fixed coeff at 0.1 threshold
-        coef_fake = np.array([-9.02997505e-07,  2.82747963e-03,  1.01417267e+00,  1.64829018e+02])
+        coef_fake = np.array([-9.02997505e-07,  2.82747963e-03,  1.01417267e+00,  1.64829018e+02])  # compile_HybridTanH_model   w 10 blocks
+        # coef_fake = np.array([-9.76272223e-07,  3.03873748e-03,  8.26771448e-01,  2.17422343e+02])   # compile_HybridTanH_model_s  w 8 blocks
 
     else:
         raise ValueError('caloclouds must be one of: ddpm, edm, cm')
