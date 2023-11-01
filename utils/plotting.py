@@ -57,7 +57,7 @@ class Configs():
     #CoG
         self.bins_cog = 30  
         # bin ranges for [X, Z, Y] coordinates, in ILD coordinate system [X', Y', Z']
-        self.cog_ranges = [(-3.99+1.5, 3.99-1.5), (1861, 2001), (37.99, 39.99+1.99)]
+        self.cog_ranges = [(-3.99+1.5, 3.99-1.5), (1861, 2001), (38.01, 39.99+1.99)]
         # self.cog_ranges = [(-1.7, 1.2), (1891, 1949), (38.5, 41.99)]
         # self.cog_ranges = [(-3.99, 3.99), (1861, 1999), (36.01, 43.99)]
         # self.cog_ranges = [(33.99, 39.99), (1861, 1999), (-38.9, -32.9)]
@@ -363,7 +363,7 @@ def plt_radial(e_radial, e_radial_list, labels, cfg=cfg, title=r'\textbf{full sp
         for idxs in indexes:
             sub_mask = np.zeros(len(mask), dtype=bool)
             sub_mask[idxs[0]:idxs[1]] = True
-            axs[1].plot(centers[sub_mask], ratios[sub_mask], linestyle=':', lw=2, marker='o', color=cfg.color_lines[i])
+            axs[1].plot(centers[sub_mask], ratios[sub_mask], linestyle='', lw=2, marker='o', color=cfg.color_lines[i])
         # remaining points either above or below plotting y range
         mask = (ratios == lims_min)
         axs[1].plot(centers[mask], ratios[mask], linestyle='', lw=2, marker='v', color=cfg.color_lines[i], clip_on=False)
@@ -387,7 +387,7 @@ def plt_radial(e_radial, e_radial_list, labels, cfg=cfg, title=r'\textbf{full sp
     
     plt.xlabel("radius [mm]")
     axs[0].set_ylabel('mean energy [MeV]')
-    axs[1].set_ylabel('ratio to MC')
+    axs[1].set_ylabel('ratio to G4')
     
     # ax = plt.gca()
     # plt.text(0.70, 1.02, 'full spectrum', fontsize=cfg.font.get_size(), family='serif', transform=ax.transAxes)
@@ -431,7 +431,7 @@ def plt_spinal(e_layers, e_layers_list, labels, cfg=cfg, title=r'\textbf{full sp
         for idxs in indexes:
             sub_mask = np.zeros(len(mask), dtype=bool)
             sub_mask[idxs[0]:idxs[1]] = True
-            axs[1].plot(centers[sub_mask], ratios[sub_mask], linestyle=':', lw=2, marker='o', color=cfg.color_lines[i])
+            axs[1].plot(centers[sub_mask], ratios[sub_mask], linestyle='', lw=2, marker='o', color=cfg.color_lines[i])
         # remaining points either above or below plotting y range
         mask = (ratios == lims_min)
         axs[1].plot(centers[mask], ratios[mask], linestyle='', lw=2, marker='v', color=cfg.color_lines[i], clip_on=False)
@@ -448,7 +448,7 @@ def plt_spinal(e_layers, e_layers_list, labels, cfg=cfg, title=r'\textbf{full sp
     axs[0].set_xlim(0, 31)
     plt.xlabel('layers')
     axs[0].set_ylabel('mean energy [MeV]')
-    axs[1].set_ylabel('ratio to MC')
+    axs[1].set_ylabel('ratio to G4')
     
     # plt.legend(prop=cfg.font, loc=(0.35, 0.78))
     #plt.legend(prop=cfg.font, loc='best')
@@ -525,7 +525,7 @@ def plt_hit_e(hits, hits_list, labels, cfg=cfg, title=r'\textbf{full spectrum}')
         for idxs in indexes:
             sub_mask = np.zeros(len(mask), dtype=bool)
             sub_mask[idxs[0]:idxs[1]] = True
-            axs[1].plot(centers[sub_mask], ratios[sub_mask], linestyle=':', lw=2, marker='o', color=cfg.color_lines[i])
+            axs[1].plot(centers[sub_mask], ratios[sub_mask], linestyle='', lw=2, marker='o', color=cfg.color_lines[i])
         # remaining points either above or below plotting y range
         mask = (ratios == lims_min)
         axs[1].plot(centers[mask], ratios[mask], linestyle='', lw=2, marker='v', color=cfg.color_lines[i], clip_on=False)
@@ -548,7 +548,7 @@ def plt_hit_e(hits, hits_list, labels, cfg=cfg, title=r'\textbf{full spectrum}')
 
     plt.xlabel('visible cell energy [MeV]')
     axs[0].set_ylabel('\# cells')
-    axs[1].set_ylabel('ratio to MC')
+    axs[1].set_ylabel('ratio to G4')
 
 
     # plt.tight_layout()
@@ -617,8 +617,8 @@ def plt_cog(cog, cog_list, labels, cfg=cfg, title=r'\textbf{full spectrum}'):
             h1 = axs[0, k].hist(np.array(cog_[j]), bins=h[1], histtype='step', linestyle='-', lw=3, color=cfg.color_lines[i], range=cfg.cog_ranges[j])
 
             # ratio plot on the bottom
-            lims_min = [0.5, 0.01, 0.5]
-            lims_max = [1.5, 3, 1.5]
+            lims_min = [0.5, 0.5, 0.5]
+            lims_max = [1.5, 1.5, 1.5]
             marker_styles = ['o', 's', 'X']
             eps = 1e-5
             centers = np.array((h[1][:-1] + h[1][1:])/2)
@@ -631,7 +631,7 @@ def plt_cog(cog, cog_list, labels, cfg=cfg, title=r'\textbf{full spectrum}'):
             for idxs in indexes:
                 sub_mask = np.zeros(len(mask), dtype=bool)
                 sub_mask[idxs[0]:idxs[1]] = True
-                axs[1, k].plot(centers[sub_mask], ratios[sub_mask], linestyle=':', lw=2, marker='o', color=cfg.color_lines[i])
+                axs[1, k].plot(centers[sub_mask], ratios[sub_mask], linestyle='', lw=2, marker='o', color=cfg.color_lines[i])
             # remaining points either above or below plotting y range
             mask = (ratios == lims_min[k])
             axs[1, k].plot(centers[mask], ratios[mask], linestyle='', lw=2, marker='v', color=cfg.color_lines[i], clip_on=False)
@@ -657,7 +657,7 @@ def plt_cog(cog, cog_list, labels, cfg=cfg, title=r'\textbf{full spectrum}'):
 
         axs[1, k].set_xlabel(f'center of gravity {lables[j]} [mm]')
         axs[0, k].set_ylabel('\# showers')
-        axs[1, k].set_ylabel('ratio to MC')
+        axs[1, k].set_ylabel('ratio to G4')
     
     # plt.tight_layout()
     plt.subplots_adjust(left=0, hspace=0.1, wspace=0.25)
@@ -716,61 +716,61 @@ def plt_feats(events, events_list: list, labels, cfg=cfg, title=r'\textbf{full s
 
 
 def plt_occupancy_singleE(occ_list, occ_list_list, labels, cfg=cfg):
-    fig, axs = plt.subplots(2, 1, figsize=(9,12), height_ratios=[3, 1], sharex=True)
+    fig, axs = plt.subplots(1, 1, figsize=(9,9), sharex=False)
 
     ## for legend ##########################################
-    axs[0].hist(np.zeros(1)+1, label=labels[0], color='lightgrey', edgecolor='dimgrey', lw=2)
+    axs.hist(np.zeros(1)+1, label=labels[0], color='lightgrey', edgecolor='dimgrey', lw=2)
     for i in range(len(occ_list_list[0])):
-        axs[0].plot(0, 0, linestyle='-', lw=3, color=cfg.color_lines[i], label=labels[i+1])
+        axs.plot(0, 0, linestyle='-', lw=3, color=cfg.color_lines[i], label=labels[i+1])
     ########################################################
 
     for j, (occ, occ_list) in enumerate(zip(occ_list, occ_list_list)):   # loop over energyies
 
-        h = axs[0].hist(occ, bins=cfg.occup_bins, color='lightgrey', rasterized=True)
-        h = axs[0].hist(occ, bins=cfg.occup_bins, color='dimgrey', histtype='step', lw=2)
+        h = axs.hist(occ, bins=cfg.occup_bins, color='lightgrey', rasterized=True)
+        h = axs.hist(occ, bins=cfg.occup_bins, color='dimgrey', histtype='step', lw=2)
         
         for i, occ_ in enumerate(occ_list):   # loop over models
-            h1 = axs[0].hist(occ_, bins=h[1], histtype='step', linestyle='-', lw=2.5, color=cfg.color_lines[i])
+            h1 = axs.hist(occ_, bins=h[1], histtype='step', linestyle='-', lw=2.5, color=cfg.color_lines[i])
 
-            # ratio plot on the bottom
-            lims_min = 0.5
-            lims_max = 1.7
-            eps = 1e-5
-            x_nhits_range = [cfg.occup_bins.min() - cfg.occ_indent, 400, 950, cfg.occup_bins.max() + cfg.occ_indent]
+            # # ratio plot on the bottom
+            # lims_min = 0.5
+            # lims_max = 1.7
+            # eps = 1e-5
+            # x_nhits_range = [cfg.occup_bins.min() - cfg.occ_indent, 400, 950, cfg.occup_bins.max() + cfg.occ_indent]
 
-            centers = np.array((h[1][:-1] + h[1][1:])/2)
-            x_mask = (centers >= x_nhits_range[j]) & (centers < x_nhits_range[j+1])
+            # centers = np.array((h[1][:-1] + h[1][1:])/2)
+            # x_mask = (centers >= x_nhits_range[j]) & (centers < x_nhits_range[j+1])
 
-            centers = centers[x_mask]
-            ratios = np.clip(np.array((h1[0]+eps)/(h[0]+eps)), lims_min, lims_max)[x_mask]
-            mask = (ratios > lims_min) & (ratios < lims_max)  # mask ratios within plotting y range
-            # only connect dots with adjecent points
-            starts = np.argwhere(np.insert(mask[:-1],0,False)<mask)[:,0]
-            ends = np.argwhere(np.append(mask[1:],False)<mask)[:,0]+1
-            indexes = np.stack((starts,ends)).T
-            for idxs in indexes:
-                sub_mask = np.zeros(len(mask), dtype=bool)
-                sub_mask[idxs[0]:idxs[1]] = True
-                axs[1].plot(centers[sub_mask], ratios[sub_mask], linestyle=':', lw=2, marker='o', color=cfg.color_lines[i])
-            # remaining points either above or below plotting y range
-            mask = (ratios == lims_min)
-            axs[1].plot(centers[mask], ratios[mask], linestyle='', lw=2, marker='v', color=cfg.color_lines[i], clip_on=False)
-            mask = (ratios == lims_max)
-            axs[1].plot(centers[mask], ratios[mask], linestyle='', lw=2, marker='^', color=cfg.color_lines[i], clip_on=False)
+            # centers = centers[x_mask]
+            # ratios = np.clip(np.array((h1[0]+eps)/(h[0]+eps)), lims_min, lims_max)[x_mask]
+            # mask = (ratios > lims_min) & (ratios < lims_max)  # mask ratios within plotting y range
+            # # only connect dots with adjecent points
+            # starts = np.argwhere(np.insert(mask[:-1],0,False)<mask)[:,0]
+            # ends = np.argwhere(np.append(mask[1:],False)<mask)[:,0]+1
+            # indexes = np.stack((starts,ends)).T
+            # for idxs in indexes:
+            #     sub_mask = np.zeros(len(mask), dtype=bool)
+            #     sub_mask[idxs[0]:idxs[1]] = True
+            #     axs[1].plot(centers[sub_mask], ratios[sub_mask], linestyle=':', lw=2, marker='o', color=cfg.color_lines[i])
+            # # remaining points either above or below plotting y range
+            # mask = (ratios == lims_min)
+            # axs[1].plot(centers[mask], ratios[mask], linestyle='', lw=2, marker='v', color=cfg.color_lines[i], clip_on=False)
+            # mask = (ratios == lims_max)
+            # axs[1].plot(centers[mask], ratios[mask], linestyle='', lw=2, marker='^', color=cfg.color_lines[i], clip_on=False)
 
     # horizontal line at 1
-    axs[1].axhline(1, linestyle='-', lw=1, color='k')
-    axs[1].axvline(x_nhits_range[1], linestyle='-', lw=2, color='k')
-    axs[1].axvline(x_nhits_range[2], linestyle='-', lw=2, color='k')
+    # axs[1].axhline(1, linestyle='-', lw=1, color='k')
+    # axs[1].axvline(x_nhits_range[1], linestyle='-', lw=2, color='k')
+    # axs[1].axvline(x_nhits_range[2], linestyle='-', lw=2, color='k')
 
-    axs[0].set_xlim(cfg.occup_bins.min() - cfg.occ_indent, cfg.occup_bins.max() + cfg.occ_indent)
-    axs[1].set_ylim(lims_min, lims_max)
+    axs.set_xlim(cfg.occup_bins.min() - cfg.occ_indent, cfg.occup_bins.max() + cfg.occ_indent)
+    # axs[1].set_ylim(lims_min, lims_max)
     plt.xlabel('number of hits')
-    axs[0].set_ylabel('\# showers')
-    axs[1].set_ylabel('ratio to MC')
+    axs.set_ylabel('\# showers')
+    # axs[1].set_ylabel('ratio to G4')
 
     # plt.legend(prop=cfg.font, loc=(0.35, 0.78))
-    axs[0].legend(prop=cfg.font, loc='best')
+    axs.legend(prop=cfg.font, loc='best')
     # axs[0].text(315, 540, '10 GeV', fontsize=cfg.font.get_size() + 2)
     # axs[0].text(870, 215, '50 GeV', fontsize=cfg.font.get_size() + 2)
     # axs[0].text(1230, 170, '90 GeV', fontsize=cfg.font.get_size() + 2)
@@ -780,9 +780,9 @@ def plt_occupancy_singleE(occ_list, occ_list_list, labels, cfg=cfg):
     # plt.text(650, y, '50 GeV', fontsize=cfg.font.get_size() + 2)
     # plt.text(1100, y, '90 GeV', fontsize=cfg.font.get_size() + 2)
 
-    plt.text(350, 4, '10 GeV', fontsize=cfg.font.get_size() + 2)
-    plt.text(750, 3.6, '50 GeV', fontsize=cfg.font.get_size() + 2)
-    plt.text(1150, 3.2, '90 GeV', fontsize=cfg.font.get_size() + 2)
+    plt.text(350, 600, '10 GeV', fontsize=cfg.font.get_size() + 2)
+    plt.text(750, 475, '50 GeV', fontsize=cfg.font.get_size() + 2)
+    plt.text(1150, 350, '90 GeV', fontsize=cfg.font.get_size() + 2)
 
     # plt.tight_layout()
     plt.subplots_adjust(hspace=0.1)
@@ -791,70 +791,74 @@ def plt_occupancy_singleE(occ_list, occ_list_list, labels, cfg=cfg):
 
 
 def plt_esum_singleE(e_sum_list, e_sum_list_list, labels, cfg=cfg):
-    fig, axs = plt.subplots(2, 1, figsize=(9,12), height_ratios=[3, 1], sharex=True)
+    fig, axs = plt.subplots(1, 1, figsize=(9,9), sharex=False)
 
     ## for legend ##########################################
-    axs[0].hist(np.zeros(10), label=labels[0], color='lightgrey', edgecolor='dimgrey', lw=2)
+    axs.hist(np.zeros(10), label=labels[0], color='lightgrey', edgecolor='dimgrey', lw=2)
     for i in range(len(e_sum_list)):
-        axs[0].plot(0, 0, linestyle='-', lw=3, color=cfg.color_lines[i], label=labels[i+1])
+        axs.plot(0, 0, linestyle='-', lw=3, color=cfg.color_lines[i], label=labels[i+1])
     ########################################################
 
     for j, (e_sum, e_sum_list) in enumerate(zip(e_sum_list, e_sum_list_list)):   # loop over energyies
-        h = axs[0].hist(np.array(e_sum), bins=cfg.e_sum_bins, color='lightgrey', rasterized=True)
-        h = axs[0].hist(np.array(e_sum), bins=cfg.e_sum_bins,  histtype='step', color='dimgrey', lw=2)
+        h = axs.hist(np.array(e_sum), bins=cfg.e_sum_bins, color='lightgrey', rasterized=True)
+        h = axs.hist(np.array(e_sum), bins=cfg.e_sum_bins,  histtype='step', color='dimgrey', lw=2)
         
         for i, e_sum_ in enumerate(e_sum_list):
-            h1 = axs[0].hist(np.array(e_sum_), bins=h[1], histtype='step', linestyle='-', lw=2.5, color=cfg.color_lines[i])
+            h1 = axs.hist(np.array(e_sum_), bins=h[1], histtype='step', linestyle='-', lw=2.5, color=cfg.color_lines[i])
             
             # ratio plot on the bottom
-            lims_min = 0.5
-            lims_max = 2.0
-            eps = 1e-5
-            x_nhits_range = [cfg.e_sum_bins.min() - cfg.e_indent, 500, 1300, cfg.e_sum_bins.max() + cfg.e_indent]
+            # lims_min = 0.5
+            # lims_max = 2.0
+            # eps = 1e-5
+            # x_nhits_range = [cfg.e_sum_bins.min() - cfg.e_indent, 500, 1300, cfg.e_sum_bins.max() + cfg.e_indent]
 
-            centers = np.array((h[1][:-1] + h[1][1:])/2)
-            x_mask = (centers >= x_nhits_range[j]) & (centers < x_nhits_range[j+1])
+            # centers = np.array((h[1][:-1] + h[1][1:])/2)
+            # x_mask = (centers >= x_nhits_range[j]) & (centers < x_nhits_range[j+1])
 
-            centers = centers[x_mask]
-            ratios = np.clip(np.array((h1[0]+eps)/(h[0]+eps)), lims_min, lims_max)[x_mask]
-            mask = (ratios > lims_min) & (ratios < lims_max)  # mask ratios within plotting y range
-            # only connect dots with adjecent points
-            starts = np.argwhere(np.insert(mask[:-1],0,False)<mask)[:,0]
-            ends = np.argwhere(np.append(mask[1:],False)<mask)[:,0]+1
-            indexes = np.stack((starts,ends)).T
-            for idxs in indexes:
-                sub_mask = np.zeros(len(mask), dtype=bool)
-                sub_mask[idxs[0]:idxs[1]] = True
-                axs[1].plot(centers[sub_mask], ratios[sub_mask], linestyle=':', lw=2, marker='o', color=cfg.color_lines[i])
-            # remaining points either above or below plotting y range
-            mask = (ratios == lims_min)
-            axs[1].plot(centers[mask], ratios[mask], linestyle='', lw=2, marker='v', color=cfg.color_lines[i], clip_on=False)
-            mask = (ratios == lims_max)
-            axs[1].plot(centers[mask], ratios[mask], linestyle='', lw=2, marker='^', color=cfg.color_lines[i], clip_on=False)
+            # centers = centers[x_mask]
+            # ratios = np.clip(np.array((h1[0]+eps)/(h[0]+eps)), lims_min, lims_max)[x_mask]
+            # mask = (ratios > lims_min) & (ratios < lims_max)  # mask ratios within plotting y range
+            # # only connect dots with adjecent points
+            # starts = np.argwhere(np.insert(mask[:-1],0,False)<mask)[:,0]
+            # ends = np.argwhere(np.append(mask[1:],False)<mask)[:,0]+1
+            # indexes = np.stack((starts,ends)).T
+            # for idxs in indexes:
+            #     sub_mask = np.zeros(len(mask), dtype=bool)
+            #     sub_mask[idxs[0]:idxs[1]] = True
+            #     axs[1].plot(centers[sub_mask], ratios[sub_mask], linestyle=':', lw=2, marker='o', color=cfg.color_lines[i])
+            # # remaining points either above or below plotting y range
+            # mask = (ratios == lims_min)
+            # axs[1].plot(centers[mask], ratios[mask], linestyle='', lw=2, marker='v', color=cfg.color_lines[i], clip_on=False)
+            # mask = (ratios == lims_max)
+            # axs[1].plot(centers[mask], ratios[mask], linestyle='', lw=2, marker='^', color=cfg.color_lines[i], clip_on=False)
     
     # horizontal line at 1
-    axs[1].axhline(1, linestyle='-', lw=1, color='k')
-    axs[1].axvline(x_nhits_range[1], linestyle='-', lw=2, color='k')
-    axs[1].axvline(x_nhits_range[2], linestyle='-', lw=2, color='k')
+    # axs[1].axhline(1, linestyle='-', lw=1, color='k')
+    # axs[1].axvline(x_nhits_range[1], linestyle='-', lw=2, color='k')
+    # axs[1].axvline(x_nhits_range[2], linestyle='-', lw=2, color='k')
 
-    axs[0].set_xlim(cfg.e_sum_bins.min() - cfg.e_indent, cfg.e_sum_bins.max() + cfg.e_indent)
-    axs[1].set_ylim(lims_min, lims_max)
+    axs.set_xlim(cfg.e_sum_bins.min() - cfg.e_indent, cfg.e_sum_bins.max() + cfg.e_indent)
+    # axs[1].set_ylim(lims_min, lims_max)
     plt.xlabel('energy sum [MeV]')
-    axs[0].set_ylabel('\# showers')
-    axs[1].set_ylabel('ratio to MC')
+    axs.set_ylabel('\# showers')
+    # axs[1].set_ylabel('ratio to G4')
     
     # y = 2.05
     # plt.text(150, y, '10 GeV', fontsize=cfg.font.get_size() + 2)
     # plt.text(750, y, '50 GeV', fontsize=cfg.font.get_size() + 2)
     # plt.text(1700, y, '90 GeV', fontsize=cfg.font.get_size() + 2)
 
-    plt.text(320, 5, '10 GeV', fontsize=cfg.font.get_size() + 2)
-    plt.text(880, 4.1, '50 GeV', fontsize=cfg.font.get_size() + 2)
-    plt.text(1750, 3.4, '90 GeV', fontsize=cfg.font.get_size() + 2)
+    # plt.text(320, 5, '10 GeV', fontsize=cfg.font.get_size() + 2)
+    # plt.text(880, 4.1, '50 GeV', fontsize=cfg.font.get_size() + 2)
+    # plt.text(1750, 3.4, '90 GeV', fontsize=cfg.font.get_size() + 2)
+
+    plt.text(320, 900, '10 GeV', fontsize=cfg.font.get_size() + 2)
+    plt.text(1000, 650, '50 GeV', fontsize=cfg.font.get_size() + 2)
+    plt.text(1800, 400, '90 GeV', fontsize=cfg.font.get_size() + 2)
 
    #if cfg.plot_legend_e:
         # plt.legend(prop=cfg.font, loc=(0.35, 0.78))
-    axs[0].legend(prop=cfg.font, loc='best')
+    axs.legend(prop=cfg.font, loc='best')
 
     # plt.tight_layout()
     plt.subplots_adjust(hspace=0.1)
