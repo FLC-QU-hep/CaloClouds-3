@@ -12,7 +12,7 @@ import time
 # from torch.utils.data import DataLoader
 # from torch.nn.utils import clip_grad_norm_
 
-from models.vae_flow import *
+#from models.vae_flow import *
 # from models.flow import add_spectral_norm, spectral_norm_power_iteration
 from configs import Configs
 

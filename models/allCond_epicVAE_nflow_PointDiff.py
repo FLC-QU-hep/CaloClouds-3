@@ -4,7 +4,6 @@ from torch.nn import Module
 from .common import *
 from .encoders import *
 from .diffusion import *
-from .flow import *
 from .encoders.epic_encoder_cond import EPiC_encoder_cond
 from utils.misc import *
 
