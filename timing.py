@@ -1,3 +1,4 @@
+# in the public repo this is calc_timing.py
 # using a single thread
 import os
 os.environ['OPENBLAS_NUM_THREADS'] = '1'    # to run numpy single threaded

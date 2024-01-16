@@ -1,3 +1,4 @@
+# in the public repo this is distillation.py
 from comet_ml import Experiment
 
 import sys

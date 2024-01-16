@@ -1,3 +1,4 @@
+# in the public repo this is CaloClouds_2.py
 import torch
 from torch.nn import Module, ModuleList
 import torch.nn.functional as F
