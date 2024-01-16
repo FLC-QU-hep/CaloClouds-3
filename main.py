@@ -1,16 +1,19 @@
 from comet_ml import Experiment
 
-import sys
 import torch
 from torch.utils.data import DataLoader
 from torch.nn.utils import clip_grad_norm_
-# from tqdm.auto import tqdm
 
-from utils.dataset import *
-from utils.misc import *
+from utils.dataset import PointCloudDataset
+from utils.misc import seed_all, get_new_log_dir, CheckpointManager
+from models.common import get_linear_scheduler
+from models.CaloClouds_1 import CaloClouds_1
+from models.CaloClouds_2 import CaloClouds_2
+#from utils.dataset import *
+#from utils.misc import *
 # from utils.data import *
 # from models.vae_gaussian import *
-from models.vae_flow import *
+#from models.vae_flow import *
 from models.flow import add_spectral_norm, spectral_norm_power_iteration
 from models.allCond_epicVAE_nflow_PointDiff import AllCond_epicVAE_nFlow_PointDiff
 from models.epicVAE_nflows_kDiffusion import epicVAE_nFlow_kDiffusion
@@ -18,18 +21,21 @@ from configs import Configs
 
 import k_diffusion as K
 
+import time
+
 cfg = Configs()
 seed_all(seed = cfg.seed)
 start_time = time.localtime()
 
-# with open('comet_api_key.txt', 'r') as file:
-    # key = file.read()
+with open('comet_api_key.txt', 'r') as file:
+    key = file.read()
 
 if cfg.log_comet:
     experiment = Experiment(
-        # api_key=key,
-        project_name=cfg.comet_project, auto_metric_logging=False,
-        # workspace="akorol",
+        api_key=key,
+        project_name=cfg.comet_project,
+        auto_metric_logging=False,
+        workspace=cfg.comet_workspace,
     )
     experiment.log_parameters(cfg.__dict__)
     experiment.set_name(cfg.name+time.strftime('%Y_%m_%d__%H_%M_%S', start_time))
