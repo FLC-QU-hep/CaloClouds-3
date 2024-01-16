@@ -73,11 +73,11 @@ class Configs():
         self.max_grad_norm = 10
         self.sched_start_epoch = 100 * 1e3
         self.sched_end_epoch = 400 * 1e3
-        self.max_iters = 10 * 1e6
+        self.max_iters = 10 #10 * 1e6
 
     # Others
-        self.device = 'cuda'
-        self.logdir = '/beegfs/desy/user/buhmae/6_PointCloudDiffusion/log'
+        self.device = 'cpu' #'cuda'
+        self.logdir = '/home/dayhallh/training/point-cloud-diffusion'
         self.seed = 42
         self.val_freq =  10_000  #  1e3          # saving intervall for checkpoints
 

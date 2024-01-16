@@ -181,7 +181,7 @@ class epicVAE_nFlow_kDiffusion(Module):
 
 
 # from: https://github.com/crowsonkb/k-diffusion/blob/master/k_diffusion/layers.py#L12
-class Denoiser(nn.Module):
+class Denoiser(torch.nn.Module):
     """A Karras et al. preconditioner for denoising diffusion models."""
 
     def __init__(self, inner_model, sigma_data=0.5, device='cuda', distillation = False, sigma_min = 0.002, diffusion_loss='l2'):
@@ -360,9 +360,9 @@ class PointwiseNet_kDiffusion(Module):
             ConcatSquashLinear(128, point_dim, context_dim+time_dim)
         ])
 
-        self.timestep_embed = nn.Sequential(
+        self.timestep_embed = torch.nn.Sequential(
             K.layers.FourierFeatures(1, time_dim, std=fourier_scale),   # 1D Fourier features --> with register_buffer, so weights are not trained
-            nn.Linear(time_dim, time_dim), # this is a trainable layer
+            torch.nn.Linear(time_dim, time_dim), # this is a trainable layer
         )
 
     def forward(self, x, sigma, context=None):
@@ -404,7 +404,7 @@ class PointwiseNet_kDiffusion_Dropout(Module):
         fourier_scale = 16   # 1 in k-diffusion, 16 in EDM, 30 in Score-based generative modeling
 
         self.act = F.leaky_relu
-        self.dropout = nn.Dropout(dropout_rate)
+        self.dropout = torch.nn.Dropout(dropout_rate)
         self.residual = residual
         self.layers = ModuleList([
             ConcatSquashLinear(point_dim, 128, context_dim+time_dim),
@@ -415,9 +415,9 @@ class PointwiseNet_kDiffusion_Dropout(Module):
             ConcatSquashLinear(128, point_dim, context_dim+time_dim)
         ])
 
-        self.timestep_embed = nn.Sequential(
+        self.timestep_embed = torch.nn.Sequential(
             K.layers.FourierFeatures(1, time_dim, std=fourier_scale),   # 1D Fourier features --> with register_buffer, so weights are not trained
-            nn.Linear(time_dim, time_dim), # this is a trainable layer
+            torch.nn.Linear(time_dim, time_dim), # this is a trainable layer
         )
 
     def forward(self, x, sigma, context=None):
@@ -458,7 +458,7 @@ class PointwiseNet_kDiffusion_Dropout_mid(Module):
         fourier_scale = 16   # 1 in k-diffusion, 16 in EDM, 30 in Score-based generative modeling
 
         self.act = F.leaky_relu
-        self.dropout = nn.Dropout(dropout_rate)
+        self.dropout = torch.nn.Dropout(dropout_rate)
         self.residual = residual
         self.layers = ModuleList([
             ConcatSquashLinear(point_dim, 128, context_dim+time_dim),
@@ -469,9 +469,9 @@ class PointwiseNet_kDiffusion_Dropout_mid(Module):
             ConcatSquashLinear(128, point_dim, context_dim+time_dim)
         ])
 
-        self.timestep_embed = nn.Sequential(
+        self.timestep_embed = torch.nn.Sequential(
             K.layers.FourierFeatures(1, time_dim, std=fourier_scale),   # 1D Fourier features --> with register_buffer, so weights are not trained
-            nn.Linear(time_dim, time_dim), # this is a trainable layer
+            torch.nn.Linear(time_dim, time_dim), # this is a trainable layer
         )
 
     def forward(self, x, sigma, context=None):
