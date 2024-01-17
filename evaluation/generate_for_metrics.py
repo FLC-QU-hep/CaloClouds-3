@@ -11,7 +11,6 @@ import joblib
 import pickle
 import h5py
 
-from models.vae_flow import *
 from models.shower_flow import compile_HybridTanH_model
 from configs import Configs
 import utils.gen_utils as gen_utils

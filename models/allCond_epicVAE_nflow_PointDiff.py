@@ -1,12 +1,13 @@
 # in the public repo this is CaloClouds_1
 import torch
 from torch.nn import Module
+from torch.nn import functional as F
 
-from .common import *
-from .encoders import *
-from .diffusion import *
+from .common import KLDloss, standard_normal_logprob, reparameterize_gaussian, ConcatSquashEPiC_wn
+from .diffusion import DiffusionPoint, PointwiseNet, VarianceSchedule
 from .encoders.epic_encoder_cond import EPiC_encoder_cond
-from utils.misc import *
+from utils.misc import get_flow_model
+from torch.nn.utils import clip_grad_norm_
 
 
 class AllCond_epicVAE_nFlow_PointDiff(Module):
@@ -130,12 +131,12 @@ class PointwiseNet_epic_res_wn(Module):
         self.act = F.leaky_relu
         self.residual = residual
         self.layers = ModuleList([
-            ConcatSquashEPiCres_wn(point_dim, 128, context_dim+3+context_dim+3),     # gated learned sum of point vector and context vector
-            ConcatSquashEPiCres_wn(128, 256, context_dim+3+context_dim+3),
-            ConcatSquashEPiCres_wn(256, 512, context_dim+3+context_dim+3),
-            ConcatSquashEPiCres_wn(512, 256, context_dim+3+context_dim+3),
-            ConcatSquashEPiCres_wn(256, 128, context_dim+3+context_dim+3),
-            ConcatSquashEPiCres_wn(128, point_dim, context_dim+3+context_dim+3)
+            ConcatSquashEPiC_wn(point_dim, 128, context_dim+3+context_dim+3),     # gated learned sum of point vector and context vector
+            ConcatSquashEPiC_wn(128, 256, context_dim+3+context_dim+3),
+            ConcatSquashEPiC_wn(256, 512, context_dim+3+context_dim+3),
+            ConcatSquashEPiC_wn(512, 256, context_dim+3+context_dim+3),
+            ConcatSquashEPiC_wn(256, 128, context_dim+3+context_dim+3),
+            ConcatSquashEPiC_wn(128, point_dim, context_dim+3+context_dim+3)
         ])
 
     def forward(self, x, beta, context):

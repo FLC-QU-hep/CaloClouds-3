@@ -8,11 +8,6 @@ from torch.nn.utils import clip_grad_norm_
 from utils.dataset import PointCloudDataset
 from utils.misc import seed_all, get_new_log_dir, CheckpointManager
 from models.common import get_linear_scheduler
-#from utils.dataset import *
-#from utils.misc import *
-# from utils.data import *
-# from models.vae_gaussian import *
-#from models.vae_flow import *
 from models.flow import add_spectral_norm, spectral_norm_power_iteration
 from models.allCond_epicVAE_nflow_PointDiff import AllCond_epicVAE_nFlow_PointDiff
 from models.epicVAE_nflows_kDiffusion import epicVAE_nFlow_kDiffusion

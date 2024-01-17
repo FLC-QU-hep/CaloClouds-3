@@ -33,7 +33,7 @@ class Configs():
         # EPiC arguments
         self.use_epic = False
         self.epic_layers = 5
-        self.hid_d = 128        # default: 128
+        self.hidden_dim = 128        # default: 128
         self.sum_scale = 1e-3
         self.weight_norm = True
 
@@ -77,9 +77,9 @@ class Configs():
 
     # Others
         self.device = 'cpu' #'cuda'
-        self.logdir = '/home/dayhallh/training/point-cloud-diffusion'
+        self.logdir = '/home/dayhallh/training/point-cloud-diffusion-logs'
         self.seed = 42
-        self.val_freq =  10_000  #  1e3          # saving intervall for checkpoints
+        self.val_freq =  1_000  #  1e3          # saving intervall for checkpoints
 
         self.test_freq = 30 * 1e3   
         self.test_size = 400
@@ -121,7 +121,7 @@ class Configs():
         # self.model_path = 'kCaloClouds_2023_05_24__14_54_09/ckpt_0.000000_500000.pt'
         # self.model_path = 'kCaloClouds_2023_05_31__17_57_11/ckpt_0.000000_1690000.pt'
         # self.model_path = 'kCaloClouds_2023_06_29__23_08_31/ckpt_0.000000_2000000.pt'   # lat 0
-        self.model_path = 'kCaloClouds_2023_07_02__20_30_03/ckpt_0.000000_2000000.pt'     # lat 32
+        self.model_path = 'CD_2024_01_16__17_58_33/ckpt_0.000000_10.pt'
         self.use_ema_trainer = True
         self.start_ema = 0.95
         # self.ema_rate = 0.999943    # decay rate of separately saved EMA model (not implemented yet)

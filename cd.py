@@ -7,15 +7,10 @@ from torch.utils.data import DataLoader
 from torch.nn.utils import clip_grad_norm_
 # from tqdm.auto import tqdm
 
-#from utils.dataset import *
-#from utils.misc import *
-# from utils.data import *
-# from models.vae_gaussian import *
-#from models.vae_flow import *
 from utils.dataset import PointCloudDataset, PointCloudDatasetGH
 from utils.misc import seed_all, get_new_log_dir, CheckpointManager
 from models.vae_flow import VAEFlow
-from models.CaloClouds_2 import CaloClouds_2
+from models.epicVAE_nflows_kDiffusion import epicVAE_nFlow_kDiffusion
 from models.flow import add_spectral_norm, spectral_norm_power_iteration
 from models.allCond_epicVAE_nflow_PointDiff import AllCond_epicVAE_nFlow_PointDiff
 from models.epicVAE_nflows_kDiffusion import epicVAE_nFlow_kDiffusion

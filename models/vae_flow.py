@@ -6,7 +6,7 @@ from .encoders.pointnet import PointNetEncoder
 from .diffusion import DiffusionPoint
 
 
-class FlowVAE(Module):
+class VAEFlow(Module):
 
     def __init__(self, args):
         super().__init__()

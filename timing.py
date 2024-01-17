@@ -13,7 +13,6 @@ import time
 # from torch.utils.data import DataLoader
 # from torch.nn.utils import clip_grad_norm_
 
-#from models.vae_flow import *
 # from models.flow import add_spectral_norm, spectral_norm_power_iteration
 from configs import Configs
 
@@ -32,7 +31,7 @@ import models.allCond_epicVAE_nflow_PointDiff as mdls2
 ### PARAMS #############
 ########################
 
-caloclouds = 'cm'   # 'ddpm, 'edm', 'cm'
+caloclouds = 'edm'   # 'ddpm, 'edm', 'cm'
 
 cfg = Configs()
 cfg.device = 'cpu'  # 'cuda' or 'cpu'
@@ -102,7 +101,7 @@ def main(cfg, min_e, max_e, num, bs, iterations):
         cfg.residual = True
         cfg.latent_dim = 256
         model = mdls2.AllCond_epicVAE_nFlow_PointDiff(cfg).to(cfg.device)
-        checkpoint = torch.load('/beegfs/desy/user/akorol/logs/point-cloud/AllCond_epicVAE_nFlow_PointDiff_100s_MSE_loss_smired_possitions_quardatic2023_04_06__16_34_39/ckpt_0.000000_837000.pt', map_location=torch.device(cfg.device)) # quadratic
+        checkpoint = torch.load(cfg.logdir + '/' + cfg.model_path, map_location=torch.device(cfg.device))   # max 1200000
         model.load_state_dict(checkpoint['state_dict'])
         coef_real = np.array([ 2.42091454e-09, -2.72191705e-05,  2.95613817e-01,  4.88328360e+01])   # fixed coeff at 0.1 threshold
         coef_fake = np.array([-2.03879741e-06,  4.93529413e-03,  5.11518795e-01,  3.14176987e+02])
@@ -114,7 +113,7 @@ def main(cfg, min_e, max_e, num, bs, iterations):
         cfg.dropout_rate = 0.0
         cfg.latent_dim = 0
         cfg.residual = False
-        checkpoint = torch.load(cfg.logdir + '/' + 'kCaloClouds_2023_06_29__23_08_31/ckpt_0.000000_2000000.pt', map_location=torch.device(cfg.device))    # max 5200000
+        checkpoint = torch.load(cfg.logdir + '/' + cfg.model_path, map_location=torch.device(cfg.device))   # max 1200000
         model = mdls.epicVAE_nFlow_kDiffusion(cfg).to(cfg.device)
         model.load_state_dict(checkpoint['others']['model_ema'])
         coef_real = np.array([ 2.42091454e-09, -2.72191705e-05,  2.95613817e-01,  4.88328360e+01])  # fixed coeff at 0.1 threshold
@@ -127,7 +126,7 @@ def main(cfg, min_e, max_e, num, bs, iterations):
         cfg.dropout_rate = 0.0
         cfg.latent_dim = 0
         cfg.residual = False
-        checkpoint = torch.load(cfg.logdir + '/' + 'CD_2023_07_07__16_32_09/ckpt_0.000000_1000000.pt', map_location=torch.device(cfg.device))   # max 1200000
+        checkpoint = torch.load(cfg.logdir + '/' + cfg.model_path, map_location=torch.device(cfg.device))   # max 1200000
         model = mdls.epicVAE_nFlow_kDiffusion(cfg, distillation = True).to(cfg.device)
         model.load_state_dict(checkpoint['others']['model_ema'])
         coef_real = np.array([ 2.42091454e-09, -2.72191705e-05,  2.95613817e-01,  4.88328360e+01])  # fixed coeff at 0.1 threshold
