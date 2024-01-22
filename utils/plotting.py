@@ -4,6 +4,7 @@ import numpy as np
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 import matplotlib.font_manager as font_manager
+from scipy.stats import binned_statistic
 
 import utils.metrics as metrics
 
@@ -49,7 +50,7 @@ class Configs():
         self.e_indent = 20
 
     # hits
-        self.hit_bins = np.logspace(np.log10(0.01000001), np.log10(1000), 70)
+        self.hit_bins = np.logspace(np.log10(0.01000001), np.log10(200), 50)
         # self.hit_bins = np.logspace(np.log10(0.01), np.log10(100), 70)
         self.ylim_hits = (1, 1*1e7)
         # self.ylim_hits = (10, 8*1e5)
@@ -57,10 +58,7 @@ class Configs():
     #CoG
         self.bins_cog = 30  
         # bin ranges for [X, Z, Y] coordinates, in ILD coordinate system [X', Y', Z']
-        self.cog_ranges = [(-3.99+1.5, 3.99-1.5), (1861, 2001), (38.01, 39.99+1.99)]
-        # self.cog_ranges = [(-1.7, 1.2), (1891, 1949), (38.5, 41.99)]
-        # self.cog_ranges = [(-3.99, 3.99), (1861, 1999), (36.01, 43.99)]
-        # self.cog_ranges = [(33.99, 39.99), (1861, 1999), (-38.9, -32.9)]
+        self.cog_ranges = [(-0.3-1.5, -0.3+1.5), (1875, 1940), (39.8-1.5, 39.8+1.5)]
 
     # xyz featas
         self.bins_feats = 50  
@@ -81,6 +79,9 @@ class Configs():
     # percentile edges for occupancy based metrics
         self.layer_edges = [0, 8, 11, 13, 15, 16, 18, 19, 21, 24, 29]
         self.radial_edges = [0, 6.558, 9.849, 12.96, 17.028, 23.434, 33.609, 40.119, 48.491, 68.808, 300]
+
+    # error band
+        self.alpha = 0.3
 
 cfg = Configs()
 
@@ -318,7 +319,9 @@ def get_features(events):
     dict['hits'] = np.concatenate(hits_list)   # hit energies
     dict['occ'] = np.array(occ_list)
     dict['e_layers_distibution'] = np.array(e_layers_list)  # distibution of energy per layer
-    dict['e_layers'] = np.array(e_layers_list).sum(axis=0)/len(events)  # average energy per layer
+    # dict['e_layers'] = np.array(e_layers_list).sum(axis=0)/len(events)  # average energy per layer
+    dict['e_layers'] = np.array(e_layers_list).mean(axis=0)  # average energy per layer
+    dict['e_layers_std'] = np.array(e_layers_list).std(axis=0)  # std of energy per layer
     dict['occ_layers'] = np.array(occ_layers_list)#.sum(axis=0)/len(events)
     dict['e_radial_lists'] = e_radidal_lists  # nested list: e_rad_lst[ EVENTS ][DIST,E ] [ POINTS ]
     dict['hits_noThreshold'] = np.concatenate(hits_noThreshold_list)  # hit energies without threshold
@@ -343,32 +346,51 @@ def plt_radial(e_radial, e_radial_list, labels, cfg=cfg, title=r'\textbf{full sp
     axs[0].legend(prop=cfg.font, loc='upper right')
     ########################################################
 
-    h = axs[0].hist(e_radial[0], bins=cfg.bins_r, weights=e_radial[1]/events, color='lightgrey', rasterized=True)
-    h = axs[0].hist(e_radial[0], bins=cfg.bins_r, weights=e_radial[1]/events, color='dimgrey', histtype='step', lw=2)
+    # mean and std as binned statistic
+    mean, edges, _ = binned_statistic(e_radial[0], e_radial[1], bins=cfg.bins_r, statistic='mean')
+    std, _, _ = binned_statistic(e_radial[0], e_radial[1], bins=cfg.bins_r, statistic='std')
+    count, _, _ = binned_statistic(e_radial[0], e_radial[1], bins=cfg.bins_r, statistic='count')
+
+    mean_shower = mean * count / events  # mean shower energy per bin
+    std_shower = std / np.sqrt(count)  # std of individual event measures --> std of mean
+    std_shower = std_shower * count / events  # std of shower energy per bin 
+
+    # data histogram
+    axs[0].stairs(mean_shower, edges=edges, color='lightgrey', fill=True)
+    # h = axs[0].hist(e_radial[0], bins=cfg.bins_r, weights=e_radial[1]/events, color='lightgrey', rasterized=True)
+    # h = axs[0].hist(e_radial[0], bins=cfg.bins_r, weights=e_radial[1]/events, color='dimgrey', histtype='step', lw=2)
+
+    # uncertainty band
+    axs[0].stairs(mean_shower+std_shower, edges=edges, baseline=mean_shower-std_shower, color='dimgrey', lw=2, hatch='///')
     
     for i, e_radial_ in enumerate(e_radial_list):
-        h1 = axs[0].hist(e_radial_[0], bins=h[1], weights=e_radial_[1]/events, histtype='step', linestyle='-', lw=3, color=cfg.color_lines[i])
+        # h1 = axs[0].hist(e_radial_[0], bins=edges, weights=e_radial_[1]/events, histtype='step', linestyle='-', lw=3, color=cfg.color_lines[i])
 
+        # mean and std as binned statistic
+        mean, _, _ = binned_statistic(e_radial_[0], e_radial_[1], bins=edges, statistic='mean')
+        std, _, _ = binned_statistic(e_radial_[0], e_radial_[1], bins=edges, statistic='std')
+        count, _, _ = binned_statistic(e_radial_[0], e_radial_[1], bins=edges, statistic='count')
+        mean_shower_gen = mean * count / events  # mean shower energy per bin
+        std_shower_gen = std / np.sqrt(count)  # std of individual event measures --> std of mean
+        std_shower_gen = std_shower_gen * count / events  # std of shower energy per bin   
+
+        # gen histogram
+        axs[0].stairs(mean_shower_gen, edges=edges, linestyle='-', lw=3, color=cfg.color_lines[i])
+        # uncertainty band
+        axs[0].stairs(mean_shower_gen+std_shower_gen, edges=edges, baseline=mean_shower_gen-std_shower_gen, color=cfg.color_lines[i], alpha=cfg.alpha, fill=True)
+    
         # ratio plot on the bottom
         lims_min = 0.5
         lims_max = 1.9
-        eps = 1e-5
-        centers = np.array((h[1][:-1] + h[1][1:])/2)
-        ratios = np.clip(np.array((h1[0]+eps)/(h[0]+eps)), lims_min, lims_max)
-        mask = (ratios > lims_min) & (ratios < lims_max)  # mask ratios within plotting y range
-        # only connect dots with adjecent points
-        starts = np.argwhere(np.insert(mask[:-1],0,False)<mask)[:,0]
-        ends = np.argwhere(np.append(mask[1:],False)<mask)[:,0]+1
-        indexes = np.stack((starts,ends)).T
-        for idxs in indexes:
-            sub_mask = np.zeros(len(mask), dtype=bool)
-            sub_mask[idxs[0]:idxs[1]] = True
-            axs[1].plot(centers[sub_mask], ratios[sub_mask], linestyle='', lw=2, marker='o', color=cfg.color_lines[i])
-        # remaining points either above or below plotting y range
-        mask = (ratios == lims_min)
-        axs[1].plot(centers[mask], ratios[mask], linestyle='', lw=2, marker='v', color=cfg.color_lines[i], clip_on=False)
-        mask = (ratios == lims_max)
-        axs[1].plot(centers[mask], ratios[mask], linestyle='', lw=2, marker='^', color=cfg.color_lines[i], clip_on=False)
+
+        # plot ratio
+        ratio = (mean_shower_gen) / (mean_shower)
+        axs[1].stairs(ratio, edges=edges, color=cfg.color_lines[i], lw=3)
+
+        # plot error band
+        ratio_err = ratio * np.sqrt( ((std_shower)/(mean_shower))**2 + ((std_shower_gen)/(mean_shower_gen))**2 )
+        axs[1].stairs(ratio+ratio_err, edges=edges, baseline=ratio-ratio_err, color=cfg.color_lines[i], alpha=cfg.alpha, fill=True)
+
 
     axs[1].set_ylim(lims_min, lims_max)
 
@@ -398,7 +420,7 @@ def plt_radial(e_radial, e_radial_list, labels, cfg=cfg, title=r'\textbf{full sp
     plt.savefig('radial.pdf', dpi=100, bbox_inches='tight')
     plt.show()
     
-def plt_spinal(e_layers, e_layers_list, labels, cfg=cfg, title=r'\textbf{full spectrum}'):
+def plt_spinal(e_layers, e_layers_list, e_layers_std_real, e_layers_std_list, labels, cfg=cfg, title=r'\textbf{full spectrum}', events=40_000):
     
     fig, axs = plt.subplots(2, 1, figsize=(7,9), height_ratios=[3, 1], sharex=True)
 
@@ -411,32 +433,35 @@ def plt_spinal(e_layers, e_layers_list, labels, cfg=cfg, title=r'\textbf{full sp
     pos = np.arange(1, len(e_layers)+1)
     bins = np.arange(0.5, len(e_layers)+1.5)
 
-    axs[0].hist(pos, bins=bins, weights=e_layers, color='lightgrey', rasterized=True)
-    axs[0].hist(pos, bins=bins, weights=e_layers, color='dimgrey', histtype='step', lw=2)
+    # h_data = axs[0].hist(pos, bins=bins, weights=e_layers, color='lightgrey', rasterized=True)
+    axs[0].stairs(e_layers, edges=bins, color='lightgrey', fill=True)
+    # axs[0].hist(pos, bins=bins, weights=e_layers, color='dimgrey', histtype='step', lw=2)
+
+    # uncertainty band 
+    err_data = e_layers_std_real / np.sqrt(events)   # std of individual measures --> std of mean
+    axs[0].stairs(e_layers+err_data, edges=bins, baseline=e_layers-err_data, color='dimgrey', lw=2, hatch='///')
     
-    for i, e_layers_ in enumerate(e_layers_list):
-        axs[0].hist(pos, bins=bins, weights=e_layers_, histtype='step', linestyle='-', lw=3, color=cfg.color_lines[i])
+    
+    for i, (e_layers_, e_layers_std_) in enumerate(zip(e_layers_list, e_layers_std_list)):
+        # axs[0].hist(pos, bins=bins, weights=e_layers_, histtype='step', linestyle='-', lw=3, color=cfg.color_lines[i])
+        axs[0].stairs(e_layers_, edges=bins, linestyle='-', lw=3, color=cfg.color_lines[i])
+        # uncertainty band
+        err_gen = e_layers_std_ / np.sqrt(events)
+        axs[0].stairs(e_layers_+err_gen, edges=bins, baseline=e_layers_-err_gen, color=cfg.color_lines[i], alpha=cfg.alpha, fill=True)
+
 
         # ratio plot on the bottom
         lims_min = 0.8
         lims_max = 1.05
-        eps = 1e-5
-        centers = pos
-        ratios = np.clip((e_layers_+eps)/(e_layers+eps), lims_min, lims_max)
-        mask = (ratios > lims_min) & (ratios < lims_max)  # mask ratios within plotting y range
-        # only connect dots with adjecent points
-        starts = np.argwhere(np.insert(mask[:-1],0,False)<mask)[:,0]
-        ends = np.argwhere(np.append(mask[1:],False)<mask)[:,0]+1
-        indexes = np.stack((starts,ends)).T
-        for idxs in indexes:
-            sub_mask = np.zeros(len(mask), dtype=bool)
-            sub_mask[idxs[0]:idxs[1]] = True
-            axs[1].plot(centers[sub_mask], ratios[sub_mask], linestyle='', lw=2, marker='o', color=cfg.color_lines[i])
-        # remaining points either above or below plotting y range
-        mask = (ratios == lims_min)
-        axs[1].plot(centers[mask], ratios[mask], linestyle='', lw=2, marker='v', color=cfg.color_lines[i], clip_on=False)
-        mask = (ratios == lims_max)
-        axs[1].plot(centers[mask], ratios[mask], linestyle='', lw=2, marker='^', color=cfg.color_lines[i], clip_on=False)
+
+        # plot ratio
+        ratio = (e_layers_) / (e_layers)
+        axs[1].stairs(ratio, edges=bins, color=cfg.color_lines[i], lw=3)
+
+        # plot error band
+        ratio_err = ratio * np.sqrt( ((err_gen)/(e_layers_))**2 + ((err_data)/(e_layers))**2 )
+        axs[1].stairs(ratio+ratio_err, edges=bins, baseline=ratio-ratio_err, color=cfg.color_lines[i], alpha=cfg.alpha, fill=True)
+
 
     axs[1].set_ylim(lims_min, lims_max)
 
@@ -494,7 +519,7 @@ def plt_hit_e(hits, hits_list, labels, cfg=cfg, title=r'\textbf{full spectrum}')
     fig, axs = plt.subplots(2, 1, figsize=(7,9), height_ratios=[3, 1], sharex=True)
 
     ## for legend ##########################################
-    axs[0].hist(np.zeros(1)+1, label=labels[0], color='lightgrey', edgecolor='dimgrey', lw=2)
+    axs[0].hist(np.zeros(1)+1, label=labels[0], color='lightgrey', edgecolor='dimgrey', lw=3)
     for i in range(len(hits_list)):
         axs[0].plot(0, 0, linestyle='-', lw=3, color=cfg.color_lines[i], label=labels[i+1])
     # plt.legend(prop=cfg.font, loc='upper right')
@@ -504,43 +529,42 @@ def plt_hit_e(hits, hits_list, labels, cfg=cfg, title=r'\textbf{full spectrum}')
     axs[0].set_title(title, fontsize=cfg.font.get_size(), loc='right')
     ########################################################
 
-    h = axs[0].hist(hits, bins=cfg.hit_bins, color='lightgrey', rasterized=True)
-    h = axs[0].hist(hits, bins=cfg.hit_bins, histtype='step', color='dimgrey', lw=2)
-    
+    h_data = axs[0].hist(hits, bins=cfg.hit_bins, color='lightgrey', rasterized=True)
+    # h = axs[0].hist(hits, bins=cfg.hit_bins, histtype='step', color='dimgrey', lw=2)
+
+    # uncertainty band
+    h_data_err = np.sqrt(h_data[0])
+    axs[0].stairs(h_data[0]+h_data_err, edges=h_data[1], baseline=h_data[0]-h_data_err, color='dimgrey', lw=3, hatch='///')
+
     for i, hits_ in enumerate(hits_list):
-        h1 = axs[0].hist(hits_, bins=h[1], histtype='step', linestyle='-', lw=3, color=cfg.color_lines[i])
-        # ratio plot on the bottom
-        # axs[1].plot((h[1][:-1] + h[1][1:])/2, h1[0]/h[0], linestyle='-', lw=2, marker='o', color=cfg.color_lines[i])
+        h_gen = axs[0].hist(hits_, bins=h_data[1], histtype='step', linestyle='-', lw=3, color=cfg.color_lines[i])
+
+        # uncertainty band in histogram
+        h_gen_err = np.sqrt(h_gen[0])
+        axs[0].stairs(h_gen[0]+h_gen_err, edges=h_gen[1], baseline=h_gen[0]-h_gen_err, color=cfg.color_lines[i], alpha=cfg.alpha, fill=True)
+
         # ratio plot on the bottom
         lims_min = 0.5
         lims_max = 1.9
-        eps = 1e-5
-        centers = np.array((h[1][:-1] + h[1][1:])/2)
-        ratios = np.clip(np.array((h1[0]+eps)/(h[0]+eps)), lims_min, lims_max)
-        mask = (ratios > lims_min) & (ratios < lims_max)  # mask ratios within plotting y range
-        # only connect dots with adjecent points
-        starts = np.argwhere(np.insert(mask[:-1],0,False)<mask)[:,0]
-        ends = np.argwhere(np.append(mask[1:],False)<mask)[:,0]+1
-        indexes = np.stack((starts,ends)).T
-        for idxs in indexes:
-            sub_mask = np.zeros(len(mask), dtype=bool)
-            sub_mask[idxs[0]:idxs[1]] = True
-            axs[1].plot(centers[sub_mask], ratios[sub_mask], linestyle='', lw=2, marker='o', color=cfg.color_lines[i])
-        # remaining points either above or below plotting y range
-        mask = (ratios == lims_min)
-        axs[1].plot(centers[mask], ratios[mask], linestyle='', lw=2, marker='v', color=cfg.color_lines[i], clip_on=False)
-        mask = (ratios == lims_max)
-        axs[1].plot(centers[mask], ratios[mask], linestyle='', lw=2, marker='^', color=cfg.color_lines[i], clip_on=False)
+        # eps = 1e-8 # to avoid division by zero
 
+        # plot ratio
+        ratio = (h_gen[0]) / (h_data[0])
+        axs[1].stairs(ratio, edges=h_data[1], color=cfg.color_lines[i], lw=3)
+
+        # plot error band
+        ratio_err = ratio * np.sqrt( ((h_data_err)/(h_data[0]))**2 + ((h_gen_err)/(h_gen[0]))**2 )
+        axs[1].stairs(ratio+ratio_err, edges=h_data[1], baseline=ratio-ratio_err, color=cfg.color_lines[i], alpha=cfg.alpha, fill=True)
+            
     axs[1].set_ylim(lims_min, lims_max)
 
     # horizontal line at 1
     axs[1].axhline(1, linestyle='-', lw=1, color='k')
 
-    axs[0].axvspan(h[1].min(), cfg.threshold, facecolor='gray', alpha=0.5, hatch= "/", edgecolor='k')
-    axs[1].axvspan(h[1].min(), cfg.threshold, facecolor='gray', alpha=0.5, hatch= "/", edgecolor='k')
-    # axs[0].set_xlim(h[1].min(), h[1].max()+0)
-    axs[0].set_xlim(h[1].min(), 3e2)
+    axs[0].axvspan(h_data[1].min(), cfg.threshold, facecolor='gray', alpha=0.5, hatch= "/", edgecolor='k')
+    axs[1].axvspan(h_data[1].min(), cfg.threshold, facecolor='gray', alpha=0.5, hatch= "/", edgecolor='k')
+    axs[0].set_xlim(h_data[1].min(), h_data[1].max())
+    # axs[0].set_xlim(h_data[1].min(), 3e2)
     axs[0].set_ylim(cfg.ylim_hits[0], cfg.ylim_hits[1])
 
     axs[0].set_yscale('log')
@@ -556,6 +580,7 @@ def plt_hit_e(hits, hits_list, labels, cfg=cfg, title=r'\textbf{full spectrum}')
 
     plt.savefig('hits.pdf', dpi=100, bbox_inches='tight')
     plt.show()
+
     
 def plt_esum(e_sum, e_sum_list, labels, cfg=cfg):
     plt.figure(figsize=(7, 7))
@@ -602,8 +627,14 @@ def plt_cog(cog, cog_list, labels, cfg=cfg, title=r'\textbf{full spectrum}'):
 
         axs[0, k].set_xlim(cfg.cog_ranges[j])
         
-        h = axs[0, k].hist(np.array(cog[j]), bins=cfg.bins_cog, color='lightgrey', range=cfg.cog_ranges[j], rasterized=True)
-        h = axs[0, k].hist(np.array(cog[j]), bins=h[1], color='dimgrey', histtype='step', lw=2)
+        # real data
+        h_data = axs[0, k].hist(np.array(cog[j]), bins=cfg.bins_cog, color='lightgrey', range=cfg.cog_ranges[j], rasterized=True)
+        # h = axs[0, k].hist(np.array(cog[j]), bins=h[1], color='dimgrey', histtype='step', lw=2)
+        
+        # uncertainty band
+        h_data_err = np.sqrt(h_data[0])
+        axs[0, k].stairs(h_data[0]+h_data_err, edges=h_data[1], baseline=h_data[0]-h_data_err, color='dimgrey', lw=2, hatch='///')
+
         
         # for legend ##############################################
         if k == k:
@@ -613,31 +644,27 @@ def plt_cog(cog, cog_list, labels, cfg=cfg, title=r'\textbf{full spectrum}'):
                 axs[0, k].plot(0, 0, linestyle='-', lw=3, color=cfg.color_lines[i], label=labels[i+1])
         ###########################################################
 
+        # generated data
         for i, cog_ in enumerate(cog_list):
-            h1 = axs[0, k].hist(np.array(cog_[j]), bins=h[1], histtype='step', linestyle='-', lw=3, color=cfg.color_lines[i], range=cfg.cog_ranges[j])
+            h_gen = axs[0, k].hist(np.array(cog_[j]), bins=h_data[1], histtype='step', linestyle='-', lw=3, color=cfg.color_lines[i], range=cfg.cog_ranges[j])
+
+            # uncertainty band in histogram
+            h_gen_err = np.sqrt(h_gen[0])
+            axs[0, k].stairs(h_gen[0]+h_gen_err, edges=h_gen[1], baseline=h_gen[0]-h_gen_err, color=cfg.color_lines[i], alpha=cfg.alpha, fill=True)
 
             # ratio plot on the bottom
             lims_min = [0.5, 0.5, 0.5]
             lims_max = [1.5, 1.5, 1.5]
-            marker_styles = ['o', 's', 'X']
-            eps = 1e-5
-            centers = np.array((h[1][:-1] + h[1][1:])/2)
-            ratios = np.clip(np.array((h1[0]+eps)/(h[0]+eps)), lims_min[k], lims_max[k])
-            mask = (ratios > lims_min[k]) & (ratios < lims_max[k])  # mask ratios within plotting y range
-            # only connect dots with adjecent points
-            starts = np.argwhere(np.insert(mask[:-1],0,False)<mask)[:,0]
-            ends = np.argwhere(np.append(mask[1:],False)<mask)[:,0]+1
-            indexes = np.stack((starts,ends)).T
-            for idxs in indexes:
-                sub_mask = np.zeros(len(mask), dtype=bool)
-                sub_mask[idxs[0]:idxs[1]] = True
-                axs[1, k].plot(centers[sub_mask], ratios[sub_mask], linestyle='', lw=2, marker='o', color=cfg.color_lines[i])
-            # remaining points either above or below plotting y range
-            mask = (ratios == lims_min[k])
-            axs[1, k].plot(centers[mask], ratios[mask], linestyle='', lw=2, marker='v', color=cfg.color_lines[i], clip_on=False)
-            mask = (ratios == lims_max[k])
-            axs[1, k].plot(centers[mask], ratios[mask], linestyle='', lw=2, marker='^', color=cfg.color_lines[i], clip_on=False)
+            # eps = 1e-8  # to avoid division by zero
 
+            # plot ratio
+            ratio = (h_gen[0]) / (h_data[0])
+            axs[1, k].stairs(ratio, edges=h_data[1], color=cfg.color_lines[i], lw=2)
+
+            # plot error band
+            ratio_err = ratio * np.sqrt( ((h_data_err)/(h_data[0]))**2 + ((h_gen_err)/(h_gen[0]))**2 )
+            axs[1, k].stairs(ratio+ratio_err, edges=h_data[1], baseline=ratio-ratio_err, color=cfg.color_lines[i], alpha=cfg.alpha, fill=True)
+             
         # horizontal line at 1
         axs[1, k].axhline(1, linestyle='-', lw=1, color='k')
 
@@ -651,7 +678,9 @@ def plt_cog(cog, cog_list, labels, cfg=cfg, title=r'\textbf{full spectrum}'):
 
         ###########################################################
 
-        axs[0, k].set_ylim(0, max(h[0]) + max(h[0])*0.5)
+        axs[0, k].set_ylim(0, max(h_data[0]) + max(h_data[0])*0.2)
+        if k == 2:
+            axs[0, k].set_ylim(0, max(h_data[0]) + max(h_data[0])*0.75)
         axs[1, k].set_ylim(lims_min[k], lims_max[k])
         #axs[1, k].set_yscale('log')
 
@@ -663,6 +692,7 @@ def plt_cog(cog, cog_list, labels, cfg=cfg, title=r'\textbf{full spectrum}'):
     plt.subplots_adjust(left=0, hspace=0.1, wspace=0.25)
     plt.savefig('cog.pdf', dpi=100, bbox_inches='tight')
     plt.show()
+
 
 
 def plt_feats(events, events_list: list, labels, cfg=cfg, title=r'\textbf{full spectrum}', scale=None, density=False):
@@ -727,10 +757,18 @@ def plt_occupancy_singleE(occ_list, occ_list_list, labels, cfg=cfg):
     for j, (occ, occ_list) in enumerate(zip(occ_list, occ_list_list)):   # loop over energyies
 
         h = axs.hist(occ, bins=cfg.occup_bins, color='lightgrey', rasterized=True)
-        h = axs.hist(occ, bins=cfg.occup_bins, color='dimgrey', histtype='step', lw=2)
+        # h = axs.hist(occ, bins=cfg.occup_bins, color='dimgrey', histtype='step', lw=2)
+
+        # uncertainty
+        h_err = np.sqrt(h[0])
+        axs.stairs(h[0]+h_err, edges=h[1], baseline=h[0]-h_err, color='dimgrey', lw=2, hatch='///')
         
         for i, occ_ in enumerate(occ_list):   # loop over models
             h1 = axs.hist(occ_, bins=h[1], histtype='step', linestyle='-', lw=2.5, color=cfg.color_lines[i])
+
+            # uncertainty band in histogram
+            h1_err = np.sqrt(h1[0])
+            axs.stairs(h1[0]+h1_err, edges=h1[1], baseline=h1[0]-h1_err, color=cfg.color_lines[i], alpha=cfg.alpha, fill=True)
 
             # # ratio plot on the bottom
             # lims_min = 0.5
@@ -801,10 +839,18 @@ def plt_esum_singleE(e_sum_list, e_sum_list_list, labels, cfg=cfg):
 
     for j, (e_sum, e_sum_list) in enumerate(zip(e_sum_list, e_sum_list_list)):   # loop over energyies
         h = axs.hist(np.array(e_sum), bins=cfg.e_sum_bins, color='lightgrey', rasterized=True)
-        h = axs.hist(np.array(e_sum), bins=cfg.e_sum_bins,  histtype='step', color='dimgrey', lw=2)
+        # h = axs.hist(np.array(e_sum), bins=cfg.e_sum_bins,  histtype='step', color='dimgrey', lw=2)
+
+        # uncertainty
+        h_err = np.sqrt(h[0])
+        axs.stairs(h[0]+h_err, edges=h[1], baseline=h[0]-h_err, color='dimgrey', lw=2, hatch='///')
         
         for i, e_sum_ in enumerate(e_sum_list):
             h1 = axs.hist(np.array(e_sum_), bins=h[1], histtype='step', linestyle='-', lw=2.5, color=cfg.color_lines[i])
+
+            # uncertainty band in histogram
+            h1_err = np.sqrt(h1[0])
+            axs.stairs(h1[0]+h1_err, edges=h1[1], baseline=h1[0]-h1_err, color=cfg.color_lines[i], alpha=cfg.alpha, fill=True)
             
             # ratio plot on the bottom
             # lims_min = 0.5
@@ -903,8 +949,9 @@ def get_observables_for_plotting(events, events_list: list):
     e_sum_real = dict_real['e_sum']
     hits_real = dict_real['hits_noThreshold']
     e_layers_real = dict_real['e_layers']
+    e_layers_std_real = dict_real['e_layers_std']
     
-    e_radial_list, occ_list, e_sum_list, hits_list, e_layers_list = [], [], [], [], []
+    e_radial_list, occ_list, e_sum_list, hits_list, e_layers_list, e_layers_std_list = [], [], [], [], [], []
     
     for i in range(len(events_list)):
         dict_fake = get_features(events_list[i])
@@ -914,10 +961,11 @@ def get_observables_for_plotting(events, events_list: list):
         e_sum_list.append(dict_fake['e_sum'])
         hits_list.append(dict_fake['hits_noThreshold'])
         e_layers_list.append(dict_fake['e_layers'])
+        e_layers_std_list.append(dict_fake['e_layers_std'])
         
-    fakes_list = [e_radial_list, occ_list, e_sum_list, hits_list, e_layers_list]
+    fakes_list = [e_radial_list, occ_list, e_sum_list, hits_list, e_layers_list, e_layers_std_list]
 
-    real_list = [e_radial_real, occ_real, e_sum_real, hits_real, e_layers_real]
+    real_list = [e_radial_real, occ_real, e_sum_real, hits_real, e_layers_real, e_layers_std_real]
     
     return real_list, fakes_list
 
@@ -927,12 +975,12 @@ def get_plots_from_observables(real_list: list, fakes_list: list, labels: list =
     if len(real_list) != len(fakes_list):
         e_radial_real, occ_real, e_sum_real, hits_real, e_layers_real, occ_layer_real, e_layers_distibution_real, e_radial_lists_real, hits_noThreshold_list_real = real_list
     else:
-        e_radial_real, occ_real, e_sum_real, hits_real, e_layers_real = real_list
+        e_radial_real, occ_real, e_sum_real, hits_real, e_layers_real, e_layers_std_real = real_list
     
-    e_radial_list, occ_list, e_sum_list, hits_list, e_layers_list = fakes_list        
+    e_radial_list, occ_list, e_sum_list, hits_list, e_layers_list, e_layers_std_list = fakes_list        
     
     plt_radial(e_radial_real, e_radial_list, labels=labels, title=title, events=events)
-    plt_spinal(e_layers_real, e_layers_list, labels=labels, title=title)
+    plt_spinal(e_layers_real, e_layers_list, e_layers_std_real, e_layers_std_list, labels=labels, title=title)
     if len(real_list) != len(fakes_list):
         plt_hit_e(hits_noThreshold_list_real, hits_list, labels=labels, title=title)
     else:
