@@ -1,4 +1,5 @@
 # in the public repo this is distillation.py
+# this trains the student model
 from comet_ml import Experiment
 
 import sys

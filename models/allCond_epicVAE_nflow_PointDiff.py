@@ -1,7 +1,6 @@
 # in the public repo this is CaloClouds_1
 import torch
-from torch.nn import Module
-from torch.nn import functional as F
+from torch.nn import Module, functional
 
 from .common import KLDloss, standard_normal_logprob, reparameterize_gaussian, ConcatSquashEPiC_wn
 from .diffusion import DiffusionPoint, PointwiseNet, VarianceSchedule
@@ -47,7 +46,7 @@ class AllCond_epicVAE_nFlow_PointDiff(Module):
         # batch_size, _, _ = x.size()
         # print(x.size())
         z_mu, z_sigma = self.encoder(x, cond_feats)
-        z = reparameterize_gaussian(mean=z_mu, logvar=z_sigma)  # (B, F)
+        z = reparameterize_gaussian(mean=z_mu, logvar=z_sigma)  # (B, functional)
         
         # H[Q(z|X)]
         # entropy = gaussian_entropy(logvar=z_sigma)      # (B, )     encoder loss, but why not KLD incl. z_mu?
@@ -89,8 +88,8 @@ class AllCond_epicVAE_nFlow_PointDiff(Module):
 
     def sample(self, cond_feats, num_points, flexibility):
         batch_size, _ = cond_feats.size()
-        z = self.flow.sample(context=cond_feats, num_samples=1).view(batch_size, -1)  # B,F
-        z = torch.cat([z, cond_feats], -1)   # B, F+C
+        z = self.flow.sample(context=cond_feats, num_samples=1).view(batch_size, -1)  # B,functional
+        z = torch.cat([z, cond_feats], -1)   # B, functional+C
         samples = self.diffusion.sample(num_points, context=z, flexibility=flexibility)
         return samples
     
@@ -102,8 +101,8 @@ class AllCond_epicVAE_nFlow_PointDiff(Module):
 
     def sample_fromData(self, x, cond_feats, num_points, flexibility):
         z_mu, z_sigma = self.encoder(x, cond_feats)
-        z = reparameterize_gaussian(mean=z_mu, logvar=z_sigma)  # (B, F)
-        z = torch.cat([z, cond_feats], -1)   # B,F+C
+        z = reparameterize_gaussian(mean=z_mu, logvar=z_sigma)  # (B, functional)
+        z = torch.cat([z, cond_feats], -1)   # B,functional+C
         samples = self.diffusion.sample(num_points, context=z, flexibility=flexibility)
         return samples
 
@@ -128,7 +127,7 @@ class PointwiseNet_epic_res_wn(Module):
 
     def __init__(self, point_dim, context_dim, residual):
         super().__init__()
-        self.act = F.leaky_relu
+        self.act = functional.leaky_relu
         self.residual = residual
         self.layers = ModuleList([
             ConcatSquashEPiC_wn(point_dim, 128, context_dim+3+context_dim+3),     # gated learned sum of point vector and context vector
@@ -144,14 +143,14 @@ class PointwiseNet_epic_res_wn(Module):
         Args:
             x:  Point clouds at some timestep t, (B, N, d).
             beta:     Time. (B, ).
-            context:  Shape latents. (B, F).
+            context:  Shape latents. (B, functional).
         """
         batch_size = x.size(0)
         beta = beta.view(batch_size, 1, 1)          # (B, 1, 1)
-        context = context.view(batch_size, 1, -1)   # (B, 1, F)
+        context = context.view(batch_size, 1, -1)   # (B, 1, functional)
 
         time_emb = torch.cat([beta, torch.sin(beta), torch.cos(beta)], dim=-1)  # (B, 1, 3)
-        ctx_emb = torch.cat([time_emb, context], dim=-1)    # (B, 1, F+3)
+        ctx_emb = torch.cat([time_emb, context], dim=-1)    # (B, 1, functional+3)
         out = x
         ctx_emb_in = ctx_emb.clone()
         for i, layer in enumerate(self.layers):

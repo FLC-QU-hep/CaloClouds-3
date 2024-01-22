@@ -1,5 +1,4 @@
 import torch
-import torch.nn as nn
 from torch.nn import Module, Linear
 from torch.optim.lr_scheduler import LambdaLR
 import numpy as np
@@ -23,7 +22,7 @@ def standard_normal_logprob(z):
     return log_z - z.pow(2) / 2
 
 
-class KLDloss(nn.Module):
+class KLDloss(Module):
     
     def __init__(self):
         super(KLDloss, self).__init__()
