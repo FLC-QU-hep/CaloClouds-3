@@ -143,4 +143,5 @@ joblog/
 testbed.ipynb
 *old*
 *.pth
+*.swp
 *.npy
