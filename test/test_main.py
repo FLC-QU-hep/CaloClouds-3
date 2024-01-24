@@ -18,6 +18,7 @@ def test_main(tmpdir):
     cfg.dataset_path = os.path.join(path_root1, 'test', 'mini_data_sample.hdf5')
     cfg.max_iters = 2
     cfg.logdir = tmpdir.mkdir("logs")
+    cfg.device = 'cpu'
     main(cfg)
 
 
