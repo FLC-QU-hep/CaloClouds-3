@@ -14,8 +14,7 @@ from configs import Configs
 import time
 
 
-def main():
-    cfg = Configs()
+def main(cfg=Configs()):
     seed_all(seed=cfg.seed)
     start_time = time.localtime()
 
