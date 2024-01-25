@@ -20,26 +20,26 @@ default:
       - .cache/pip
   before_script:
     - echo " PIP_CACHE_DIR = "$PIP_CACHE_DIR
-    - ls $PIP_CACHE_DIR
+    - [ -d "$DIR" ] && ls $PIP_CACHE_DIR
     - python -V               # Print out python version for debugging
     - pip install virtualenv
     - virtualenv venv
     - source venv/bin/activate
     - echo " PIP_CACHE_DIR = "$PIP_CACHE_DIR
-    - ls $PIP_CACHE_DIR
+    - [ -d "$DIR" ] && ls $PIP_CACHE_DIR
 
 # Setup for building the code
 build:
   stage: build
   script:
     - echo " PIP_CACHE_DIR = "$PIP_CACHE_DIR
-    - ls $PIP_CACHE_DIR
+    - [ -d "$DIR" ] && ls $PIP_CACHE_DIR
     - echo "No real build, just python modules to get."
     - pip install -r requirements.txt
     - pip install pytest
     - echo "Python modules installed."
     - echo " PIP_CACHE_DIR = "$PIP_CACHE_DIR
-    - ls $PIP_CACHE_DIR
+    - [ -d "$DIR" ] && ls $PIP_CACHE_DIR
 
 # run the regression tests
 pytest:
@@ -50,7 +50,7 @@ pytest:
     - merge_requests
   script:
     - echo " PIP_CACHE_DIR = "$PIP_CACHE_DIR
-    - ls $PIP_CACHE_DIR
+    - [ -d "$DIR" ] && ls $PIP_CACHE_DIR
     - echo "Running pytests"
     - pytest test/
       
