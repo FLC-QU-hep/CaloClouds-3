@@ -1,0 +1,47 @@
+# GitLab Continuous Integration configuration for the repository.
+
+# "Global" build stages.
+stages:
+  - build
+  - test
+
+# Set the behaviour of the CI build.
+variables:
+  GIT_STRATEGY: fetch
+  GIT_SUBMODULE_STRATEGY: recursive
+  # Change pip's cache directory to be inside the project directory since we can only cache local items.
+  PIP_CACHE_DIR: "$CI_PROJECT_DIR/.cache/pip"
+
+# Set up caching pip packages
+default:
+  image: python:3.11
+  cache:                      # Pip's cache doesn't store the python packages
+    paths:                    # https://pip.pypa.io/en/stable/topics/caching/
+      - .cache/pip
+  before_script:
+    - python -V               # Print out python version for debugging
+    - pip install virtualenv
+    - virtualenv venv
+    - source venv/bin/activate
+
+# Setup for building the code
+build:
+  stage: build
+  script:
+    - echo "No real build, just python modules to get."
+    - pip install -r requirements.txt
+    - pip install pytest
+    - echo "Python modules installed."
+
+# run the regression tests
+pytest:
+  stage: test
+  only:
+    - main
+    - *Tests
+    - merge_requests
+  script:
+    - echo "Running pytests"
+    - pytest test/
+      
+
