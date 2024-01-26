@@ -22,7 +22,7 @@ pytest:
     - merge_requests
   script:
     - echo "Getting docker"
-    - git clone https://gitlab-ci-token:${CI_JOB_TOKEN}@gitlab.desy.de:ftx-sft/generative/point-cloud-diffusion-docker.git
+    - git clone https://gitlab-ci-token:${CI_JOB_TOKEN}@gitlab.desy.de/ftx-sft/generative/point-cloud-diffusion-docker.git
     - ls *
     - echo "Running tests"
     - singularity exec point-cloud-diffusion-docker/pointcloud.sif pytest
