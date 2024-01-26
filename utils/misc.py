@@ -141,8 +141,8 @@ def get_logger(name, log_dir=None):
     return logger
 
 
-def get_new_log_dir(root='./logs', postfix='', prefix=''):
-    log_dir = os.path.join(root, prefix + time.strftime('%Y_%m_%d__%H_%M_%S', time.localtime()) + postfix)
+def get_new_log_dir(root='./logs', postfix='', prefix='', start_time=time.localtime()):
+    log_dir = os.path.join(root, prefix + time.strftime('%Y_%m_%d__%H_%M_%S', start_time) + postfix)
     os.makedirs(log_dir)
     return log_dir
 
@@ -273,3 +273,10 @@ class SubnetFactory:
             last_features = self.hidden_features
         layers.append(nn.Linear(last_features, num_features_out))
         return self.CatCall(nn.Sequential(*layers))
+    
+
+def mean_flat(tensor):
+    """
+    Take the mean over all non-batch dimensions.
+    """
+    return tensor.mean(dim=list(range(1, len(tensor.shape))))

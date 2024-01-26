@@ -1,11 +1,6 @@
-import os
-import random
-from copy import copy
-import torch
 from torch.utils.data import Dataset
 import numpy as np
 import h5py
-from tqdm.auto import tqdm
 
 class PointCloudDataset(Dataset):
     def __init__(self, file_path, chech_overfiting=False, bs=32, max_ds_seq_len=6000, quantized_pos=True):

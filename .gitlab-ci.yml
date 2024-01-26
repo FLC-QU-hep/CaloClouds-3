@@ -1,0 +1,29 @@
+# GitLab Continuous Integration configuration for the repository.
+image:
+  name: python:3.11
+
+# "Global" build stages.
+stages:
+  - build
+  - test
+
+# Set the behaviour of the CI build.
+variables:
+  GIT_STRATEGY: fetch
+  GIT_SUBMODULE_STRATEGY: recursive
+
+# run the regression tests
+pytest:
+  stage: test
+  only:
+    - main
+    - henry_dev_newTests
+    - merge_requests
+  script:
+    - echo "Installing requirments"
+    - pip install -r requirements.txt
+    - pip install pytest
+    - echo "Running pytests"
+    - pytest test/
+      
+

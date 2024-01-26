@@ -140,3 +140,8 @@ slurm-*
 *.png
 joblog/
 *.pdf
+testbed.ipynb
+*old*
+*.pth
+*.swp
+*.npy
