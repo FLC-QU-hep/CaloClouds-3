@@ -1,11 +1,10 @@
 # GitLab Continuous Integration configuration for the repository.
-
 image:
-  name: quay.io/singularity/singularity:v3.7.3
-  entrypoint: ["/bin/sh", "-c"]
+  name: python:3.11
 
 # "Global" build stages.
 stages:
+  - build
   - test
 
 # Set the behaviour of the CI build.
@@ -21,10 +20,10 @@ pytest:
     - henry_dev_newTests
     - merge_requests
   script:
-    - echo "Getting docker"
-    - git clone https://gitlab-ci-token:${CI_JOB_TOKEN}@gitlab.desy.de/ftx-sft/generative/point-cloud-diffusion-docker.git
-    - ls *
-    - echo "Running tests"
-    - singularity exec --userns point-cloud-diffusion-docker/pointcloud.sif pytest
+    - echo "Installing requirments"
+    - pip install -r requirements.txt
+    - pip install pytest
+    - echo "Running pytests"
+    - pytest test/
       
 
