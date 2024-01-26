@@ -2,44 +2,12 @@
 
 # "Global" build stages.
 stages:
-  - build
   - test
 
 # Set the behaviour of the CI build.
 variables:
   GIT_STRATEGY: fetch
   GIT_SUBMODULE_STRATEGY: recursive
-  # Change pip's cache directory to be inside the project directory since we can only cache local items.
-  PIP_CACHE_DIR: "$CI_PROJECT_DIR/.cache/pip"
-
-# Set up caching pip packages
-default:
-  image: python:3.11
-  cache:                      # Pip's cache doesn't store the python packages
-    paths:                    # https://pip.pypa.io/en/stable/topics/caching/
-      - .cache/pip
-  before_script:
-    - echo " PIP_CACHE_DIR = "$PIP_CACHE_DIR
-    - if [ -d "$PIP_CACHE_DIR" ]; then ls $PIP_CACHE_DIR; fi
-    - python -V               # Print out python version for debugging
-    - pip install virtualenv
-    - virtualenv venv
-    - source venv/bin/activate
-    - echo " PIP_CACHE_DIR = "$PIP_CACHE_DIR
-    - if [ -d "$PIP_CACHE_DIR" ]; then ls $PIP_CACHE_DIR; fi
-
-# Setup for building the code
-build:
-  stage: build
-  script:
-    - echo " PIP_CACHE_DIR = "$PIP_CACHE_DIR
-    - if [ -d "$PIP_CACHE_DIR" ]; then ls $PIP_CACHE_DIR; fi
-    - echo "No real build, just python modules to get."
-    - pip install -r requirements.txt
-    - pip install pytest
-    - echo "Python modules installed."
-    - echo " PIP_CACHE_DIR = "$PIP_CACHE_DIR
-    - if [ -d "$PIP_CACHE_DIR" ]; then ls $PIP_CACHE_DIR; fi
 
 # run the regression tests
 pytest:
@@ -49,9 +17,10 @@ pytest:
     - henry_dev_newTests
     - merge_requests
   script:
-    - echo " PIP_CACHE_DIR = "$PIP_CACHE_DIR
-    - if [ -d "$PIP_CACHE_DIR" ]; then ls $PIP_CACHE_DIR; fi
-    - echo "Running pytests"
-    - pytest test/
+    - echo "Getting docker"
+    - git clone https://gitlab-ci-token:${CI_JOB_TOKEN}@gitlab.desy.de:ftx-sft/generative/point-cloud-diffusion-docker.git
+    - ls *
+    - echo "Running tests"
+    - singularity exec point-cloud-diffusion-docker/pointcloud.sif pytest
       
 
