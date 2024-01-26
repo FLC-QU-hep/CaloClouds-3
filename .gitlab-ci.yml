@@ -1,5 +1,9 @@
 # GitLab Continuous Integration configuration for the repository.
 
+image:
+  name: quay.io/singularity/singularity:v3.7.3
+  entrypoint: ["/bin/sh", "-c"]
+
 # "Global" build stages.
 stages:
   - test
