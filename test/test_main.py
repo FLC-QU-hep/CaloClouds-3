@@ -5,6 +5,7 @@ path_root1 = Path(__file__).parents[1]
 sys.path.append(str(path_root1))
 
 import os
+import glob
 import pytest
 from configs import Configs
 from main import main
@@ -20,5 +21,7 @@ def test_main(tmpdir):
     cfg.logdir = tmpdir.mkdir("logs")
     cfg.device = 'cpu'
     main(cfg)
+    # check the model ckpt was created
+    assert glob.glob(f"{cfg.logdir}/{cfg.name}*/ckpt_*.pt")
 
 

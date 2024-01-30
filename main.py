@@ -341,6 +341,7 @@ def main(cfg=Configs()):
             if it >= cfg.max_iters:
                 stop = True
                 break
+    ckpt_mgr.save(model, cfg, 0, others=opt_states, step=it)
     print("training done in %.2f seconds" % (time.time() - start_time))
 
 
