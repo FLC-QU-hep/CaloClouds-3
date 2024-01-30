@@ -2,6 +2,7 @@
 # this trains the student model
 from comet_ml import Experiment
 
+import os
 import torch
 from torch.utils.data import DataLoader
 from torch.nn.utils import clip_grad_norm_
@@ -61,7 +62,7 @@ def main(cfg=Configs()):
     model_teacher = epicVAE_nFlow_kDiffusion(cfg, distillation=False).to(cfg.device)
 
     # load model
-    checkpoint = torch.load(cfg.logdir + "/" + cfg.model_path)
+    checkpoint = torch.load(os.path.join(cfg.logdir, cfg.model_path))
     if cfg.use_ema_trainer:
         model.load_state_dict(checkpoint["others"]["model_ema"])
         model_ema_target.load_state_dict(checkpoint["others"]["model_ema"])
