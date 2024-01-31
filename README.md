@@ -6,6 +6,9 @@
 Spawned the CaloClouds model published in ([arXiv:2305.04847](https://arxiv.org/abs/2305.04847)).
 and also *CaloClouds II: Ultra-Fast Geometry-Independent Highly-Granular Calorimeter Simulation* ([arXiv:2309.05704](https://arxiv.org/abs/2309.05704)).
 
+
+Not sure how to do something with git or gitlab? Please start by checking the docs here; [`gitlab.desy.de/ftx-sft/Documentation/-/tree/master/git`](https://gitlab.desy.de/ftx-sft/Documentation/-/tree/master/git)
+
 ---
 
 Configs are stored in [`configs/`](./configs/), and the one in use is determined by what the soft link `configs.py` is pointing to.
