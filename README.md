@@ -1,4 +1,5 @@
-![Run python tests](https://github.com/FLC-QU-hep/point-cloud-diffusion/actions/workflows/ci.yml/badge.svg)
+[![pipeline status](https://gitlab.desy.de/ftx-sft/generative/point-cloud-diffusion/badges/main/pipeline.svg?ignore_skipped=true)](https://gitlab.desy.de/ftx-sft/generative/point-cloud-diffusion/-/commits/main) 
+[![Apache-2.0](https://opensource.org/licenses/Apache-2.0)](https://gitlab.desy.de/ftx-sft/generative/point-cloud-diffusion/-/blob/main/LICENCE) 
 
 
 # Rolling implementation of CaloClouds and friends
