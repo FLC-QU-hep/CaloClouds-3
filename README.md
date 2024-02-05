@@ -1,5 +1,5 @@
 [![pipeline status](https://gitlab.desy.de/ftx-sft/generative/point-cloud-diffusion/badges/main/pipeline.svg?ignore_skipped=true)](https://gitlab.desy.de/ftx-sft/generative/point-cloud-diffusion/-/commits/main) 
-[![Apache-2.0](https://opensource.org/licenses/Apache-2.0)](https://gitlab.desy.de/ftx-sft/generative/point-cloud-diffusion/-/blob/main/LICENCE) 
+[![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 
 
 # Rolling implementation of CaloClouds and friends
