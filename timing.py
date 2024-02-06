@@ -16,8 +16,6 @@ import time
 # from models.flow import add_spectral_norm, spectral_norm_power_iteration
 from configs import Configs
 
-# from utils.plotting import get_projections, get_plots, MAP, offset, layer_bottom_pos, cell_thickness, Xmax, Xmin, Zmax, Zmin
-
 import utils.gen_utils as gen_utils
 
 # import k_diffusion as K

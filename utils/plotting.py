@@ -87,8 +87,6 @@ class PltConfigs:
 cfg = PltConfigs()
 
 
-
-
 def get_cog(cloud, thr=cfg.threshold):  # expects shape [events, 4, points]
     """
     Get Center of Gravity
