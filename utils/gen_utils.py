@@ -2,7 +2,7 @@ import numpy as np
 import torch
 from tqdm import tqdm
 
-from utils.plotting import MAP, offset, layer_bottom_pos, cell_thickness, Xmax, Xmin, Zmax, Zmin
+from utils.detector_map import layer_bottom_pos, cell_thickness, Xmax, Xmin, Zmax, Zmin
 
 
 
