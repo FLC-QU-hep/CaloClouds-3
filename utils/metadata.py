@@ -1,3 +1,6 @@
+import os
+import numpy as np
+
 from configs import Configs
 
 
@@ -7,14 +10,17 @@ def get_metadata_folder(config=Configs()):
     """
     this_dir = os.path.dirname(__file__)
     dataset_filebase = os.path.basename(config.dataset_path).rsplit(".", 1)[0]
-    if dataset_filebase in [
-        "10-90GeV_x36_grid_regular_524k",
-        "10-90GeV_x36_grid_regular_524k_float32",
-    ]:
-        folder = "10-90GeV_x36_grid_regular_524k"
+
+    subfolders = os.listdir(os.path.join(this_dir, "../metadata/"))
+
+    if dataset_filebase in subfolders:
+        folder = dataset_filebase
     else:
         raise NotImplementedError(
-            f"Cannot recognise the dataset at {config.dataset_path}"
+            f"Cannot find metadata for the dataset at {config.dataset_path}."
+            + f" Datasets with known metadata: {subfolders}"
+            + f" If you have the metadata for this dataset, please add in a subfolder of metadata/."
+            + f" If this dataset is equivalent to another dataset, please make a symlink to the equivalent metadata."
         )
     data_dir = os.path.join(this_dir, "../metadata/", folder)
     return data_dir
@@ -35,9 +41,11 @@ class Metadata:
             )
             if content.dtype == "O":
                 for key, value in content.item().items():
+                    assert not hasattr(self, key)
                     setattr(self, key, value)
             else:
                 basename = os.path.basename(file)[: -len(".npy")]
+                assert not hasattr(self, basename)
                 setattr(self, basename, content)
 
     def load_muon_map(self):
