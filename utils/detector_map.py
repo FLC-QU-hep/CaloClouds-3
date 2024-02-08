@@ -6,7 +6,8 @@ import matplotlib.pyplot as plt
 import matplotlib.font_manager as font_manager
 from scipy.stats import binned_statistic
 
-from .Metadata import Metadata
+from .metadata import Metadata
+from configs import Configs
 
 
 def create_map(X=None, Y=None, Z=None, layer_bottom_pos=None, dm=1, configs=Configs()):
