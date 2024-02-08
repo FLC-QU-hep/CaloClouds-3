@@ -14,7 +14,7 @@ import h5py
 from models.shower_flow import compile_HybridTanH_model
 from configs import Configs
 import utils.gen_utils as gen_utils
-from utils.detector_map import get_projections, create_map, layer_bottom_pos
+from utils.detector_map import get_projections, create_map
 import utils.metrics as metrics
 import utils.plotting as plotting
 
@@ -178,7 +178,7 @@ for _ in range(int(total_events / n_events)):
 
     print('projecting showers')
     MAP, _ = create_map()
-    events, clouds  = get_projections(showers, MAP, layer_bottom_pos, max_num_hits=6000, return_cell_point_cloud=True)
+    events, clouds  = get_projections(showers, MAP, max_num_hits=6000, return_cell_point_cloud=True)
 
     print('get features and center of gravities')
     dict = plotting.get_features(events)
