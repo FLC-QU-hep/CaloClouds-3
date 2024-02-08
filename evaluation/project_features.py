@@ -11,7 +11,7 @@ import h5py
 
 # from configs import Configs
 import utils.plotting as plotting
-from utils.plotting import get_projections, MAP, layer_bottom_pos
+from utils.detector_map import get_projections, create_map, layer_bottom_pos
 
 # cfg = Configs()
 
@@ -78,6 +78,7 @@ for j in range(len(min_energy_list)):
 
     # projection
     print('files loaded (all energy hits in MeV). now projection.')
+    MAP, _ = create_map()
     events, cloud = get_projections(real_showers[:n], MAP, layer_bottom_pos, max_num_hits=6000, return_cell_point_cloud=True)
     events_fake, cloud_fake = get_projections(fake_showers[:n], MAP, layer_bottom_pos, max_num_hits=6000, return_cell_point_cloud=True)
     events_fake_2, cloud_fake_2 = get_projections(fake_showers_2[:n], MAP, layer_bottom_pos, max_num_hits=6000, return_cell_point_cloud=True)
