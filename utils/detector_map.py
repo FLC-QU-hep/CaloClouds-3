@@ -124,7 +124,7 @@ def normalise_map(MAP):
     return MAP
 
 
-def split_to_layers(points, layer_bottom_pos=layer_bottom_pos):
+def split_to_layers(points, layer_bottom_pos):
     """
     Yield points by their layer
 
@@ -149,7 +149,7 @@ def split_to_layers(points, layer_bottom_pos=layer_bottom_pos):
 
 
 def points_to_cells(
-    points, MAP, layer_bottom_pos=layer_bottom_pos, include_artifacts=False
+    points, MAP, layer_bottom_pos=None, include_artifacts=False
 ):
     """
     Project the generated pointss onto the detector map.
@@ -197,7 +197,7 @@ def points_to_cells(
     return layers
 
 
-def cells_to_points(layers, MAP, layer_bottom_pos=layer_bottom_pos, length_to_pad=None):
+def cells_to_points(layers, MAP, layer_bottom_pos, length_to_pad=None):
     """
     Given the energy deposited in each cell of the detector, convert
     back to a list of points, discreetised by the cell layout.
