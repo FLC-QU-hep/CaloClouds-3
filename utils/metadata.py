@@ -52,8 +52,8 @@ class Metadata:
         data_dir = os.path.join(self.metadata_folder, "muon_map")
 
         self.muon_map_X = np.load(data_dir + "/X.npy")
-        self.muon_map_Z = np.load(data_dir + "/Z.npy")
         self.muon_map_Y = np.load(data_dir + "/Y.npy")
+        self.muon_map_Z = np.load(data_dir + "/Z.npy")
         self.muon_map_E = np.load(data_dir + "/E.npy")
 
-        return self.muon_map_X, self.muon_map_Z, self.muon_map_Y, self.muon_map_E
+        return self.muon_map_X, self.muon_map_Y, self.muon_map_Z, self.muon_map_E
