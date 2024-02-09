@@ -10,7 +10,16 @@ from .metadata import Metadata
 from configs import Configs
 
 
-def create_map(X=None, Y=None, Z=None, layer_bottom_pos=None, dm=1, configs=Configs()):
+def create_map(
+    X=None,
+    Y=None,
+    Z=None,
+    layer_bottom_pos=None,
+    half_cell_size=None,
+    cell_thickness=None,
+    dm=1,
+    configs=Configs(),
+):
     """
     Using metadata about the detector, create a map of the cells in the detector.
 
@@ -20,6 +29,11 @@ def create_map(X=None, Y=None, Z=None, layer_bottom_pos=None, dm=1, configs=Conf
         ILD coordinates of sensors as shown by muon hits
     layer_bottom_pos : np.array
         Array of the bottom positions of the layers.
+    half_cell_size : float
+        Half the size of the cells in the detector,
+        perpendicular to the radial direction
+    cell_thickness : float
+        Thickness of the cells in the detector, in the radial direction
     dm : int
         dimension split multiplicity
         can be (1, 2, 3, 4, 5)
@@ -39,6 +53,8 @@ def create_map(X=None, Y=None, Z=None, layer_bottom_pos=None, dm=1, configs=Conf
     if X is None:
         metadata = Metadata(configs)
         layer_bottom_pos = metadata.layer_bottom_pos
+        half_cell_size = metadata.half_cell_size
+        cell_thickness = metadata.cell_thickness
         X, Y, Z, E = confine_to_box(*metadata.load_muon_map(), metadata=metadata)
 
     offset = half_cell_size * 2 / (dm)
@@ -148,9 +164,7 @@ def split_to_layers(points, layer_bottom_pos):
         yield points[idx]
 
 
-def points_to_cells(
-    points, MAP, layer_bottom_pos=None, include_artifacts=False
-):
+def points_to_cells(points, MAP, layer_bottom_pos=None, include_artifacts=False):
     """
     Project the generated pointss onto the detector map.
 
@@ -197,7 +211,9 @@ def points_to_cells(
     return layers
 
 
-def cells_to_points(layers, MAP, layer_bottom_pos, length_to_pad=None):
+def cells_to_points(
+    layers, MAP, layer_bottom_pos, half_cell_size, cell_thickness, length_to_pad=None
+):
     """
     Given the energy deposited in each cell of the detector, convert
     back to a list of points, discreetised by the cell layout.
@@ -213,6 +229,11 @@ def cells_to_points(layers, MAP, layer_bottom_pos, length_to_pad=None):
         As returned by create_map
     layer_bottom_pos : np.array
         Array of the bottom positions of the layers.
+    half_cell_size : float
+        Half the size of the cells in the detector,
+        perpendicular to the radial direction
+    cell_thickness : float
+        Thickness of the cells in the detector, in the radial direction
     length_to_pad : int (optional)
         Required length of the output array. If the number of hits is less than
         this, the output will be padded with zeros.
