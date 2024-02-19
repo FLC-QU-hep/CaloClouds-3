@@ -50,7 +50,7 @@ def create_map(
         The cell size divided by the dimension split multiplicity
     """
 
-    if X is None:
+    if None in [X, Y, Z, layer_bottom_pos, half_cell_size, cell_thickness]:
         metadata = Metadata(configs)
         layer_bottom_pos = metadata.layer_bottom_pos
         half_cell_size = metadata.half_cell_size
@@ -60,7 +60,8 @@ def create_map(
     offset = half_cell_size * 2 / (dm)
 
     layers = []
-    for l in tqdm(range(len(layer_bottom_pos))):  # loop over layers
+    for l in range(len(layer_bottom_pos)):  # loop over layers
+        # layers are well seperated, so take a 0.5 buffer either side
         idx = np.where(
             (Y <= (layer_bottom_pos[l] + cell_thickness * 1.5))
             & (Y >= layer_bottom_pos[l] - cell_thickness / 2)
@@ -196,19 +197,54 @@ def points_to_cells(points, MAP, layer_bottom_pos=None, include_artifacts=False)
     for l, points in enumerate(split_to_layers(points, layer_bottom_pos)):
         x_coord, y_coord, z_coord, e_coord = points.T
 
-        xedges = MAP[l]["xedges"]
-        zedges = MAP[l]["zedges"]
-        H_base = MAP[l]["grid"]
-
-        H, xedges, zedges = np.histogram2d(
-            x_coord, z_coord, bins=(xedges, zedges), weights=e_coord
+        layers.append(
+            layer_to_cells(x_coord, z_coord, e_coord, MAP[l], include_artifacts)
         )
-        if not include_artifacts:
-            H[H_base == 0] = 0
-
-        layers.append(H)
 
     return layers
+
+
+def layer_to_cells(x_coord, z_coord, e_coord, MAP_layer, include_artifacts=False):
+    """
+    Project this layer of points onto the detector map.
+
+    Parameters
+    ----------
+    x_coord : np.array
+        x coordinates of the points in this layer
+    z_coord : np.array
+        z coordinates of the points in this layer
+    e_coord : np.array
+        energy of the points in this layer
+    MAP_layer : dict
+        dictionary containing the grid of cells for a layer
+        As returned by create_map
+    include_artifacts : bool
+        Should the projection include hits in cells that don't have
+        sensitive material?
+        (default is False)
+
+    Returns
+    -------
+    layers : list
+        list of 2D arrays, each containing the energy deposited in each cell of the layer
+        with the arangement specified by MAP
+        in the style of a histogram
+
+    """
+    x_coord, y_coord, z_coord, e_coord = points.T
+
+    xedges = MAP_layer["xedges"]
+    zedges = MAP_layer["zedges"]
+    H_base = MAP_layer["grid"]
+
+    H, xedges, zedges = np.histogram2d(
+        x_coord, z_coord, bins=(xedges, zedges), weights=e_coord
+    )
+    if not include_artifacts:
+        H[H_base == 0] = 0
+
+    return H
 
 
 def cells_to_points(
