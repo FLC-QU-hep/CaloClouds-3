@@ -386,6 +386,25 @@ def get_projections(
 
 
 def confine_to_box(X, Y, Z, E, metadata=Metadata()):
+    """
+    Remove hits that fall outside the box specified by the metadata.
+
+    Parameters
+    ----------
+    X, Y, Z : array like (N)
+        hit coordinates
+    E : array like (N)
+        hit energies
+    metadata : Metadata (optional)
+        Metadata object containing the configuration of the dataset
+        If not given, a default Metadata object is created.
+
+    Returns
+    -------
+    X, Y, Z, E : array like (M <= N)
+        hit coordinates and energies, confined to the box
+
+    """
     inbox_idx = np.where(
         (Y > metadata.Ymin)
         & (X < metadata.Xmax)
