@@ -50,12 +50,16 @@ def create_map(
         The cell size divided by the dimension split multiplicity
     """
 
-    if None in [X, Y, Z, layer_bottom_pos, half_cell_size, cell_thickness]:
-        metadata = Metadata(configs)
-        layer_bottom_pos = metadata.layer_bottom_pos
-        half_cell_size = metadata.half_cell_size
-        cell_thickness = metadata.cell_thickness
+    metadata = Metadata(configs)
+    if not all(hasattr(item, "__iter__") for item in [X, Y, Z]):
         X, Y, Z, E = confine_to_box(*metadata.load_muon_map(), metadata=metadata)
+
+    if layer_bottom_pos is None:
+        layer_bottom_pos = metadata.layer_bottom_pos
+    if half_cell_size is None:
+        half_cell_size = metadata.half_cell_size
+    if cell_thickness is None:
+        cell_thickness = metadata.cell_thickness
 
     offset = half_cell_size * 2 / (dm)
 
@@ -138,10 +142,12 @@ def normalise_map(MAP):
         zedges = MAP[l]["zedges"]
         xedges = (xedges - xedges[0]) / (xedges[-1] - xedges[0]) * 2 - 1
         zedges = (zedges - zedges[0]) / (zedges[-1] - zedges[0]) * 2 - 1
+        MAP[l]["xedges"] = xedges
+        MAP[l]["zedges"] = zedges
     return MAP
 
 
-def split_to_layers(points, layer_bottom_pos):
+def split_to_layers(points, layer_bottom_pos, cell_thickness, percent_buffer=0.5):
     """
     Yield points by their layer
 
@@ -152,6 +158,13 @@ def split_to_layers(points, layer_bottom_pos):
         in coordinates (x, y, z, energy)
     layer_bottom_pos : np.array
         Array of the bottom positions of the layers.
+    cell_thickness : float
+        Thickness of the cells in the detector, in the radial direction
+    percent_buffer : float
+        Percentage beyond the thickness of the cell to include hits
+        in the layer. Won't extent the layer beyond the bottom of
+        the next layer.
+        (default is 0.5)
 
     Yields
     ------
@@ -160,12 +173,18 @@ def split_to_layers(points, layer_bottom_pos):
         in coordinates (x, y, z, energy)
     """
     y_coord = points[:, 1]
-    for bottom in layer_bottom_pos:
-        idx = np.where((y_coord <= (bottom + 1)) & (y_coord >= bottom - 0.5))
-        yield points[idx]
+
+    layer_floors = layer_bottom_pos - 0.5*cell_thickness
+    layer_ceilings = layer_bottom_pos + 1.5*cell_thickness
+    # Don't give points twice
+    layer_ceilings[:-1] = np.minimum(layer_ceilings[:-1], layer_floors[1:])
+
+    for floor, ceiling in zip(layer_floors, layer_ceilings):
+        mask = (y_coord >= floor) & (y_coord <= ceiling)
+        yield points[mask]
 
 
-def points_to_cells(points, MAP, layer_bottom_pos=None, include_artifacts=False):
+def points_to_cells(points, MAP, layer_bottom_pos, cell_thickness, include_artifacts=False):
     """
     Project the generated pointss onto the detector map.
 
@@ -179,6 +198,8 @@ def points_to_cells(points, MAP, layer_bottom_pos=None, include_artifacts=False)
         As returned by create_map
     layer_bottom_pos : np.array
         Array of the bottom positions of the layers.
+    cell_thickness : float
+        Thickness of the cells in the detector, in the radial direction
     include_artifacts : bool
         Should the projection include hits in cells that don't have
         sensitive material?
@@ -194,7 +215,7 @@ def points_to_cells(points, MAP, layer_bottom_pos=None, include_artifacts=False)
     """
     layers = []
 
-    for l, points in enumerate(split_to_layers(points, layer_bottom_pos)):
+    for l, points in enumerate(split_to_layers(points, layer_bottom_pos, cell_thickness)):
         x_coord, y_coord, z_coord, e_coord = points.T
 
         layers.append(
@@ -232,8 +253,6 @@ def layer_to_cells(x_coord, z_coord, e_coord, MAP_layer, include_artifacts=False
         in the style of a histogram
 
     """
-    x_coord, y_coord, z_coord, e_coord = points.T
-
     xedges = MAP_layer["xedges"]
     zedges = MAP_layer["zedges"]
     H_base = MAP_layer["grid"]
@@ -277,7 +296,7 @@ def cells_to_points(
 
     Returns
     -------
-    points : np.array
+    points : np.array (4, N)
         2D array containing hits of the points,
         in coordinates (x, y, z, energy)
     """
@@ -317,6 +336,7 @@ def get_projections(
     showers,
     MAP,
     layer_bottom_pos=None,
+    cell_thickness=None,
     return_cell_point_cloud=False,
     max_num_hits=None,
     configs=Configs(),
@@ -335,6 +355,10 @@ def get_projections(
         As returned by create_map
     layer_bottom_pos : np.array (optional)
         Array of the bottom positions of the layers.
+        If not given, the config will be used to generate a Metadata object
+        and the layer_bottom_pos will be taken from there.
+    cell_thickness : float (optional)
+        Thickness of the cells in the detector, in the radial direction
         If not given, the config will be used to generate a Metadata object
         and the layer_bottom_pos will be taken from there.
     return_cell_point_cloud : bool
@@ -363,13 +387,15 @@ def get_projections(
     if max_num_hits is None:
         max_num_hits = configs.max_points
 
+    metadata = Metadata(configs)
     if layer_bottom_pos is None:
-        metadata = Metadata(configs)
         layer_bottom_pos = metadata.layer_bottom_pos
+    if cell_thickness is None:
+        cell_thickness = metadata.cell_thickness
 
     events = []
     for shower in tqdm(showers):
-        layers = points_to_cells(shower, MAP, layer_bottom_pos, cfg.include_artifacts)
+        layers = points_to_cells(shower, MAP, layer_bottom_pos, cell_thickness, cfg.include_artifacts)
         events.append(layers)
 
     if not return_cell_point_cloud:
