@@ -174,8 +174,8 @@ def split_to_layers(points, layer_bottom_pos, cell_thickness, percent_buffer=0.5
     """
     y_coord = points[:, 1]
 
-    layer_floors = layer_bottom_pos - 0.5*cell_thickness
-    layer_ceilings = layer_bottom_pos + 1.5*cell_thickness
+    layer_floors = layer_bottom_pos - 0.5 * cell_thickness
+    layer_ceilings = layer_bottom_pos + 1.5 * cell_thickness
     # Don't give points twice
     layer_ceilings[:-1] = np.minimum(layer_ceilings[:-1], layer_floors[1:])
 
@@ -184,7 +184,9 @@ def split_to_layers(points, layer_bottom_pos, cell_thickness, percent_buffer=0.5
         yield points[mask]
 
 
-def points_to_cells(points, MAP, layer_bottom_pos, cell_thickness, include_artifacts=False):
+def points_to_cells(
+    points, MAP, layer_bottom_pos, cell_thickness, include_artifacts=False
+):
     """
     Project the generated pointss onto the detector map.
 
@@ -215,7 +217,9 @@ def points_to_cells(points, MAP, layer_bottom_pos, cell_thickness, include_artif
     """
     layers = []
 
-    for l, points in enumerate(split_to_layers(points, layer_bottom_pos, cell_thickness)):
+    for l, points in enumerate(
+        split_to_layers(points, layer_bottom_pos, cell_thickness)
+    ):
         x_coord, y_coord, z_coord, e_coord = points.T
 
         layers.append(
@@ -336,8 +340,10 @@ def get_projections(
     showers,
     MAP,
     layer_bottom_pos=None,
+    half_cell_size=None,
     cell_thickness=None,
     return_cell_point_cloud=False,
+    include_artifacts=False,
     max_num_hits=None,
     configs=Configs(),
 ):
@@ -357,12 +363,18 @@ def get_projections(
         Array of the bottom positions of the layers.
         If not given, the config will be used to generate a Metadata object
         and the layer_bottom_pos will be taken from there.
+    half_cell_size : float (optional)
+        Half the size of the cells in the detector, in the radial direction.
+        If not given, the config will be used to generate a Metadata object
+        and the half_cell_size will be taken from there.
     cell_thickness : float (optional)
         Thickness of the cells in the detector, in the radial direction
         If not given, the config will be used to generate a Metadata object
         and the layer_bottom_pos will be taken from there.
     return_cell_point_cloud : bool
         Return a second variable containing the deiscreetised point cloud
+    include_artifacts : bool
+        Retain hits that fall in cells that don't have sensitive material
     max_num_hits : int (optional)
         Padding length for the output point cloud,
         must be greater than the number of active cells in the
@@ -390,12 +402,16 @@ def get_projections(
     metadata = Metadata(configs)
     if layer_bottom_pos is None:
         layer_bottom_pos = metadata.layer_bottom_pos
+    if half_cell_size is None:
+        half_cell_size = metadata.half_cell_size
     if cell_thickness is None:
         cell_thickness = metadata.cell_thickness
 
     events = []
     for shower in tqdm(showers):
-        layers = points_to_cells(shower, MAP, layer_bottom_pos, cell_thickness, cfg.include_artifacts)
+        layers = points_to_cells(
+            shower, MAP, layer_bottom_pos, cell_thickness, include_artifacts
+        )
         events.append(layers)
 
     if not return_cell_point_cloud:
@@ -403,10 +419,13 @@ def get_projections(
 
     cell_point_clouds = []
     for event in tqdm(events):
-        point_cloud = cells_to_points(event, MAP, layer_bottom_pos, max_num_hits)
-        cell_point_clouds.append([point_cloud])
+        point_cloud = cells_to_points(event, MAP, layer_bottom_pos, half_cell_size, cell_thickness, max_num_hits)
+        cell_point_clouds.append(point_cloud)
 
-    cell_point_clouds = np.vstack(cell_point_clouds)
+    try:
+        cell_point_clouds = np.stack(cell_point_clouds)
+    except ValueError:  # to prevent us choking on empty input
+        cell_point_clouds = np.empty((0, 4, 0))
 
     return events, cell_point_clouds
 

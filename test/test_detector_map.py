@@ -223,6 +223,8 @@ def test_cells_to_points():
 
 
 def test_get_projections():
+    half_cell_size = 0.5
+    cell_thickness = 0.1
     # Mostly composed of other functions, so just a smoke test
     x_edges_before = np.linspace(0, 5, 5)
     z_edges_before = np.linspace(-5, 5, 5)
@@ -233,26 +235,30 @@ def test_get_projections():
     layer_bottom_pos = np.array([0, 1])
 
     # shouldn't choke on empty input
-    events = detector_map.get_projections([], MAP, layer_bottom_pos, False)
-    assert len(events) == 0
-    events, cell_point_clouds = detector_map.get_projections(
-        [], MAP, layer_bottom_pos, True, 10
+    events = detector_map.get_projections(
+        [], MAP, layer_bottom_pos, half_cell_size, cell_thickness, False
     )
     assert len(events) == 0
-    assert len(cell_point_clouds) == 0
+    events, cell_point_clouds = detector_map.get_projections(
+        [], MAP, layer_bottom_pos, half_cell_size, cell_thickness, True, 10
+    )
+    assert len(events) == 0
+    assert cell_point_clouds.shape == (0, 4, 0)
 
     # one simple event
     shower1 = np.array(
         [[0, 0.05, 0.5, 2.0], [3.75, 0.05, 4.5, 3.0], [0, 1.05, 0.5, 5.0]]
     )
-    events = detector_map.get_projections([shower1], MAP, layer_bottom_pos, False)
-    assert len(events) == 1
-    events, cell_point_clouds = detector_map.get_projections(
-        [shower1], MAP, layer_bottom_pos, True, 10
+    events = detector_map.get_projections(
+        [shower1], MAP, layer_bottom_pos, half_cell_size, cell_thickness, False
     )
     assert len(events) == 1
-    assert len(cell_point_clouds) == 1
-    assert cell_point_clouds.shape == (2, 10, 4)
+    events, cell_point_clouds = detector_map.get_projections(
+        [shower1], MAP, layer_bottom_pos, half_cell_size, cell_thickness, True,
+        max_num_hits=10
+    )
+    assert len(events) == 1
+    assert cell_point_clouds.shape == (1, 4, 10)
 
 
 def test_confine_to_box():
@@ -277,14 +283,14 @@ def test_confine_to_box():
     assert len(found_e) == 0
 
     # simple sample
-    X = np.array([0, 3.75, 0])
+    X = np.array([0, 3.75, 0.1])
     Y = np.array([0.05, 0.05, 1.05])
     Z = np.array([0.5, 4.5, 0.5])
     E = np.array([2.0, 3.0, 5.0])
     found_x, found_y, found_z, found_e = detector_map.confine_to_box(
         X, Y, Z, E, fake_metadata
     )
-    npt.assert_allclose(found_x, [0])
+    npt.assert_allclose(found_x, [0.1])
     npt.assert_allclose(found_y, [1.05])
     npt.assert_allclose(found_z, [0.5])
     npt.assert_allclose(found_e, [5.0])
