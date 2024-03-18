@@ -1,0 +1,10 @@
+#!/bin/bash
+
+echo pre-commit: Will mirror the notebooks
+echo pre-commit: execute ./programming_utils/mirror_notebook.py
+repo_root=$(git rev-parse --show-toplevel)
+for file_name in $(${repo_root}/programming_utils/mirror_notebook.py); do
+    git add $file_name
+done
+echo pre-commit: Mirroring done
+exit 0

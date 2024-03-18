@@ -71,11 +71,16 @@ def mirror(notebook_path, python_path=None):
         Path to the mirrored python file. If not given, the path is
         notebook_path + '_mirror.py'.
 
+    Returns
+    -------
+    python_path : str
+        Path to the mirrored python file.
     """
     if python_path is None:
         python_path = get_mirror_path(notebook_path)
     with open(python_path, "w") as f:
         f.write(extract(notebook_path))
+    return python_path
 
 
 def list_of_notebooks():
@@ -103,7 +108,8 @@ def main():
     """
     notebooks = list_of_notebooks()
     for notebook in notebooks:
-        mirror(notebook)
+        python_path = mirror(notebook)
+        print(python_path)
 
 
 if __name__ == "__main__":
