@@ -1,3 +1,7 @@
+# don't pick up changes to configs.py by default
+# as every use will point to their own
+configs.py
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]

@@ -9,7 +9,7 @@ import os
 import numpy as np
 
 from utils import metadata
-from configs import Configs
+from config_varients.default import Configs
 
 def test_get_metadata_folder():
     data_dir = metadata.get_metadata_folder()

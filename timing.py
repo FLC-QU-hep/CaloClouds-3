@@ -92,7 +92,6 @@ def main(cfg, min_e, max_e, num, bs, iterations):
 
 
     if caloclouds == 'ddpm':
-        kdiffusion=False   # EDM vs DDPM diffusion
         # caloclouds baseline
         cfg.sched_mode = 'quardatic'
         cfg.num_steps = 100
@@ -105,7 +104,6 @@ def main(cfg, min_e, max_e, num, bs, iterations):
         coef_fake = np.array([-2.03879741e-06,  4.93529413e-03,  5.11518795e-01,  3.14176987e+02])
 
     elif caloclouds == 'edm':
-        kdiffusion=True   # EDM vs DDPM diffusion
         # caloclouds EDM
         # # # baseline with lat_dim = 0, max_iter 10M, lr=1e-4 fixed, dropout_rate=0.0, ema_power=2/3 (long training)            USING THIS TRAINING
         cfg.dropout_rate = 0.0
@@ -118,7 +116,6 @@ def main(cfg, min_e, max_e, num, bs, iterations):
         coef_fake = np.array([-7.68614180e-07,  2.49613388e-03,  1.00790407e+00,  1.63126644e+02])
 
     elif caloclouds == 'cm':
-        kdiffusion=True   # EDM vs DDPM diffusion
         # condsistency model
         # long baseline with lat_dim = 0, max_iter 1M, lr=1e-4 fixed, num_steps=18, bs=256, simga_max=80, epoch=2M, EMA
         cfg.dropout_rate = 0.0
@@ -142,7 +139,7 @@ def main(cfg, min_e, max_e, num, bs, iterations):
     for _ in range(iterations):
 
         s_t = time.time()
-        fake_showers, cond_E = gen_utils.gen_showers_batch(model, distribution, min_e, max_e, num, bs, kdiffusion=kdiffusion, config=cfg, coef_real=coef_real, coef_fake=coef_fake, n_scaling=n_scaling)
+        fake_showers, cond_E = gen_utils.gen_showers_batch(model, distribution, min_e, max_e, num, bs, config=cfg, coef_real=coef_real, coef_fake=coef_fake, n_scaling=n_scaling)
         t = time.time() - s_t
         print(fake_showers.shape)
         print('total time [seconds]: ', t)

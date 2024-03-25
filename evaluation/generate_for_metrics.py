@@ -1,205 +1,373 @@
+"""
+Create a merge_dict object for other plotting scripts to take as input.
+"""
 import argparse
 import sys
+import os
 import gc
-sys.path.append('../')
 
-import numpy as np
 import torch
-import time
-import sys
-import joblib
 import pickle
 import h5py
+import lazy_ops
 
-from models.shower_flow import compile_HybridTanH_model
 from configs import Configs
-import utils.gen_utils as gen_utils
 from utils.detector_map import get_projections, create_map
 import utils.metrics as metrics
 import utils.plotting as plotting
+from utils.dataset import dataset_class_from_config
+from utils.metadata import Metadata
 
-import models.epicVAE_nflows_kDiffusion as mdls
-import models.allCond_epicVAE_nflow_PointDiff as mdls2
+from evaluation.generate import load_flow_model, load_diffusion_model, generate_showers
 
-import k_diffusion as K
-
-cfg = Configs()
-
-# print(cfg.__dict__)
-
-###############################################  PARAMS
+sys.path.append("../")
 
 
-total_events = 500_000   # total events to process
-n_events = 50_000    # in chunks of n_events
+def get_cli_args() -> argparse.Namespace:
+    """
+    Get the model name as a command line argument.
 
-### FULL SPECTRUM GENERATION
-min_energy= 10
-max_energy = 90
-
-pickle_path = '/beegfs/desy/user/buhmae/6_PointCloudDiffusion/output/metrics/'
-
-
-### COMMMONG PARAMETERS
-n_scaling = True     # default True
-prefix = ''   # default ''
-key_exceptions=['e_radial', 'e_layers', 'e_layers_distibution', 'occ_layers', 'e_radial_lists']  # not saved in dict
-
-###############################################
-
-# command line arguments
-parser = argparse.ArgumentParser()
-parser.add_argument('--caloclouds', '-cc', type=str, default='cm', help='caloclouds model to use, choose from: ddpm, edm, cm, or g4')
-
-args = parser.parse_args()
-
-###############################################
+    Returns
+    -------
+    args : argparse.Namespace
+        Namespace with the attribute `caloclouds` containing the model name.
+    """
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--caloclouds",
+        "-cc",
+        type=str,
+        default="cm",
+        help="caloclouds model to use, choose from: ddpm, edm, cm, or g4",
+    )
+    args = parser.parse_args()
+    return args
 
 
-### load shower flow model
-flow, distribution = compile_HybridTanH_model(num_blocks=10, 
-                                        #    num_inputs=32, ### when 'condioning' on additional Esum, Nhits etc add them on as inputs rather than 
-                                        #  num_inputs=35, ### when 'condioning' on additional Esum, Nhits etc add them on as inputs rather than 
-                                        num_inputs=65, ### adding 30 e layers 
-                                        num_cond_inputs=1, device=cfg.device)  # num_cond_inputs
+def make_params_dict(model_name: str = "cm") -> dict:
+    """
+    Generate the default param dict for the generation of shower metrics
+    on a single model.
+    It is expected that the user will modify this function to suit their needs.
 
-# checkpoint = torch.load('/beegfs/desy/user/akorol/chekpoints/ECFlow/EFlow+CFlow_138.pth')
-# checkpoint = torch.load('/beegfs/desy/user/buhmae/6_PointCloudDiffusion/shower_flow/220706_cog_ShowerFlow_350.pth')
-# checkpoint = torch.load('/beegfs/desy/user/buhmae/6_PointCloudDiffusion/shower_flow/220707_cog_ShowerFlow_500.pth')  # max 730
-# checkpoint = torch.load('/beegfs/desy/user/buhmae/6_PointCloudDiffusion/shower_flow/220713_cog_e_layer_ShowerFlow_best.pth') 
-checkpoint = torch.load('/beegfs/desy/user/buhmae/6_PointCloudDiffusion/shower_flow/220714_cog_e_layer_ShowerFlow_best.pth')   # trained about 350 epochs
-flow.load_state_dict(checkpoint['model'])
-flow.eval().to(cfg.device)
+    Returns
+    -------
+    params_dict : dict
+        Dictionary containing the parameters for the generation of showers.
+    """
+    params_dict = {}
+    params_dict["total_events"] = 500_000  # total events to process
+    params_dict["n_events"] = 50_000  # in chunks of n_events
+    params_dict["min_energy"] = 10
+    params_dict["max_energy"] = 90
+    params_dict[
+        "pickle_path"
+    ] = "/beegfs/desy/user/buhmae/6_PointCloudDiffusion/output/metrics/"
 
-print('flow model loaded')
+    # COMMON PARAMETERS
+    params_dict["n_scaling"] = True  # default True
+    params_dict["prefix"] = ""  # default ''
+    # list of all high level features (docs of plotting.get_features)
+    # - e_radial : array
+    #       radial profile of the energy deposition
+    # - e_sum : array
+    #       total energy deposited in the detector
+    # - hits : array
+    #       energy deposited in each cell
+    # - occ : array
+    #       number of cells hit
+    # - e_layers_distibution : array
+    #       energy deposited in each layer
+    # - e_layers : array
+    #       average energy deposited in each layer
+    # - e_layers_std : array
+    #       standard deviation of the energy deposited in each layer
+    # - occ_layers : array
+    #       number of cells hit in each layer
+    # - e_radial_lists : list
+    #       list of radial profiles of the energy deposition for each layer
+    # - hits_noThreshold : array
+    #       energy deposited in each cell without threshold
+    # - binned_layer_e : array
+    #       binned energy deposited in each layer
+    # - binned_radial_e : array
+    #       binned radial profile of the energy deposition
+    params_dict["key_exceptions"] = [
+        "e_radial",
+        "e_layers",
+        "e_layers_distibution",
+        "occ_layers",
+        "e_radial_lists",
+    ]  # not saved in dict
 
+    params_dict["caloclouds"] = model_name
 
-# load diffusion model and weights
-
-# caloclouds baseline
-if args.caloclouds == 'ddpm':
-    seed = 12345
-    batch_size = 64
-    # cfg = Configs()
-    kdiffusion=False   # EDM vs DDPM diffusion
-    cfg.sched_mode = 'quardatic'
-    cfg.num_steps = 100
-    cfg.residual = True
-    cfg.latent_dim = 256
-    cfg.dropout_rate = 0.0
-    model = mdls2.AllCond_epicVAE_nFlow_PointDiff(cfg).to(cfg.device)
-    checkpoint = torch.load('/beegfs/desy/user/akorol/logs/point-cloud/AllCond_epicVAE_nFlow_PointDiff_100s_MSE_loss_smired_possitions_quardatic2023_04_06__16_34_39/ckpt_0.000000_837000.pt', map_location=torch.device(cfg.device)) # quadratic
-    model.load_state_dict(checkpoint['state_dict'])
-    coef_real = np.array([ 2.42091454e-09, -2.72191705e-05,  2.95613817e-01,  4.88328360e+01])   # fixed coeff at 0.1 threshold
-    coef_fake = np.array([-2.03879741e-06,  4.93529413e-03,  5.11518795e-01,  3.14176987e+02])
-    n_splines = None #joblib.load('/beegfs/desy/user/buhmae/6_PointCloudDiffusion/n_spline/spline_ddpm.joblib')
-
-# caloclouds EDM
-elif args.caloclouds == 'edm':
-    seed = 123456
-    batch_size = 64
-    # cfg = Configs()
-    kdiffusion=True   # EDM vs DDPM diffusion
-    cfg.num_steps = 13
-    cfg.sampler = 'heun'   # default 'heun'
-    cfg.s_churn =  0.0     # stochasticity, default 0.0  (if s_churn more than num_steps, it will be clamped to max value)
-    cfg.s_noise = 1.0    # default 1.0   # noise added when s_churn > 0
-    cfg.sigma_max = 80.0 #  5.3152e+00  # default 80.0
-    cfg.sigma_min = 0.002   # default 0.002
-    cfg.rho = 7. # default 7.0
-    # # # baseline with lat_dim = 0, max_iter 10M, lr=1e-4 fixed, dropout_rate=0.0, ema_power=2/3 (long training)            USING THIS TRAINING
-    cfg.dropout_rate = 0.0
-    cfg.latent_dim = 0
-    cfg.residual = False
-    checkpoint = torch.load(cfg.logdir + '/' + 'kCaloClouds_2023_06_29__23_08_31/ckpt_0.000000_2000000.pt', map_location=torch.device(cfg.device))    # max 5200000
-    model = mdls.epicVAE_nFlow_kDiffusion(cfg).to(cfg.device)
-    model.load_state_dict(checkpoint['others']['model_ema'])
-    coef_real = np.array([ 2.42091454e-09, -2.72191705e-05,  2.95613817e-01,  4.88328360e+01])  # fixed coeff at 0.1 threshold
-    coef_fake = np.array([-7.68614180e-07,  2.49613388e-03,  1.00790407e+00,  1.63126644e+02])
-    n_splines = None # joblib.load('/beegfs/desy/user/buhmae/6_PointCloudDiffusion/n_spline/spline_edm.joblib')
-
-# condsistency model
-elif args.caloclouds == 'cm':
-    seed = 1234567
-    batch_size = 16
-    # cfg = Configs()
-    kdiffusion=True   # EDM vs DDPM diffusion
-    cfg.num_steps = 1
-    cfg.sigma_max = 80.0 #  5.3152e+00  # default 80.0
-    # long baseline with lat_dim = 0, max_iter 1M, lr=1e-4 fixed, num_steps=18, bs=256, simga_max=80, epoch=2M, EMA
-    cfg.dropout_rate = 0.0
-    cfg.latent_dim = 0
-    cfg.residual = False
-    checkpoint = torch.load(cfg.logdir + '/' + 'CD_2023_07_07__16_32_09/ckpt_0.000000_1000000.pt', map_location=torch.device(cfg.device))   # max 1200000
-    model = mdls.epicVAE_nFlow_kDiffusion(cfg, distillation = True).to(cfg.device)
-    model.load_state_dict(checkpoint['others']['model_ema'])
-    coef_real = np.array([ 2.42091454e-09, -2.72191705e-05,  2.95613817e-01,  4.88328360e+01])  # fixed coeff at 0.1 threshold
-    coef_fake = np.array([-9.02997505e-07,  2.82747963e-03,  1.01417267e+00,  1.64829018e+02])
-    n_splines = None # joblib.load('/beegfs/desy/user/buhmae/6_PointCloudDiffusion/n_spline/spline_cm.joblib')
+    if model_name == "ddpm":
+        params_dict["seed"] = 12345
+        params_dict["batch_size"] = 64
+    elif model_name == "edm":
+        params_dict["seed"] = 123456
+        params_dict["batch_size"] = 64
+    elif model_name == "cm":
+        params_dict["seed"] = 1234567
+        params_dict["batch_size"] = 16
+    elif model_name == "g4":
+        pass
+    else:
+        raise ValueError(f"Model name {model_name} not recognized.")
+    return params_dict
 
 
-elif args.caloclouds == 'g4':
-    path = '/beegfs/desy/user/akorol/data/calo-clouds/hdf5/all_steps/validation/10-90GeV_x36_grid_regular_712k.hdf5'
-    all_events = h5py.File(path, 'r')['events']
-    all_energy = h5py.File(path, 'r')['energy']
+def get_g4_data(path_or_config: str | Configs) -> tuple:
+    """
+    Get the validation G4 data for comparison to the simulated data.
 
-else:
-    raise ValueError('caloclouds must be one of: ddpm, edm, cm or g4')
+    Parameters
+    ----------
+    path_or_config : str or Configs
+        If str, the path to the G4 data. If Configs, the Configs object
+        from which the storage base can be extracted.
 
-print(args.caloclouds, ' model loaded')
+    Returns
+    -------
+    all_events : lazy_ops.lazy_loading.DatasetViewh5py (n_events, max_num_hits, 4)
+        The G4 events.
+    all_energy : h5py._hl.dataset.Dataset (n_events, 1)
+        The incident particle energy for the G4 events.
+    """
+    if isinstance(path_or_config, str):
+        path = path_or_config
+    else:
+        storage_base = path_or_config.storage_base
+        path = os.path.join(
+            storage_base,
+            "akorol/data/calo-clouds/hdf5/all_steps/validation",
+            "/10-90GeV_x36_grid_regular_712k.hdf5",
+        )
+    all_events = lazy_ops.DatasetView(h5py.File(path, "r")["events"])
+    # as this might be a lot of data, we avoid converting to numpy
+    # and instead use a lazy transpose to swap the axis
+    all_events = all_events.lazy_transpose([0, 2, 1])
+    all_energy = h5py.File(path, "r")["energy"]
+    return all_events, all_energy
 
-if args.caloclouds != 'g4':
-    model.eval()
-    torch.manual_seed(seed)
-    print(' one random torch number: ', torch.rand(1))
+
+# GENERATE EVENTS
 
 
-### GENERATE EVENTS
+def yield_g4_showers(
+    config: Configs, param_dict: dict, g4_data: tuple[h5py.Group, h5py.Group]
+) -> tuple:
+    """
+    Reformat the G4 data into the shower format that is produced by
+    the generative models, and yield the showers in chunks of n_events,
+    where n_events is taken from the param_dict.
 
-merge_dict = {}
-i = 0
-for _ in range(int(total_events / n_events)):
+    Parameters
+    ----------
+    config : Configs
+        The Configs object.
+    param_dict : dict
+        Dictionary containing the parameters for the generation of showers,
+        as generated by make_params_dict.
+    g4_data : tuple[h5py.Group, h5py.Group]
+        The G4 data, as returned by get_g4_data.
 
-    if args.caloclouds == 'g4':
-        print('loading Geant4 showers')
-        showers, cond_E = all_events[i:i+n_events], all_energy[i:i+n_events]
-        print(showers.shape)
-        showers[:, -1] = showers[:, -1] * 1000   # GeV to MeV
-        i += n_events
+    Yields
+    ------
+    showers : np.ndarray (n_events, max_num_hits, 4
+        The showers in the format produced by the generative models.
+    cond_E : np.ndarray (n_events, 1)
+        The incident particle energy for the showers.
+    """
+    dataset_class = dataset_class_from_config(config)
+    all_events, all_energy = g4_data
+    n_events = param_dict["n_events"]
+    for i in range(0, all_events.shape[0], n_events):
+        showers, cond_E = all_events[i : i + n_events], all_energy[i : i + n_events]
+        showers[:, -1] = showers[:, -1] * dataset_class.energy_scale
+        yield showers, cond_E
+
+
+def shower_generator_factory(config, param_dict):
+    """
+    Create a shower generator function that yields showers and incident
+    particle energies from the dataset specified by the param_dict,
+    in chunks of n_events, where n_events is taken from the param_dict.
+
+    Parameters
+    ----------
+    config : Configs
+        The Configs object.
+    param_dict : dict
+        Dictionary containing the parameters for the generation of showers,
+        as generated by make_params_dict.
+    """
+    if param_dict["caloclouds"] == "g4":
+        if "g4_data_path" in param_dict:
+            args = (param_dict["g4_data_path"],)
+        else:
+            args = (config,)
+        g4_data = get_g4_data(*args)
+
+        def shower_generator(param_dict=param_dict, g4_data=g4_data):
+            for showers, cond_E in yield_g4_showers(config, param_dict, g4_data):
+                yield showers, cond_E
 
     else:
-        print('generating showers')
-        s_t = time.time()
-        showers, cond_E = gen_utils.gen_showers_batch(model, distribution, min_energy, max_energy, n_events, bs=batch_size, kdiffusion=kdiffusion, config=cfg, coef_real=coef_real, coef_fake=coef_fake, n_scaling=n_scaling, n_splines=n_splines)
-        t = time.time() - s_t
-        print(showers.shape)
-        print(t)
-        print('time per shower: (s)', t / n_events)
+        torch.manual_seed(param_dict["seed"])
+        print(" one random torch number: ", torch.rand(1))
+        min_energy = param_dict["min_energy"]
+        max_energy = param_dict["max_energy"]
 
-    print('projecting showers')
-    MAP, _ = create_map()
-    events, clouds  = get_projections(showers, MAP, max_num_hits=6000, return_cell_point_cloud=True)
+        kwargs = {}
+        if "flow_model_path" in param_dict:
+            kwargs = {"model_path": param_dict["flow_model_path"]}
+        flow_model = load_flow_model(config, **kwargs)
 
-    print('get features and center of gravities')
-    dict = plotting.get_features(events)
-    dict['incident_energy'] = cond_E.reshape(-1)  # GeV  shape: (n_events,)
+        kwargs = {}
+        if "diffusion_model_path" in param_dict:
+            kwargs = {"model_path": param_dict["diffusion_model_path"]}
+        diffusion_model = load_diffusion_model(
+            config, param_dict["caloclouds"], **kwargs
+        )
+
+        def shower_generator(
+            min_energy=min_energy,
+            max_energy=max_energy,
+            param_dict=param_dict,
+            flow_model=flow_model,
+            diffusion_model=diffusion_model,
+        ):
+            while True:
+                yield generate_showers(
+                    config,
+                    min_energy,
+                    max_energy,
+                    param_dict,
+                    flow_model,
+                    diffusion_model,
+                )
+
+    return shower_generator
+
+
+def add_chunk(config, params_dict, shower_generator, merge_dict):
+    """
+    Add a chunk of params_dict["n_events"] events to the merge_dict,
+    using the shower_generator to generate the showers.
+    Stores the events in the merge_dict, no return value.
+
+    Parameters
+    ----------
+    config : Configs
+        The Configs object.
+    params_dict : dict
+        Dictionary containing the parameters for the generation of showers,
+        as generated by make_params_dict.
+    shower_generator : generator
+        The generator that yields showers and incident particle energies.
+    merge_dict : dict
+        The dictionary where the events are being gathered.
+
+    """
+    showers, cond_E = next(shower_generator)
+    print("projecting showers")
+    metadata = Metadata(config)
+    X, Y, Z, _ = metadata.load_muon_map()
+    map_layers, _ = create_map(
+        X,
+        Y,
+        Z,
+        metadata.layer_bottom_pos,
+        metadata.half_cell_size,
+        metadata.cell_thickness,
+    )
+    events, clouds = get_projections(
+        showers,
+        map_layers,
+        metadata.layer_bottom_pos,
+        metadata.half_cell_size,
+        metadata.cell_thickness,
+        max_num_hits=6000,
+        return_cell_point_cloud=True,
+    )
+
+    print("get features and center of gravities")
+    plt_config = plotting.PltConfigs()
+    features_dict = plotting.get_features(
+        plt_config, map_layers, metadata.half_cell_size, events
+    )
+
+    features_dict["incident_energy"] = cond_E.reshape(-1)  # GeV  shape: (n_events,)
     cog_list = plotting.get_cog(clouds)
-    dict['cog_x'] = cog_list[0]
-    dict['cog_y'] = cog_list[1]
-    dict['cog_z'] = cog_list[2]
+    features_dict["cog_x"] = cog_list[0]
+    features_dict["cog_y"] = cog_list[1]
+    features_dict["cog_z"] = cog_list[2]
 
-    print('merging dicts')
-    merge_dict = metrics.merge_dicts([merge_dict, dict], key_exceptions=key_exceptions)
+    print("merging dicts")
+    combined = metrics.merge_dicts(
+        [merge_dict, features_dict], key_exceptions=params_dict["key_exceptions"]
+    )
+    merge_dict.update(combined)
 
-    print('current shape of occupancy in merge_dict: ', merge_dict['occ'].shape)
-
-    # save dictonary 
-    with open(pickle_path+'merge_dict_{}-{}GeV_{}_{}.pickle'.format(str(min_energy), str(max_energy), str(total_events), args.caloclouds), 'wb') as f:
-        pickle.dump(merge_dict, f)
-    print('merge_dict saved in pickle file')
-
-    del showers, events, dict
-    gc.collect()
+    print("current shape of occupancy in merge_dict: ", merge_dict["occ"].shape)
 
 
+def write_merge_dict(params_dict, merge_dict):
+    """
+    Makes a checkpoint of the current merge_dict in a pickle file.
+    Will overwrite the last checkpoint if it exists.
 
+    Parameters
+    ----------
+    params_dict : dict
+        Dictionary containing the parameters for the generation of showers,
+        as generated by make_params_dict.
+        Determines the name of the output file.
+    merge_dict : dict
+        The dictionary to be saved in the pickle file.
+
+    Returns
+    -------
+    file_path : str
+        The path to the saved pickle file.
+    """
+    file_name = (
+        f"merge_dict_{params_dict['min_energy']}-{params_dict['max_energy']}GeV"
+        + f"_{params_dict['total_events']}_{params_dict['caloclouds']}.pickle"
+    )
+    file_path = os.path.join(params_dict["pickle_path"], file_name)
+    with open(file_path, "wb") as pickle_file:
+        pickle.dump(merge_dict, pickle_file)
+    print("merge_dict saved in pickle file")
+    return file_path
+
+
+def write_all_events(config, params_dict):
+    """
+    For the number of total events specified in params_dict, generate
+    showers and write them to a pickle file.
+
+    Parameters
+    ----------
+    config : Configs
+        The Configs object.
+    params_dict : dict
+        Dictionary containing the parameters for the generation of showers,
+        as generated by make_params_dict.
+    """
+    shower_generator = shower_generator_factory(config, params_dict)
+    merge_dict = {}
+    n_chunks = int(params_dict["total_events"] / params_dict["n_events"])
+    for chunk_n in range(n_chunks):
+        print(f"processing chunk {chunk_n} of {n_chunks}")
+        add_chunk(config, params_dict, shower_generator, merge_dict)
+        write_merge_dict(params_dict, merge_dict)
+        gc.collect()
+
+
+if __name__ == "__main__":
+    config = Configs()
+    params_dict = make_params_dict()
+    # write_merge_dict(config, params_dict)

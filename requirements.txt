@@ -5,6 +5,7 @@
 comet_ml >= 3.37
 torch >= 2.1
 h5py >= 3.10
+lazy_ops
 pyro-ppl>=1.8
 pandas >= 2.1
 k-diffusion

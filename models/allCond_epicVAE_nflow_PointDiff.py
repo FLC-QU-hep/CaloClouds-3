@@ -86,7 +86,8 @@ class AllCond_epicVAE_nFlow_PointDiff(Module):
         return loss, loss_prior
 
 
-    def sample(self, cond_feats, num_points, flexibility):
+    def sample(self, cond_feats, num_points, config):
+        flexibility = config.flexibility
         batch_size, _ = cond_feats.size()
         z = self.flow.sample(context=cond_feats, num_samples=1).view(batch_size, -1)  # B,functional
         z = torch.cat([z, cond_feats], -1)   # B, functional+C
@@ -99,7 +100,8 @@ class AllCond_epicVAE_nFlow_PointDiff(Module):
             x = self.sample(z, num_points, flexibility=cfg.flexibility)
         return x
 
-    def sample_fromData(self, x, cond_feats, num_points, flexibility):
+    def sample_fromData(self, x, cond_feats, num_points, config):
+        flexibility = config.flexibility
         z_mu, z_sigma = self.encoder(x, cond_feats)
         z = reparameterize_gaussian(mean=z_mu, logvar=z_sigma)  # (B, functional)
         z = torch.cat([z, cond_feats], -1)   # B,functional+C

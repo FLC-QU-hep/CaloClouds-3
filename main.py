@@ -9,7 +9,7 @@ from torch.nn.utils import clip_grad_norm_
 import k_diffusion
 import time
 
-from utils.dataset import PointCloudDataset, PointCloudDatasetGH
+from utils.dataset import dataset_class_from_config
 from utils.misc import seed_all, get_new_log_dir, CheckpointManager
 from models.common import get_linear_scheduler
 from models.vae_flow import VAEFlow
@@ -49,18 +49,12 @@ def get_ckp_mgr(config, start_time):
 
 
 def get_dataloader(config):
-    if config.dataset == "x36_grid" or config.dataset == "clustered":
-        train_dset = PointCloudDataset(
-            file_path=config.dataset_path,
-            bs=config.train_bs,
-            quantized_pos=config.quantized_pos,
-        )
-    elif config.dataset == "gettig_high":
-        train_dset = PointCloudDatasetGH(
-            file_path=config.dataset_path,
-            bs=config.train_bs,
-            quantized_pos=config.quantized_pos,
-        )
+    dataset_class = dataset_class_from_config(config)
+    train_dset = dataset_class(
+        file_path=config.dataset_path,
+        bs=config.train_bs,
+        quantized_pos=config.quantized_pos,
+    )
     dataloader = DataLoader(
         train_dset, batch_size=1, num_workers=config.workers, shuffle=config.shuffle
     )

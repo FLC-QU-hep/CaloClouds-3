@@ -196,7 +196,7 @@ def test_cells_to_points():
     points = detector_map.cells_to_points(
         layers, MAP, layer_bottom_pos, half_cell_size, cell_thickness
     )
-    assert points.shape == (4, 0)
+    assert points.shape == (0, 4)
 
     # if told to pad, the output from empty input should eb all 0
     points = detector_map.cells_to_points(
@@ -213,13 +213,13 @@ def test_cells_to_points():
     points = detector_map.cells_to_points(
         layers, MAP, layer_bottom_pos, half_cell_size, cell_thickness
     )
-    assert points.shape == (4, 3)
+    assert points.shape == (3, 4)
     # we don't know which order the points will be in
-    energy_order = np.argsort(points[3])
+    energy_order = np.argsort(points[:, 3])
     expected_points = np.array(
         [[2.5, 0.05, -4.5, 2.0], [4.5, 0.05, 3.5, 3.0], [2.5, 1.05, -4.5, 5.0]]
     )
-    npt.assert_allclose(points[:, energy_order], expected_points.T)
+    npt.assert_allclose(points[energy_order], expected_points)
 
 
 def test_get_projections():
@@ -243,7 +243,7 @@ def test_get_projections():
         [], MAP, layer_bottom_pos, half_cell_size, cell_thickness, True, 10
     )
     assert len(events) == 0
-    assert cell_point_clouds.shape == (0, 4, 0)
+    assert cell_point_clouds.shape == (0, 0, 4)
 
     # one simple event
     shower1 = np.array(
@@ -258,7 +258,7 @@ def test_get_projections():
         max_num_hits=10
     )
     assert len(events) == 1
-    assert cell_point_clouds.shape == (1, 4, 10)
+    assert cell_point_clouds.shape == (1, 10, 4)
 
 
 def test_confine_to_box():

@@ -7,7 +7,7 @@ sys.path.append(str(path_root1))
 import os
 import shutil
 import pytest
-from configs import Configs
+from config_varients.default import Configs
 from cd import main
 
 

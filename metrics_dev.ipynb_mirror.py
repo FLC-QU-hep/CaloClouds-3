@@ -50,9 +50,15 @@ import utils.plotting as plotting
 
 
 
+from utils.metadata import Metadata
+
+
+
 
 
 cfg = Configs()
+
+metadata = Metadata(cfg)
 
 
 
@@ -65,25 +71,29 @@ importlib.reload(plotting)
 
 path = '/beegfs/desy/user/akorol/data/calo-clouds/hdf5/all_steps/validation/photon-showers_10-90GeV_A90_Zpos4.slcio.hdf5'
 
-real_showers = h5py.File(path, 'r')['events'][:]
+real_showers, real_energy = generate_for_metrics.get_g4_data(path)
 
-real_showers[:, -1] = real_showers[:, -1] * 1000   # GeV to MeV
+dataset_class = dataset.dataset_class_from_config(Configs())
+
+real_showers[:, :, -1] = real_showers[:, :, -1] * dataset_class.energy_scale   # GeV to MeV
 
 print(real_showers.shape)
-MAP = create_map()
+MAP = create_map(configs=cfg)
 
-real_events = get_projections(real_showers[:], MAP)
+real_events = get_projections(real_showers[:], MAP, configs=cfg)
 
 len(real_events)
 
 len(real_events[0])
 importlib.reload(plotting)
 
+plt_config = plotting.PltConfigs()
+
 
 
 st = time.time()
 
-dict = plotting.get_features(real_events[:])
+dict = plotting.get_features(plt_config, MAP, metadata.half_cell_size, real_events[:])
 
 print(time.time()-st)
 print(dict.keys())
