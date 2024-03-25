@@ -1,1 +1,1 @@
-configs/default.py
+config_varients/default.py

@@ -15,6 +15,18 @@ import utils.plotting as plotting
 
 
 
+from evaluation import generate
+
+
+
+from configs import Configs
+
+cfg = Configs()
+
+metadata = Metadata(cfg)
+
+
+
 import numpy as np
 
 import h5py
@@ -29,11 +41,11 @@ import importlib
 
 path = '/beegfs/desy/user/akorol/data/calo-clouds/hdf5/high_granular_grid/validation/10-90GeV_x36_grid_regular_float32.hdf5' # real point clouds 
 
-real_showers = h5py.File(path, 'r')['events'][:]
+real_showers, real_energy = generate_for_metrics.get_g4_data(path)
 
-real_showers[:, -1] = real_showers[:, -1] * 1000   # GeV to MeV
+dataset_class = dataset.dataset_class_from_config(Configs())
 
-
+real_showers[:, :, -1] = real_showers[:, :, -1] * dataset_class.energy_scale   # GeV to MeV
 
 print(len(real_showers))
 
@@ -76,7 +88,7 @@ print(len(real_showers))
 
 # other tests
 
-fake_showers = np.load('/beegfs/desy/user/buhmae/6_PointCloudDiffusion/output/full/no_scaling_10-90GeV_100000_cm_seed1234.npy')
+fake_showers = generate.load_np_showers('/beegfs/desy/user/buhmae/6_PointCloudDiffusion/output/full/no_scaling_10-90GeV_100000_cm_seed1234.npy')
 
 # fake_showers[:, -1] = fake_showers[:, -1] / 1000
 
@@ -92,16 +104,17 @@ importlib.reload(plotting)
 
 # events = plotting.get_projections(real_showers[:n], MAP)       # get projection of a point clouds to the detector grid
 
-MAP, _ = create_map()
+MAP, _ = create_map(configs=cfg)
 
-events_fake = plotting.get_projections(fake_showers[:n], MAP)  # get projection of a point clouds to the detector grid
+events_fake = plotting.get_projections(fake_showers[:n], MAP, configs=cfg)  # get projection of a point clouds to the detector grid
 importlib.reload(plotting)
 
 
 
 # _, occ_real, _, _, _, _, _, _, _ = plotting.get_features(events)      # get event level features
 
-_, occ_fake, _, _, _, _, _, _, _ = plotting.get_features(events_fake) # get event level features
+_, occ_fake, _, _, _, _, _, _, _ = plotting.get_features(plt_config, MAP, metadata.half_cell_size, events_fake) # get event level features
+
 # num_hits_real = (real_showers[:, -1, :] > 0).sum(axis=1)  # get num points in the point clouds
 
 num_hits_fakel = (fake_showers[:, -1, :] > 0).sum(axis=1) # get num points in the point clouds

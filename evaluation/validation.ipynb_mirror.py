@@ -52,11 +52,13 @@ from utils.detector_map import get_projections, create_map
 
 from utils.plotting import get_plots
 
+from utils import dataset
+
 import utils.gen_utils as gen_utils
 
 
 
-
+from evaluation import generate, generate_for_metrics
 
 import k_diffusion as K
 
@@ -541,8 +543,6 @@ caloclouds = 'edm'   # 'ddpm, 'edm', 'cm'
 
 if caloclouds == 'ddpm':
 
-    kdiffusion=False   # EDM vs DDPM diffusion
-
     cfg.sched_mode = 'quardatic'
 
     cfg.num_steps = 100
@@ -570,8 +570,6 @@ if caloclouds == 'ddpm':
 # caloclouds EDM
 
 elif caloclouds == 'edm':
-
-    kdiffusion=True   # EDM vs DDPM diffusion
 
     cfg.num_steps = 13
 
@@ -612,8 +610,6 @@ elif caloclouds == 'edm':
 # condsistency model
 
 elif caloclouds == 'cm':
-
-    kdiffusion=True   # EDM vs DDPM diffusion
 
     cfg.num_steps = 1
 
@@ -659,8 +655,6 @@ importlib.reload(gen_utils)
 torch.manual_seed(1234567)
 
 
-
-# kdiffusion=True   # EDM vs DDPM diffusion
 
 # cfg.num_steps = 13
 
@@ -708,7 +702,7 @@ n_scaling = True
 
 s_t = time.time()
 
-fake_showers_3 = gen_utils.gen_showers_batch(model, distribution, 50, 50, 2000, bs=16, kdiffusion=kdiffusion, config=cfg, coef_real=coef_real, coef_fake=coef_fake, n_scaling=n_scaling)
+fake_showers_3 = gen_utils.gen_showers_batch(model, distribution, 50, 50, 2000, bs=16, config=cfg, coef_real=coef_real, coef_fake=coef_fake, n_scaling=n_scaling)
 
 t = time.time() - s_t
 
@@ -799,9 +793,11 @@ path = '/beegfs/desy/user/akorol/data/calo-clouds/hdf5/all_steps/validation/phot
 
 # path = '/beegfs/desy/user/akorol/projects/getting_high/ILDConfig/StandardConfig/production/out/10GeV_x36_grid_regular_2k_Z4_grid_pos_rundom.hdf5'
 
-real_showers = h5py.File(path, 'r')['events'][:]
+real_showers, real_energy = generate_for_metrics.get_g4_data(path)
 
-real_showers[:, -1] = real_showers[:, -1] * 1000   # GeV to MeV
+dataset_class = dataset.dataset_class_from_config(Configs())
+
+real_showers[:, :, -1] = real_showers[:, :, -1] * dataset_class.energy_scale   # GeV to MeV
 
 print(real_showers.shape)
 
@@ -851,7 +847,9 @@ print(real_showers.shape)
 
 
 
-fake_showers = np.load('/beegfs/desy/user/buhmae/6_PointCloudDiffusion/output/CCbaseline_50GeV_2000.npy')
+# this method ensure axis order is [n_events, n_points, x_y_z_e]
+
+fake_showers, _ = generate.load_np_showers('/beegfs/desy/user/buhmae/6_PointCloudDiffusion/output/CCbaseline_50GeV_2000.npy')
 
 # fake_showers = np.load('/beegfs/desy/user/buhmae/6_PointCloudDiffusion/output/CCbaseline_10-90GeV_40k_wNscaling.npy')
 
@@ -863,7 +861,7 @@ fake_showers = np.load('/beegfs/desy/user/buhmae/6_PointCloudDiffusion/output/CC
 
 # fake_showers_2 = np.load('/beegfs/desy/user/buhmae/6_PointCloudDiffusion/output/kCaloClouds_2023_05_24__14_54_09_heun13_50GeV_2k.npy')
 
-fake_showers_2 = np.load('/beegfs/desy/user/buhmae/6_PointCloudDiffusion/output/kCaloClouds_2023_06_29__23_08_31_ckpt_0.000000_2000000_heun13_50GeV_2k.npy')
+fake_showers_2, _ = generate.load_np_showers('/beegfs/desy/user/buhmae/6_PointCloudDiffusion/output/kCaloClouds_2023_06_29__23_08_31_ckpt_0.000000_2000000_heun13_50GeV_2k.npy')
 
 # fake_showers_2 = np.load('/beegfs/desy/user/buhmae/6_PointCloudDiffusion/output/kCaloClouds_2023_06_29__23_08_31_ckpt_0.000000_2000000_10-90GeV_40k_wNscaling.npy')
 
@@ -902,14 +900,14 @@ fake_showers_2 = np.load('/beegfs/desy/user/buhmae/6_PointCloudDiffusion/output/
 # fake_showers_worst_2 = np.load('DM_10GeV_worst_2.npy')
 
 # fake_showers_worst_2[:, -1] = fake_showers_worst_2[:, -1] / 1000
-real_showers[:2000,-1,:].max(), fake_showers_2[:2000,-1,:].max()
+real_showers[:2000,:,-1].max(), fake_showers_2[:2000,:,-1].max()
 # log bins 
 
-bins = np.logspace(np.log10(real_showers[:,-1,:][real_showers[:,-1,:] != 0.0].min()),np.log10(real_showers[:,-1,:].max()+1e2), 100)
+bins = np.logspace(np.log10(real_showers[:, :, -1][real_showers[:,:,-1] != 0.0].min()),np.log10(real_showers[:,:,-1].max()+1e2), 100)
 
-plt.hist(real_showers[:,-1,:][real_showers[:,-1,:] != 0.0], bins = bins, histtype='step', label='real showers', density=False)
+plt.hist(real_showers[:,:,-1][real_showers[:,:,-1] != 0.0], bins = bins, histtype='step', label='real showers', density=False)
 
-plt.hist(fake_showers_2[:,-1,:][fake_showers_2[:,-1,:] != 0.0], bins = bins, histtype='step', label='fake showers', density=False)   
+plt.hist(fake_showers_2[:,:,-1][fake_showers_2[:,:,-1] != 0.0], bins = bins, histtype='step', label='fake showers', density=False)   
 
 plt.legend(loc='best', fontsize=14)
 
@@ -948,7 +946,7 @@ plotting.plt_feats(real_showers, [fake_showers, fake_showers_2, fake_showers_3],
 cfg.bins_r = 35
 
 # # Projections
-MAP, _ = create_map()
+MAP, _ = create_map(configs=cfg)
 
 # events, cloud = get_projections(real_showers[0:2000], MAP, max_num_hits=6000, return_cell_point_cloud=True)
 
@@ -956,15 +954,15 @@ MAP, _ = create_map()
 
 # events_fake_2, cloud_fake_2 = get_projections(fake_showers_2, MAP, max_num_hits=6000, return_cell_point_cloud=True)
 
-events_fake_3, cloud_fake_3 = get_projections(fake_showers_3[0:2000], MAP, max_num_hits=6000, return_cell_point_cloud=True)
-cloud[:,-1,:].max(), cloud_fake_3[:,-1,:].max()
+events_fake_3, cloud_fake_3 = get_projections(fake_showers_3[0:2000], MAP, max_num_hits=6000, return_cell_point_cloud=True, configs=cfg)
+cloud[:,:,-1].max(), cloud_fake_3[:,:,-1].max()
 # log bins 
 
-bins = np.logspace(np.log10(cloud[:,-1,:][cloud[:,-1,:] != 0.0].min()),np.log10(cloud[:,-1,:].max()+1e2), 100)
+bins = np.logspace(np.log10(cloud[:,:,-1,][cloud[:,:,-1] != 0.0].min()),np.log10(cloud[:,:,-1].max()+1e2), 100)
 
-plt.hist(cloud[:,-1,:][cloud[:,-1,:] != 0.0], bins = bins, histtype='step', label='real showers', density=False)
+plt.hist(cloud[:,:,-1][cloud[:,:,-1] != 0.0], bins = bins, histtype='step', label='real showers', density=False)
 
-plt.hist(cloud_fake_3[:,-1,:][cloud_fake_3[:,-1,:] != 0.0], bins = bins, histtype='step', label='fake showers', density=False)   
+plt.hist(cloud_fake_3[:,:,-1][cloud_fake_3[:,:,-1] != 0.0], bins = bins, histtype='step', label='fake showers', density=False)   
 
 plt.legend(loc='best', fontsize=14)
 

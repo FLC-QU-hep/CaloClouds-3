@@ -1,10 +1,5 @@
 from tqdm import tqdm
-import os
 import numpy as np
-import matplotlib as mpl
-import matplotlib.pyplot as plt
-import matplotlib.font_manager as font_manager
-from scipy.stats import binned_statistic
 
 from .metadata import Metadata
 from configs import Configs
@@ -280,8 +275,8 @@ def cells_to_points(
     Parameters
     ----------
     layers : list
-        list of 2D arrays, each containing the energy deposited in each cell of the layer
-        with the arangement specified by MAP
+        list of 2D arrays, each containing the energy deposited in each
+        cell of the layer with the arangement specified by MAP
         in the style of a histogram
     MAP : list
         list of dictionaries, each containing the grid of cells for a layer
@@ -300,7 +295,7 @@ def cells_to_points(
 
     Returns
     -------
-    points : np.array (4, N)
+    points : np.array (n_hits, 4)
         2D array containing hits of the points,
         in coordinates (x, y, z, energy)
     """
@@ -328,10 +323,10 @@ def cells_to_points(
             ]
         )
 
-    points = np.concatenate(points, axis=1)
+    points = np.concatenate(points, axis=1).T
     if length_to_pad is not None:
-        zeros_to_concat = np.zeros((4, length_to_pad - len(points[0])))
-        points = np.concatenate((points, zeros_to_concat), axis=1)
+        zeros_to_concat = np.zeros((length_to_pad - points.shape[0], 4))
+        points = np.vstack((points, zeros_to_concat))
 
     return points
 
@@ -389,10 +384,10 @@ def get_projections(
     Returns
     -------
     events : list
-        list of 2D arrays, each containing the energy deposited in each cell of the layer
-        with the arangement specified by MAP
+        list of 2D arrays, each containing the energy deposited
+        in each cell of the layer with the arangement specified by MAP
         in the style of a histogram
-    cell_point_clouds : np.array (optional)
+    cell_point_clouds : np.array (n_hits, 4) (optional)
         3D array containing hits of the points,
         in coordinates (x, y, z, energy)
     """
@@ -419,13 +414,15 @@ def get_projections(
 
     cell_point_clouds = []
     for event in tqdm(events):
-        point_cloud = cells_to_points(event, MAP, layer_bottom_pos, half_cell_size, cell_thickness, max_num_hits)
+        point_cloud = cells_to_points(
+            event, MAP, layer_bottom_pos, half_cell_size, cell_thickness, max_num_hits
+        )
         cell_point_clouds.append(point_cloud)
 
     try:
         cell_point_clouds = np.stack(cell_point_clouds)
     except ValueError:  # to prevent us choking on empty input
-        cell_point_clouds = np.empty((0, 4, 0))
+        cell_point_clouds = np.empty((0, 0, 4))
 
     return events, cell_point_clouds
 
