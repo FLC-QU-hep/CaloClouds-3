@@ -1,15 +1,10 @@
 """ Module to test the metadata module. """
-import sys
-from pathlib import Path
-path_root1 = Path(__file__).parents[1]
-sys.path.append(str(path_root1))
-
 from unittest.mock import patch
 import os
 import numpy as np
 
-from utils import metadata
-from config_varients.default import Configs
+from pointcloud.utils import metadata
+from pointcloud.config_varients.default import Configs
 
 def test_get_metadata_folder():
     data_dir = metadata.get_metadata_folder()
@@ -40,7 +35,7 @@ def test_Metadata(tmpdir):
     muon_map_path_E = os.path.join(str(tmpdir), "muon_map/E.npy")
     np.save(muon_map_path_E, np.array([1, 6, 3]))
     
-    with patch('utils.metadata.get_metadata_folder', return_value=str(tmpdir)):
+    with patch('pointcloud.utils.metadata.get_metadata_folder', return_value=str(tmpdir)):
         m = metadata.Metadata()
         assert hasattr(m, "dog")
         assert np.array_equal(m.dog, np.array([1, 2, 3]))
