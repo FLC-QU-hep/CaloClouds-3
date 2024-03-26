@@ -1,0 +1,143 @@
+# %load_ext autoreload
+
+# %autoreload 2
+
+
+
+from IPython.core.display import display, HTML
+
+display(HTML("<style>.container { width:90% !important; }</style>"))
+
+
+
+import sys
+
+sys.path.append('../')
+
+
+
+
+
+# import math
+
+# import argparse
+
+# import h5py
+
+import importlib
+
+# import numpy as np
+
+# import torch
+
+import time
+
+import sys
+
+# from torch.utils.data import DataLoader
+
+# from torch.nn.utils import clip_grad_norm_
+
+# from tqdm import tqdm
+
+import pickle
+
+
+
+# from pointcloud.models.vae_flow import *
+
+# from pointcloud.models.flow import add_spectral_norm, spectral_norm_power_iteration
+
+# from pointcloud.models.shower_flow import compile_HybridTanH_model
+
+# from pointcloud.configs import Configs
+
+# import pointcloud.utils.gen_utils as gen_utils
+
+
+
+
+
+# import k_diffusion as K
+
+
+
+
+
+# cfg = Configs()
+
+
+
+# print(cfg.__dict__)
+
+
+
+
+
+# from pointcloud.utils.plotting import cfg as cfg_plt
+
+import pointcloud.utils.plotting as plotting
+
+importlib.reload(plotting)
+
+
+
+import numpy as np
+
+# import h5py
+
+# import matplotlib.pyplot as plt
+real_label = r'\textsc{Geant4}'
+
+ddpm_label = r'\textsc{CaloClouds}'
+
+edm_label = r'\textsc{CaloClouds II}'
+
+cm_label = r'\textsc{CaloClouds II (CM)}'
+# # load pickled dicts
+pickle_path = '/beegfs/desy/user/buhmae/6_PointCloudDiffusion/output/singleE/pickle/'
+
+min_energy_list = [10, 50, 90]
+
+max_energy_list = [10, 50, 90]
+
+
+
+dict_list = []
+
+real_list_list = []
+
+fakes_list_list = []
+
+for j in range(len(min_energy_list)):
+
+    min_energy = min_energy_list[j]
+
+    max_energy = max_energy_list[j]
+
+    with open(pickle_path+'dict_{}-{}GeV.pickle'.format(str(min_energy), str(max_energy)), 'rb') as f:
+
+        dict = pickle.load(f)
+
+    dict_list.append(dict)
+
+    real_list_list.append(dict['real_list'])
+
+    fakes_list_list.append(dict['fakes_list'])
+
+    
+
+print('dicts loaded')
+
+print(dict_list[0].keys())
+# mean occ of 50 GeV CM model
+
+fakes_list_list[2][1][2].mean()
+# # Plotting
+importlib.reload(plotting)
+
+
+
+plotting.get_plots_from_observables_singleE(real_list_list, fakes_list_list, labels=[real_label, ddpm_label, edm_label, cm_label])
+
+

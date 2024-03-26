@@ -1,13 +1,6 @@
 """
 Notebooks should be converted to python files before being commited to the repository.
 """
-# get the folder above on the path
-import sys
-from pathlib import Path
-
-path_root1 = Path(__file__).parents[1]
-sys.path.append(str(path_root1))
-
 from programming_utils import mirror_notebook
 import os
 

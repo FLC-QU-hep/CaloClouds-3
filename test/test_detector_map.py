@@ -1,15 +1,9 @@
 """ Module to test the detector_map module. """
 # get the folder above on the path
-import sys
-from pathlib import Path
-
-path_root1 = Path(__file__).parents[1]
-sys.path.append(str(path_root1))
-
 import numpy as np
 import numpy.testing as npt
 
-from utils import detector_map
+from pointcloud.utils import detector_map
 
 
 # TODO test dm parameter

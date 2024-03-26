@@ -1,26 +1,20 @@
 """
 Module to test the functions in evaluation.generate
 """
-import sys
-from pathlib import Path
-
-path_root1 = Path(__file__).parents[1]
-sys.path.append(str(path_root1))
-
 import os
-import glob
 import pytest
 import torch
-from config_varients.default import Configs
-from evaluation import generate
-from models.shower_flow import compile_HybridTanH_model
+from pointcloud.config_varients.default import Configs
+from pointcloud.evaluation import generate
+from pointcloud.models.shower_flow import compile_HybridTanH_model
 
 
 def make_config():
     config = Configs()
     # no logging for tests, as we would need a comet key
     config.log_comet = False
-    config.dataset_path = os.path.join(path_root1, "test", "mini_data_sample.hdf5")
+    test_dir = os.path.dirname(os.path.realpath(__file__))
+    config.dataset_path = os.path.join(test_dir, "mini_data_sample.hdf5")
     config.max_iters = 2
     config.device = "cpu"
     return config
