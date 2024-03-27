@@ -9,6 +9,7 @@ import time
 from ..models.shower_flow import compile_HybridTanH_model
 from ..configs import Configs
 from ..utils import gen_utils
+from ..utils.misc import regularise_shower_axes
 
 from ..models import epicVAE_nflows_kDiffusion as mdls
 from ..models import allCond_epicVAE_nflow_PointDiff as mdls2
@@ -358,8 +359,7 @@ def load_np_showers(file_path: str) -> np.array or tuple[np.array, np.array]:
     else:
         showers = data["fake_showers"]
         cond_E = data["energy"]
-    if showers.shape[2] != 4 and showers.shape[1] == 4:
-        showers = showers.swapaxes(1, 2)
+    showers = regularise_shower_axes(showers)
     return showers, cond_E
 
 
