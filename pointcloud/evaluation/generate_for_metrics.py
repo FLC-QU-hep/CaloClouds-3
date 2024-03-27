@@ -8,13 +8,13 @@ import gc
 import torch
 import pickle
 import h5py
-import lazy_ops
 
 from ..configs import Configs
 from ..utils.detector_map import get_projections, create_map
 from ..utils import metrics, plotting
 from ..utils.dataset import dataset_class_from_config
 from ..utils.metadata import Metadata
+from ..utils.misc import regularise_shower_axes
 
 from .generate import load_flow_model, load_diffusion_model, generate_showers
 
@@ -126,7 +126,7 @@ def get_g4_data(path_or_config: str | Configs) -> tuple:
 
     Returns
     -------
-    all_events : lazy_ops.lazy_loading.DatasetViewh5py (n_events, max_num_hits, 4)
+    all_events : np.array (n_events, max_num_hits, 4)
         The G4 events.
     all_energy : h5py._hl.dataset.Dataset (n_events, 1)
         The incident particle energy for the G4 events.
@@ -138,12 +138,13 @@ def get_g4_data(path_or_config: str | Configs) -> tuple:
         path = os.path.join(
             storage_base,
             "akorol/data/calo-clouds/hdf5/all_steps/validation",
-            "/10-90GeV_x36_grid_regular_712k.hdf5",
+            "10-90GeV_x36_grid_regular_712k.hdf5",
         )
-    all_events = lazy_ops.DatasetView(h5py.File(path, "r")["events"])
-    # as this might be a lot of data, we avoid converting to numpy
-    # and instead use a lazy transpose to swap the axis
-    all_events = all_events.lazy_transpose([0, 2, 1])
+    try:
+        all_events = h5py.File(path, "r")["events"][:]
+    except KeyError:
+        all_events = h5py.File(path, "r")["event"][:]
+    all_events = regularise_shower_axes(all_events, known_transposed=True)
     all_energy = h5py.File(path, "r")["energy"]
     return all_events, all_energy
 

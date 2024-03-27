@@ -280,3 +280,52 @@ def mean_flat(tensor):
     Take the mean over all non-batch dimensions.
     """
     return tensor.mean(dim=list(range(1, len(tensor.shape))))
+
+
+def regularise_shower_axes(showers, known_transposed=False):
+    """
+    Regularize the axis format for the input showers.
+    The regular format is (event_n, point_n, x_y_z_e).
+    This performs two checks;
+      - If there are aditional axis of length 1 before the event axis, they are removed.
+      - Attempt to ensure the features axes (x_y_z_e) is the last axes.
+        If only one axes is length 4, it is assumed to be the features axes.
+        If the last two axis are length 4, the second last axes is considered
+        the features axes if known_transposed is True, otherwise the
+        last axes is considered the features axes.
+
+    Parameters
+    ----------
+    showers : array like with at least 3 axes
+        The input showers tensor.
+    known_transposed : bool, optional
+        If True, the second last axes is always considered the features axes.
+        Otherwise, the length of the axes are checked to determine the features axes.
+
+    Returns
+    -------
+    showers : array like with 3 axes
+        The regularized showers.
+    """
+    if len(showers.shape) < 3:
+        raise ValueError('Input showers must have at least 3 axes.')
+    if len(showers.shape) > 3:
+        prior_axes = showers.shape[:-3]
+        if not all([a == 1 for a in prior_axes]):
+            raise ValueError("There are axes not length 1 before the event axis; "
+                             f"{showers.shape}")
+        showers = showers.squeeze()
+    if showers.shape[1] == 4:
+        if showers.shape[2] != 4 or known_transposed:
+            showers = showers.transpose(0, 2, 1)
+        else:
+            print("Warning; there are two axes of length 4 in the shower"
+                  " and we do not know if it is transposed")
+    elif known_transposed and showers.shape[2] == 4:
+        print("Warning; the second last axes is not length 4 while the "
+              "last axes is, but 'known_transposed=True', "
+              "assuming the dataset is actually already in "
+              "the format (event_n, point_n, x_y_z_e).")
+    if showers.shape[2] != 4:
+        raise ValueError(f"No features axes found; {showers.shape}")
+    return showers
