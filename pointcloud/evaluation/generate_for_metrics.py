@@ -126,7 +126,7 @@ def get_g4_data(path_or_config: str | Configs) -> tuple:
 
     Returns
     -------
-    all_events : lazy_ops.lazy_loading.DatasetViewh5py (n_events, max_num_hits, 4)
+    all_events : np.array (n_events, max_num_hits, 4)
         The G4 events.
     all_energy : h5py._hl.dataset.Dataset (n_events, 1)
         The incident particle energy for the G4 events.
