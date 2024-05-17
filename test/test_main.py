@@ -7,8 +7,8 @@ from scripts.main import main
 
 
 def test_main(tmpdir):
+#def test_main():
     # set a test config
-    #import ipdb; ipdb.set_trace()
     cfg = Configs()
     # no logging for tests, as we would need a comet key
     cfg.log_comet = False
