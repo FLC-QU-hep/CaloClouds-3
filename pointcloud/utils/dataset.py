@@ -2,19 +2,26 @@ from torch.utils.data import Dataset
 import numpy as np
 import h5py
 
+from ..configs import Configs
+from ..utils.metadata import Metadata
+from ..utils.detector_map import floors_ceilings
+
 
 class PointCloudDataset(Dataset):
+    metadata = Metadata(Configs())
     # these can be accessed without instantiating the class
-    Ymin, Ymax = 0, 30
-    Xmin, Xmax = -200, 200
-    Zmin, Zmax = -160, 240
     energy_scale = 1000  # MeV to GeV
     # The keys that will be draw from the dataset
     # format is {"name in batch": "name on disk"}
     keys_to_include = {"event": "events", "energy": "energy", "points": None}
 
     def __init__(
-        self, file_path, bs=32, max_ds_seq_len=6000, quantized_pos=True, n_files=0
+        self,
+        file_path,
+        bs=32,
+        max_ds_seq_len=6000,
+        quantized_pos=True,
+        n_files=0,
     ):
         """
         Base class for point cloud open_files.
@@ -58,7 +65,14 @@ class PointCloudDataset(Dataset):
         self.quantized_pos = quantized_pos
         self.offset = 5.0883331298828125 / 6  # size of x36 granular grid
 
-        self._roll_axis = True
+        if self.open_files[0]["events"].shape[-1] == 4:
+            # no moves needed.
+            self._roll_axis = False
+        else:
+            assert (
+                self.open_files[0]["events"].shape[-2] == 4
+            ), "Can't find xyze axis in data"
+            self._roll_axis = True
 
         # avoid repeat calculation
         self._len = len(self.index_list)
@@ -144,27 +158,137 @@ class PointCloudDataset(Dataset):
         event[:, :, 0] = event[:, :, 0] + pos_offset_x
         event[:, :, 2] = event[:, :, 2] + pos_offset_z
 
-    def normalize_xyze(self, event):
-        event[:, :, 0] = (
-            ((event[:, :, 0] - self.Xmin) * 2) / (self.Xmax - self.Xmin)
+    @classmethod
+    def normalize_xyze(cls, event):
+        """
+        Ensure that the x, y and z go from -1 to 1.
+        Also rescale the energy values to by the classes energy_scale.
+        Acts in place.
+
+        Parameters
+        ----------
+        event : np.ndarray, (..., 4)
+            One or more events. The last dimension should be 4
+            with coordinates x, y, z, and energy.
+
+        """
+        cls.normalize_parallal(event)
+        cls.normalize_perpendicular(event)
+        event[..., 3] *= cls.energy_scale
+
+    @classmethod
+    def normalize_parallal(cls, event):
+        """
+        Normalise in the directions parallel to the layers.
+        In this case that's the x and z directions.
+        Ensure that the x and z go from -1 to 1.
+        Acts in place.
+
+        Parameters
+        ----------
+        event : np.ndarray, (..., 4)
+            One or more events. The last dimension should be 4
+            with coordinates x, y, z, and energy.
+
+        """
+        Xmin = cls.metadata.Xmin
+        Xmax = cls.metadata.Xmax
+        event[..., 0] = (
+            ((event[..., 0] - Xmin) * 2) / (Xmax - Xmin)
         ) - 1  # x coordinate normalization
-        event[:, :, 1] = (
-            ((event[:, :, 1] - self.Ymin) * 2) / (self.Ymax - self.Ymin)
-        ) - 1  # y coordinate normalization
-        event[:, :, 2] = (
-            ((event[:, :, 2] - self.Zmin) * 2) / (self.Zmax - self.Zmin)
+        Zmin = cls.metadata.Zmin
+        Zmax = cls.metadata.Zmax
+        event[..., 2] = (
+            ((event[..., 2] - Zmin) * 2) / (Zmax - Zmin)
         ) - 1  # z coordinate normalization
-        event[:, :, 3] = event[:, :, 3] * self.energy_scale
         # ensure padding xyz is 0
-        event[event[:, :, -1] == 0] = 0
+        event[event[..., 3] == 0] = 0
+
+    normalised_bounds = np.linspace(-1, 1, len(metadata.layer_bottom_pos_raw) + 1)
+
+    @classmethod
+    def normalize_perpendicular(cls, event):
+        """
+        Normalise in the direction perpendicular to the layers.
+        Map the relevant coordinate to a linspace from -1 to 1.
+        Gaps between layers are rescaled to have the same size,
+        but points do not lose their variation in the perpendicular.
+        Acts in place.
+
+        Parameters
+        ----------
+        event : np.ndarray, (..., 4)
+            One or more events. The last dimension should be 4
+            with coordinates x, y, z, and energy.
+
+        Raises
+        ------
+        ValueError
+            If some points are outside the layers.
+
+        """
+        return cls._normalize_perpendicular(event, perpendicular_axis=1)
+
+    @classmethod
+    def _normalize_perpendicular(cls, event, perpendicular_axis=1):
+        """
+        Normalise in the direction perpendicular to the layers.
+        Map the relevant coordinate to a linspace from -1 to 1.
+        Gaps between layers are rescaled to have the same size,
+        but points do not lose their variation in the perpendicular.
+        Acts in place.
+
+        Parameters
+        ----------
+        event : np.ndarray, (..., 4)
+            One or more events. The last dimension should be 4
+            with coordinates x, y, z, and energy.
+
+        Raises
+        ------
+        ValueError
+            If some points are outside the layers.
+
+        """
+        layer_floors, layer_ceilings = floors_ceilings(
+            cls.metadata.layer_bottom_pos_raw,
+            cls.metadata.cell_thickness_raw,
+            percent_buffer=0,
+        )
+        select_from, select_to = floors_ceilings(
+            cls.metadata.layer_bottom_pos_raw,
+            cls.metadata.cell_thickness_raw,
+            percent_buffer=0.5,
+        )
+
+        done = np.zeros(event.shape[:-1], dtype=bool)
+
+        for i, (floor, ceiling) in enumerate(zip(layer_floors, layer_ceilings)):
+            mask = (event[..., perpendicular_axis] >= select_from[i]) & (
+                event[..., perpendicular_axis] < select_to[i]
+            )
+            new_floor = cls.normalised_bounds[i]
+            new_ceiling = cls.normalised_bounds[i + 1]
+            shift_floor = new_floor - floor
+            rescale = (new_ceiling - new_floor) / (ceiling - floor)
+            event[..., perpendicular_axis][mask] = np.clip(
+                (event[..., perpendicular_axis][mask] + shift_floor) * rescale,
+                new_floor,
+                new_ceiling,
+            )
+            done[mask] = True
+        if not np.all(done):
+            import ipdb
+            ipdb.set_trace()
+            raise ValueError("Some points appear to be outside all layers")
 
     def _event_processing(self, event):
         if self._roll_axis:
             event = np.moveaxis(event, -1, -2)
 
         # Trim padding
-        max_len = (event[:, :, -1] > 0).sum(axis=1).max()
-        event = event[:, self.max_ds_seq_len - max_len:]
+        max_len = (event[:, :, 3] > 0).sum(axis=1).max()
+        event = event[:, self.max_ds_seq_len - max_len :]
 
         if not self.quantized_pos:
             self._fuzz(event)
@@ -207,9 +331,10 @@ class PointCloudDatasetUnordered(PointCloudDataset):
 
 
 class PointCloudDatasetGH(PointCloudDataset):
-    Ymin, Ymax = 0, 30
-    Xmin, Xmax = 0, 30
-    Zmin, Zmax = 0, 30
+    # These should be set from metadata...
+    # Ymin, Ymax = 0, 30
+    # Xmin, Xmax = 0, 30
+    # Zmin, Zmax = 0, 30
     energy_scale = 1  # no conversion needed for GH dataset
 
     keys_to_include = {"event": "events", "energy": "energy"}
@@ -233,11 +358,66 @@ class PointCloudDatasetGH(PointCloudDataset):
 
 
 class PointCloudAngular(PointCloudDataset):
-    Ymin, Ymax = -250, 250
-    Xmin, Xmax = -250, 250
-    Zmin, Zmax = 0, 30
-    keys_to_include = {"event": "events", "energy": "energy",
-                       "p_norm_local": "p_norm_local"}
+    # These should be set from metadata...
+    # Ymin, Ymax = -250, 250
+    # Xmin, Xmax = -250, 250
+    # Zmin, Zmax = 0, 30
+    keys_to_include = {
+        "event": "events",
+        "energy": "energy",
+        "p_norm_local": "p_norm_local",
+    }
+
+    @classmethod
+    def normalize_parallal(cls, event):
+        """
+        Normalise in the directions parallel to the layers.
+        In this case that's the x and y directions.
+        Ensure that the x and y go from -1 to 1.
+        Acts in place.
+
+        Parameters
+        ----------
+        event : np.ndarray, (..., 4)
+            One or more events. The last dimension should be 4
+            with coordinates x, y, z, and energy.
+
+        """
+        Xmin = cls.metadata.Xmin
+        Xmax = cls.metadata.Xmax
+        event[..., 0] = (
+            ((event[..., 0] - Xmin) * 2) / (Xmax - Xmin)
+        ) - 1  # x coordinate normalization
+        Ymin = cls.metadata.Ymin
+        Ymax = cls.metadata.Ymax
+        event[..., 1] = (
+            ((event[..., 1] - Ymin) * 2) / (Ymax - Ymin)
+        ) - 1  # z coordinate normalization
+        # ensure padding xyz is 0
+        event[event[..., 3] == 0] = 0
+
+    @classmethod
+    def normalize_perpendicular(cls, event):
+        """
+        Normalise in the direction perpendicular to the layers.
+        Map the relevant coordinate to a linspace from -1 to 1.
+        Gaps between layers are rescaled to have the same size,
+        but points do not lose their variation in the perpendicular.
+        Acts in place.
+
+        Parameters
+        ----------
+        event : np.ndarray, (..., 4)
+            One or more events. The last dimension should be 4
+            with coordinates x, y, z, and energy.
+
+        Raises
+        ------
+        ValueError
+            If some points are outside the layers.
+
+        """
+        return cls._normalize_perpendicular(event, perpendicular_axis=2)
 
 
 def dataset_class_from_config(config):
@@ -262,6 +442,8 @@ def dataset_class_from_config(config):
         correct_class = PointCloudDatasetGH
     else:
         raise ValueError(f"Don't know how to handle dataset {config.dataset}")
+    # ensure the metadata is for the config supplied rather than the default
+    correct_class.metadata = Metadata(config)
     return correct_class
 
 

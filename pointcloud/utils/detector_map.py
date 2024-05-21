@@ -1,5 +1,6 @@
 from tqdm import tqdm
 import numpy as np
+from functools import lru_cache
 
 from ..configs import Configs
 
@@ -143,6 +144,36 @@ def normalise_map(MAP):
     return MAP
 
 
+def floors_ceilings(layer_bottom_pos, cell_thickness, percent_buffer=0.5):
+    """
+    Find top and bottom coordinates for the layers in the detector.
+
+    Parameters
+    ----------
+    layer_bottom_pos : np.array
+        Array of the bottom positions of the layers.
+    cell_thickness : float
+        Thickness of the cells in the detector, in the radial direction
+    percent_buffer : float
+        Percentage beyond the thickness of the cell to include hits
+        in the layer. Won't extent the layer beyond the bottom of
+        the next layer.
+        (default is 0.5)
+
+    Returns
+    -------
+    layer_floors : np.array
+        Array of the bottom positions of the layers.
+    layer_ceilings : np.array
+        Array of the top positions of the layers.
+    """
+    layer_floors = layer_bottom_pos - percent_buffer * cell_thickness
+    layer_ceilings = layer_bottom_pos + (1 + percent_buffer) * cell_thickness
+    # Don't give points twice
+    layer_ceilings[:-1] = np.minimum(layer_ceilings[:-1], layer_floors[1:])
+    return layer_floors, layer_ceilings
+
+
 def split_to_layers(points, layer_bottom_pos, cell_thickness, percent_buffer=0.5):
     """
     Yield points by their layer
@@ -170,11 +201,9 @@ def split_to_layers(points, layer_bottom_pos, cell_thickness, percent_buffer=0.5
     """
     y_coord = points[:, 1]
 
-    layer_floors = layer_bottom_pos - 0.5 * cell_thickness
-    layer_ceilings = layer_bottom_pos + 1.5 * cell_thickness
-    # Don't give points twice
-    layer_ceilings[:-1] = np.minimum(layer_ceilings[:-1], layer_floors[1:])
-
+    layer_floors, layer_ceilings = floors_ceilings(
+        layer_bottom_pos, cell_thickness, percent_buffer
+    )
     for floor, ceiling in zip(layer_floors, layer_ceilings):
         mask = (y_coord >= floor) & (y_coord <= ceiling)
         yield points[mask]

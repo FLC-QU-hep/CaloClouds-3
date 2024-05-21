@@ -58,7 +58,7 @@ def test_get_g4_data():
     assert isinstance(all_events, np.ndarray)
     assert isinstance(all_energy, h5py.Dataset)
     n_events_in_sample = 2
-    max_hits_per_event = 30000
+    max_hits_per_event = 6000
     assert all_events.shape == (n_events_in_sample, max_hits_per_event, 4)
     assert all_energy.shape == (n_events_in_sample, 1)
 
@@ -68,7 +68,7 @@ def test_yield_g4_showers():
     param_dict = generate_for_metrics.make_params_dict("cm")
     test_data_path = "test/mini_data_sample.hdf5"
     g4_data = generate_for_metrics.get_g4_data(test_data_path)
-    max_hits_per_event = 30000
+    max_hits_per_event = 6000
     for showers, cond_E in generate_for_metrics.yield_g4_showers(
         config, param_dict, g4_data
     ):
@@ -83,7 +83,7 @@ def test_shower_generator_factory(tmpdir):
     param_dict = generate_for_metrics.make_params_dict("g4")
     param_dict["g4_data_path"] = "test/mini_data_sample.hdf5"
     shower_generator = generate_for_metrics.shower_generator_factory(config, param_dict)
-    max_hits_per_event = 30000
+    max_hits_per_event = 6000
     for showers, cond_E in shower_generator():
         assert showers.shape[1:] == (max_hits_per_event, 4)
         assert cond_E.shape[1] == 1
@@ -114,7 +114,7 @@ def test_add_chunk():
     param_dict = generate_for_metrics.make_params_dict("g4")
     param_dict["n_events"] = 50
     # make a fake shower generator
-    max_hits_per_event = 30000
+    max_hits_per_event = 6000
 
     def shower_generator_func():
         fake_events = np.random.rand(param_dict["n_events"], max_hits_per_event, 4)
