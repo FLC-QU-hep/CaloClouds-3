@@ -171,7 +171,7 @@ def floors_ceilings(layer_bottom_pos, cell_thickness, percent_buffer=0.5):
     # Unless the cells are thicker than the layers, (which they shouldn't be)
     # the hard ceiling for each layer is the bottom of the layer plus the thickness
     # it really cant extend beyond the bottom of the next layer though
-    hard_ceilings = np.minimim(layer_bottom_pos + cell_thickness, layer_bottom_pos[1:])
+    hard_ceilings = np.minimum(layer_bottom_pos + cell_thickness, layer_bottom_pos[1:])
     layer_ceilings = layer_bottom_pos + (1 + percent_buffer) * cell_thickness
     # Don't give points twice
     layer_ceilings[:-1] = np.clip(
