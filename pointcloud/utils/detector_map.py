@@ -168,9 +168,16 @@ def floors_ceilings(layer_bottom_pos, cell_thickness, percent_buffer=0.5):
         Array of the top positions of the layers.
     """
     layer_floors = layer_bottom_pos - percent_buffer * cell_thickness
+    # Unless the cells are thicker than the layers, (which they shouldn't be)
+    # the hard ceiling for each layer is the bottom of the layer plus the thickness
+    # it really cant extend beyond the bottom of the next layer though
+    hard_ceilings = np.minimim(layer_bottom_pos + cell_thickness, layer_bottom_pos[1:])
     layer_ceilings = layer_bottom_pos + (1 + percent_buffer) * cell_thickness
     # Don't give points twice
-    layer_ceilings[:-1] = np.minimum(layer_ceilings[:-1], layer_floors[1:])
+    layer_ceilings[:-1] = np.clip(
+        layer_ceilings[:-1], hard_ceilings[:-1], layer_floors[1:]
+    )
+    layer_floors[1:] = np.maximum(layer_floors[1:], layer_ceilings[:-1])
     return layer_floors, layer_ceilings
 
 
@@ -205,7 +212,7 @@ def split_to_layers(points, layer_bottom_pos, cell_thickness, percent_buffer=0.5
         layer_bottom_pos, cell_thickness, percent_buffer
     )
     for floor, ceiling in zip(layer_floors, layer_ceilings):
-        mask = (y_coord >= floor) & (y_coord <= ceiling)
+        mask = (y_coord >= floor) & (y_coord < ceiling)
         yield points[mask]
 
 
