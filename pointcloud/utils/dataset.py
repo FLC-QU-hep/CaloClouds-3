@@ -262,6 +262,8 @@ class PointCloudDataset(Dataset):
         )
 
         done = np.zeros(event.shape[:-1], dtype=bool)
+        # not real points don't need moving
+        done[event[..., 3] <= 0] = True
 
         for i, (floor, ceiling) in enumerate(zip(layer_floors, layer_ceilings)):
             mask = (event[..., perpendicular_axis] >= select_from[i]) & (
