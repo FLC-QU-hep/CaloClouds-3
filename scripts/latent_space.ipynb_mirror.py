@@ -29,7 +29,7 @@ from matplotlib.gridspec import GridSpec
 
 
 
-from pointcloud.utils.dataset import *
+from pointcloud.data.dataset import *
 
 from pointcloud.utils.misc import *
 

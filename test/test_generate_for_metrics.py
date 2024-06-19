@@ -55,7 +55,7 @@ def test_make_params_dict():
 def test_get_g4_data():
     test_data_path = "test/mini_data_sample.hdf5"
     all_events, all_energy = generate_for_metrics.get_g4_data(test_data_path)
-    assert isinstance(all_events, np.ndarray)
+    assert isinstance(all_events, generate_for_metrics.lazy_loading.DatasetView)
     assert isinstance(all_energy, h5py.Dataset)
     n_events_in_sample = 2
     max_hits_per_event = 6000

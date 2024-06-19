@@ -1,6 +1,7 @@
 # GitLab Continuous Integration configuration for the repository.
-image:
-  name: python:3.11
+image: gitlab.desy.de:5555/fh-sustainability-forum/sustainable-coding-tutorial/tutorial-containers/unittesting
+
+    #image: gitlab.desy.de:5555/ftx-sft/generative/point-cloud-diffusion-docker/unittesting
 
 # "Global" build stages.
 stages:
@@ -22,8 +23,14 @@ pytest:
   script:
     - echo "Installing requirments"
     - pip install -r requirements.txt
-    - pip install pytest
+    - pip install pytest pytest-mock coverage
     - echo "Running pytests"
-    - pytest test/
+    - coverage run -m pytest test/test*py test/externals/test*py
+    - coverage xml
+  artifacts:
+    reports:
+      coverage_report:
+        coverage_format: cobertura
+        path: coverage.xml
       
 

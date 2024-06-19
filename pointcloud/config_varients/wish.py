@@ -1,8 +1,9 @@
-from .config_varients import default
+from pointcloud.config_varients import default
 import os
 
 class Configs(default.Configs):
     def __init__(self):
+        super().__init__()
         
     # Experiment Name
         self.name = 'wish_'  # options: [TEST_, kCaloClouds_, CaloClouds_, CD_]
@@ -13,13 +14,18 @@ class Configs(default.Configs):
 
     # Model arguments
         self.model_name = 'wish'             # choices=['flow', 'AllCond_epicVAE_nFlow_PointDiff', 'epicVAE_nFlow_kDiffusion]
+        self.poly_degree = 3
+        self.fit_attempts = 100
 
     # Data
-        self.storage_base = '/mnt/beegfs/desy/user/'
-        self.dataset_path_in_storage = True
-        self._dataset_path = 'akorol/data/calo-clouds/hdf5/high_granular_grid/train/10-90GeV_x36_grid_regular_524k_float32.hdf5'
-        # self._dataset_path_in_storage = False
-        # self._dataset_path = '/home/henry/training/local_data/varied_20_sample.hdf5'
+        self.storage_base = '/home/dayhallh/training'
+        #self.dataset_path_in_storage = True
+        #self._dataset_path = 'akorol/data/calo-clouds/hdf5/high_granular_grid/train/10-90GeV_x36_grid_regular_524k_float32.hdf5'
+        self.dataset_path_in_storage = False
+        #self._dataset_path = '/home/henry/training/local_data/varied_20_sample.hdf5'
+        self._dataset_path = '/home/dayhallh/Data/p22_th90_ph90_en10-100_joined/p22_th90_ph90_en10-100_seed{}_all_steps.hdf5'
+        self.n_dataset_files = 10
+
         self.image_dir = os.environ["HOME"] + '/training/point-cloud-diffusion-images'
 
     # Dataloader
@@ -36,7 +42,7 @@ class Configs(default.Configs):
 
     # Others
         self.device = 'cpu'
-        self._logdir_in_storage = False
+        self.logdir_in_storage = False
         self._logdir = os.environ["HOME"] + '/training/point-cloud-diffusion-logs/wish'
         self.val_freq =  10  #  10_000       # saving intervall for checkpoints
 
@@ -45,4 +51,9 @@ class Configs(default.Configs):
         self.log_iter = 10   # log every n iterations, default: 100
     # for other models
         self.latent_dim = 0
+
+    # for anomaly detection
+        self.formatted_tree_base = os.path.join(self.storage_base, "formatted_trees")
+        self.anomaly_checkpoint = os.path.join(self.storage_base, "autoencoder_checkpoints")
+        self.anomaly_hidden_dim = 8
 

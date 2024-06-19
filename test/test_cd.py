@@ -5,6 +5,8 @@ from pointcloud.config_varients.default import Configs
 from scripts.cd import main
 
 
+# The user warning is about the number of workers, but this number works well on our setup
+@pytest.mark.filterwarnings("ignore::UserWarning")
 def test_main(tmpdir):
     # set a test config
     cfg = Configs()
