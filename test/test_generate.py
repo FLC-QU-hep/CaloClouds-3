@@ -2,15 +2,18 @@
 Module to test the functions in evaluation.generate
 """
 import os
-import pytest
 import torch
-from pointcloud.config_varients.default import Configs
+from pointcloud.config_varients import default, wish
 from pointcloud.evaluation import generate
 from pointcloud.models.shower_flow import compile_HybridTanH_model
+from pointcloud.models.wish import Wish
 
 
-def make_config():
-    config = Configs()
+def make_config(use_wish=False):
+    if use_wish:
+        config = wish.Configs()
+    else:
+        config = default.Configs()
     # no logging for tests, as we would need a comet key
     config.log_comet = False
     test_dir = os.path.dirname(os.path.realpath(__file__))
@@ -47,7 +50,12 @@ def write_fake_flow_model(config, file_path):
     torch.save({"model": flow.state_dict()}, file_path)
 
 
-def test_load_flow_model(tmpdir):
+def write_fake_wish_model(config, file_path):
+    model = Wish(config)
+    model.save(file_path)
+
+
+def test_load_flow_model_caloclouds(tmpdir):
     config = make_config()
     test_model_path = str(tmpdir) + "/example_flow_model.pt"
     write_fake_flow_model(config, test_model_path)
@@ -88,7 +96,14 @@ def test_load_flow_model(tmpdir):
     assert samples.dtype == "float32"
 
 
-def test_load_diffusion_model():
+def test_load_flow_model_wish(tmpdir):
+    config = make_config(use_wish=True)
+    flow, distribution = generate.load_flow_model(config, model_path="dummy")
+    assert flow is None
+    assert distribution is None
+
+
+def test_load_diffusion_model_calocloud():
     config = make_config()
     # only testing the cm model, becuse the file is small and
     # can be kept in the test dir of the repo
@@ -109,6 +124,30 @@ def test_load_diffusion_model():
     conditioning = torch.cat([total_hits, total_energy], -1)
 
     samples = model.sample(conditioning, max_hits, config)
+    assert samples.shape == (batch_size, max_hits, 4)
+
+
+def test_load_diffusion_model_wish(tmpdir):
+    config = make_config(use_wish=True)
+    test_model_path = os.path.join(str(tmpdir), "wish_model.pt")
+    write_fake_wish_model(config, test_model_path)
+    model_name = "wish"
+
+    model, coef_real, coef_fake, n_splines = generate.load_diffusion_model(
+        config, model_name, model_path=test_model_path
+    )
+    assert isinstance(model, torch.nn.Module)
+    assert coef_real is None
+    assert coef_fake is None
+    assert n_splines is None
+    # check the model can be sampled from
+    batch_size = 5
+    max_hits = 100
+    total_hits = torch.ones((batch_size, 1), device=config.device)
+    total_energy = torch.FloatTensor(batch_size, 1).uniform_(0, 1)
+    conditioning = torch.cat([total_hits, total_energy], -1)
+
+    samples = model.sample(conditioning, max_hits)
     assert samples.shape == (batch_size, max_hits, 4)
 
 

@@ -8,17 +8,9 @@ from IPython.core.display import display, HTML
 
 display(HTML("<style>.container { width:90% !important; }</style>"))
 
-
-
-import sys
-
-sys.path.append('../')
-print('hi')
 import math
 
 import argparse
-
-import h5py
 
 import importlib
 
@@ -52,7 +44,7 @@ from pointcloud.utils.detector_map import get_projections, create_map
 
 from pointcloud.utils.plotting import get_plots
 
-from pointcloud.utils import dataset
+from pointcloud.data import dataset
 
 import pointcloud.utils.gen_utils as gen_utils
 
@@ -72,31 +64,7 @@ cfg = Configs()
 
 print(cfg.__dict__)
 # # Shower Flow Model
-flow, distribution = compile_HybridTanH_model(num_blocks=10, 
-
-                                        #    num_inputs=32, ### when 'condioning' on additional Esum, Nhits etc add them on as inputs rather than 
-
-                                          #  num_inputs=35, ### when 'condioning' on additional Esum, Nhits etc add them on as inputs rather than 
-
-                                           num_inputs=65, ### adding 30 e layers 
-
-                                           num_cond_inputs=1, device=cfg.device)  # num_cond_inputs
-
-
-
-# checkpoint = torch.load('/beegfs/desy/user/akorol/chekpoints/ECFlow/EFlow+CFlow_138.pth')
-
-# checkpoint = torch.load('/beegfs/desy/user/buhmae/6_PointCloudDiffusion/shower_flow/220706_cog_ShowerFlow_350.pth')
-
-# checkpoint = torch.load('/beegfs/desy/user/buhmae/6_PointCloudDiffusion/shower_flow/220707_cog_ShowerFlow_500.pth')  # max 730
-
-# checkpoint = torch.load('/beegfs/desy/user/buhmae/6_PointCloudDiffusion/shower_flow/220713_cog_e_layer_ShowerFlow_best.pth') 
-
-checkpoint = torch.load('/beegfs/desy/user/buhmae/6_PointCloudDiffusion/shower_flow/220714_cog_e_layer_ShowerFlow_best.pth')   # trained about 350 epochs
-
-flow.load_state_dict(checkpoint['model'])
-
-flow.eval().to(cfg.device)
+flow, distribution = generate.load_flow_model(cfg, "../../../point-cloud-diffusion-logs/wish/from_rescaled_hls_v4.pt")
 
 
 
@@ -533,117 +501,9 @@ import pointcloud.models.allCond_epicVAE_nflow_PointDiff as mdls2
 
 
 # print('model loaded')
-caloclouds = 'edm'   # 'ddpm, 'edm', 'cm'
+caloclouds = "wish"
 
-
-
-
-
-# caloclouds baseline
-
-if caloclouds == 'ddpm':
-
-    cfg.sched_mode = 'quardatic'
-
-    cfg.num_steps = 100
-
-    cfg.residual = True
-
-    cfg.latent_dim = 256
-
-    model = mdls2.AllCond_epicVAE_nFlow_PointDiff(cfg).to(cfg.device)
-
-    checkpoint = torch.load('/beegfs/desy/user/akorol/logs/point-cloud/AllCond_epicVAE_nFlow_PointDiff_100s_MSE_loss_smired_possitions_quardatic2023_04_06__16_34_39/ckpt_0.000000_837000.pt', map_location=torch.device(cfg.device)) # quadratic
-
-    model.load_state_dict(checkpoint['state_dict'])
-
-    # coef_real = np.array([ 2.50244046e-09, -2.82685784e-05,  3.15731003e-01,  5.08123555e+01])
-
-    # coef_fake = np.array([ 3.72975819e-09, -3.87472364e-05,  3.80314204e-01,  5.30334567e+01])
-
-    coef_real = np.array([ 2.42091454e-09, -2.72191705e-05,  2.95613817e-01,  4.88328360e+01])
-
-    coef_fake = np.array([ 3.26839258e-09, -3.34485096e-05,  3.35514492e-01,  5.21262922e+01])
-
-
-
-# caloclouds EDM
-
-elif caloclouds == 'edm':
-
-    cfg.num_steps = 13
-
-    cfg.sampler = 'heun'   # default 'heun'
-
-    cfg.s_churn =  0.0     # stochasticity, default 0.0  (if s_churn more than num_steps, it will be clamped to max value)
-
-    cfg.s_noise = 1.0    # default 1.0   # noise added when s_churn > 0
-
-    cfg.sigma_max = 80.0 #  5.3152e+00  # default 80.0
-
-    cfg.sigma_min = 0.002   # default 0.002
-
-    cfg.rho = 7. # default 7.0
-
-    # # # baseline with lat_dim = 0, max_iter 10M, lr=1e-4 fixed, dropout_rate=0.0, ema_power=2/3 (long training)            USING THIS TRAINING
-
-    cfg.dropout_rate = 0.0
-
-    cfg.latent_dim = 0
-
-    checkpoint = torch.load(cfg.logdir + '/' + 'kCaloClouds_2023_06_29__23_08_31/ckpt_0.000000_2000000.pt', map_location=torch.device(cfg.device))    # max 5200000
-
-    model = mdls.epicVAE_nFlow_kDiffusion(cfg).to(cfg.device)
-
-    model.load_state_dict(checkpoint['others']['model_ema'])
-
-    # coef_real = np.array([ 2.50244046e-09, -2.82685784e-05,  3.15731003e-01,  5.08123555e+01])
-
-    # coef_fake = np.array([ 5.08021809e-09, -5.26101363e-05,  4.74959822e-01,  5.34314449e+01])
-
-    coef_real = np.array([ 2.42091454e-09, -2.72191705e-05,  2.95613817e-01,  4.88328360e+01])
-
-    coef_fake = np.array([ 4.68671594e-09, -4.83679440e-05,  4.30093515e-01,  4.92378621e+01])
-
-
-
-# condsistency model
-
-elif caloclouds == 'cm':
-
-    cfg.num_steps = 1
-
-    cfg.sigma_max = 80.0 #  5.3152e+00  # default 80.0
-
-    # long baseline with lat_dim = 0, max_iter 1M, lr=1e-4 fixed, num_steps=18, bs=256, simga_max=80, epoch=2M, EMA
-
-    cfg.dropout_rate = 0.0
-
-    cfg.latent_dim = 0
-
-    checkpoint = torch.load(cfg.logdir + '/' + 'CD_2023_07_07__16_32_09/ckpt_0.000000_1000000.pt', map_location=torch.device(cfg.device))   # max 1200000
-
-    model = mdls.epicVAE_nFlow_kDiffusion(cfg, distillation = True).to(cfg.device)
-
-    model.load_state_dict(checkpoint['others']['model_ema'])
-
-    # coef_real = np.array([ 2.50244046e-09, -2.82685784e-05,  3.15731003e-01,  5.08123555e+01])
-
-    # coef_fake = np.array([ 4.29894066e-09, -4.61132724e-05,  4.40193379e-01,  6.23006887e+01])
-
-    coef_real = np.array([ 2.42091454e-09, -2.72191705e-05,  2.95613817e-01,  4.88328360e+01])
-
-    coef_fake = np.array([ 4.10401929e-09, -4.34978084e-05,  4.00683098e-01,  5.60974626e+01])
-
-
-
-else:
-
-    raise ValueError('caloclouds must be one of: ddpm, edm, cm')
-
-
-
-model.eval()
+model, coef_real, coef_fake, n_splines = generate.load_diffusion_model(cfg, caloclouds, "../../../point-cloud-diffusion-logs/wish/from_rescaled_hls_v4.pt")
 
 
 
@@ -656,53 +516,13 @@ torch.manual_seed(1234567)
 
 
 
-# cfg.num_steps = 13
-
-# cfg.sampler = 'heun'   # default 'heun'
-
-# cfg.s_churn =  0.0     # stochasticity, default 0.0  (if s_churn more than num_steps, it will be clamped to max value)
-
-# cfg.s_noise = 1.0    # default 1.0   # noise added when s_churn > 0
-
-# cfg.sigma_max = 80.0 #  5.3152e+00  # default 80.0
-
-# cfg.sigma_min = 0.002   # default 0.002
-
-# cfg.rho = 7. # default 7.0
-
-
-
-# CaloClouds
-
-# coef_real = np.array([ 2.57988645e-09, -2.94056522e-05,  3.42194568e-01,  5.34968378e+01])
-
-# coef_fake = np.array([ 3.85057207e-09, -4.16463897e-05,  4.19800713e-01,  5.82246858e+01])
-
-
-
-# kCaloClouds_2023_05_24__14_54_09_heun18
-
-# coef_real = np.array([ 2.39735048e-09, -2.69842295e-05,  2.96136986e-01,  4.89770787e+01])
-
-# coef_fake = np.array([ 4.45753201e-09, -4.26483492e-05,  4.03632976e-01,  6.31063427e+01])
-
-
-
-# kCaloClouds_2023_05_24__14_54_09_heun13
-
-# coef_real = np.array([ 2.39735048e-09, -2.69842295e-05,  2.96136986e-01,  4.89770787e+01])
-
-# coef_fake = np.array([ 5.72940149e-09, -4.76120436e-05,  4.37720799e-01,  5.97962496e+01])
-
-
-
 n_scaling = True
 
 
 
 s_t = time.time()
 
-fake_showers_3 = gen_utils.gen_showers_batch(model, distribution, 50, 50, 2000, bs=16, config=cfg, coef_real=coef_real, coef_fake=coef_fake, n_scaling=n_scaling)
+fake_showers_3, fake_incident_3 = gen_utils.gen_showers_batch(model, distribution, 50, 50, 2000, bs=16, config=cfg, coef_real=coef_real, coef_fake=coef_fake, n_scaling=n_scaling)
 
 t = time.time() - s_t
 
@@ -715,11 +535,6 @@ print('time per shower: ', t / 2000)
 
 # print(sigmas)
 
-# %%timeit
-
-# with torch.no_grad():
-
-#     fake_showers = get_shower(4000, 50, 50)
 #np.save('/beegfs/desy/user/buhmae/6_PointCloudDiffusion/output/CCbaseline_50GeV_2000.npy', fake_showers)
 
 # np.save('/beegfs/desy/user/buhmae/6_PointCloudDiffusion/output/kCaloClouds_2023_05_24__14_54_09_heun18_10-90GeV_40k.npy', fake_showers_2)
@@ -755,9 +570,6 @@ print('time per shower: ', t / 2000)
 
 
 # print('saved')
-
-
-
 # # Plots
 title = r'\textbf{full spectrum}' #  r'\textbf{50 GeV}'
 
@@ -780,9 +592,11 @@ importlib.reload(plotting)
 
 import numpy as np
 
-import h5py
-
 import matplotlib.pyplot as plt
+cfg.dataset_path
+
+# path = "../../../point-cloud-diffusion-data/even_batch_10k.h5"
+
 path = '/beegfs/desy/user/akorol/data/calo-clouds/hdf5/all_steps/validation/photon-showers_50GeV_A90_Zpos4.slcio.hdf5'
 
 # path = '/beegfs/desy/user/akorol/data/calo-clouds/hdf5/high_granular_grid/validation/50GeV_x36_grid_regular_2k_Z4.hdf5'
@@ -796,6 +610,8 @@ path = '/beegfs/desy/user/akorol/data/calo-clouds/hdf5/all_steps/validation/phot
 real_showers, real_energy = generate_for_metrics.get_g4_data(path)
 
 dataset_class = dataset.dataset_class_from_config(Configs())
+
+real_showers = real_showers[:]
 
 real_showers[:, :, -1] = real_showers[:, :, -1] * dataset_class.energy_scale   # GeV to MeV
 
@@ -907,7 +723,7 @@ bins = np.logspace(np.log10(real_showers[:, :, -1][real_showers[:,:,-1] != 0.0].
 
 plt.hist(real_showers[:,:,-1][real_showers[:,:,-1] != 0.0], bins = bins, histtype='step', label='real showers', density=False)
 
-plt.hist(fake_showers_2[:,:,-1][fake_showers_2[:,:,-1] != 0.0], bins = bins, histtype='step', label='fake showers', density=False)   
+plt.hist(fake_showers_3[:,:,-1][fake_showers_3[:,:,-1] != 0.0], bins = bins, histtype='step', label='fake showers', density=False)   
 
 plt.legend(loc='best', fontsize=14)
 
@@ -922,37 +738,38 @@ plt.show()
 
 # fake_showers_3[:, 2] = fake_showers_3[:, 2] - (-0.3062229876492353) # calulated as cog_2[2].mean() - cog[2].mean() for 40k samples, E from 10 to 100 GeV
 # fake_showers_3[:, 2, :] += 0.216814
+cfg_plt = plotting.PltConfigs()
+
 cfg_plt.bins_cog = 50
-cog = gen_utils.get_cog(real_showers, thr=0.0)
+cog_real = plotting.get_cog(real_showers)
 
 
 
-cog_2 = gen_utils.get_cog(fake_showers, thr=0.0)
+cog = plotting.get_cog(fake_showers)
 
 
 
-cog_3 = gen_utils.get_cog(fake_showers_2, thr=0.0)
+cog_2 = plotting.get_cog(fake_showers_2)
 
 
 
-cog_4 = gen_utils.get_cog(fake_showers_3, thr=0.0)
-plotting.plt_cog(cog, [cog_2, cog_3, cog_4], [real_label, ddpm_label, edm_label, cm_label], title=title)
-cog[2].mean(), cog_2[2].mean(), cog_3[2].mean(), cog_4[2].mean()
-plotting.plt_feats(real_showers, [fake_showers, fake_showers_2, fake_showers_3], ['G4 50GeV', 'CaloClouds', 'Heun 13 (25)', r'13 (25) $\sigma_{max}=80$'], title=r'\textbf{50 GeV}', density=False)
+cog_3 = plotting.get_cog(fake_showers_3)
+plotting.plt_cog(cog_real, [cog, cog_3], [real_label, ddpm_label, "wish"], title=title)
+cog_real[2].mean(), cog[2].mean(), cog_2[2].mean(), cog_3[2].mean()
+plotting.plt_feats(real_showers, [fake_showers, fake_showers_3], ['G4 50GeV', 'CaloClouds', 'wish'], title=r'\textbf{50 GeV}', density=False)
 
-plotting.plt_feats(real_showers, [fake_showers, fake_showers_2, fake_showers_3], ['G4 50GeV', 'CaloClouds', 'Heun 13 (25)', r'13 (25) $\sigma_{max}=80$'], title=r'\textbf{50 GeV}', density=True)
+plotting.plt_feats(real_showers, [fake_showers, fake_showers_3], ['G4 50GeV', 'CaloClouds', 'wish'], title=r'\textbf{50 GeV}', density=True)
 
-plotting.plt_feats(real_showers, [fake_showers, fake_showers_2, fake_showers_3], ['G4 50GeV', 'CaloClouds', 'Heun 13 (25)', r'18 (25) $\sigma_{max}=80$'], title=r'\textbf{50 GeV}', scale='log', density=True)
-cfg.bins_r = 35
-
+plotting.plt_feats(real_showers, [fake_showers, fake_showers_3], ['G4 50GeV', 'CaloClouds', 'wish'], title=r'\textbf{50 GeV}', scale='log', density=True)
 # # Projections
+
 MAP, _ = create_map(configs=cfg)
 
-# events, cloud = get_projections(real_showers[0:2000], MAP, max_num_hits=6000, return_cell_point_cloud=True)
+events, cloud = get_projections(real_showers[0:2000], MAP, max_num_hits=6000, return_cell_point_cloud=True)
 
-# events_fake, cloud_fake = get_projections(fake_showers, MAP, max_num_hits=6000, return_cell_point_cloud=True)
+events_fake, cloud_fake = get_projections(fake_showers, MAP, max_num_hits=6000, return_cell_point_cloud=True)
 
-# events_fake_2, cloud_fake_2 = get_projections(fake_showers_2, MAP, max_num_hits=6000, return_cell_point_cloud=True)
+events_fake_2, cloud_fake_2 = get_projections(fake_showers_2, MAP, max_num_hits=6000, return_cell_point_cloud=True)
 
 events_fake_3, cloud_fake_3 = get_projections(fake_showers_3[0:2000], MAP, max_num_hits=6000, return_cell_point_cloud=True, configs=cfg)
 cloud[:,:,-1].max(), cloud_fake_3[:,:,-1].max()
@@ -1100,15 +917,15 @@ c_cog_fake = [c_cog_2, c_cog_3, c_cog_4]
 # print('pickle loaded')
 importlib.reload(plotting)
 
-plotting.plt_cog(c_cog_real, c_cog_fake, [real_label, ddpm_label, edm_label, cm_label], title=title)
+plotting.plt_cog(c_cog_real, c_cog_fake, [real_label, ddpm_label, edm_label, "wish"], title=title)
 print(cog[0].mean(), cog_2[0].mean(), cog_3[0].mean(), cog_4[0].mean())
 
 print(c_cog[0].mean(), c_cog_2[0].mean(), c_cog_3[0].mean(), c_cog_4[0].mean())
-plotting.plt_feats(cloud, [cloud_fake, cloud_fake_2, cloud_fake_3], ['G4 50GeV', 'CaloClouds', 'Heun 13 (25)', r'13 (25) $\sigma_{max}=80$'], title=r'\textbf{50 GeV}', density=False)
+plotting.plt_feats(cloud, [cloud_fake, cloud_fake_2, cloud_fake_3], ['G4 50GeV', 'CaloClouds', 'Heun 13 (25)', "wish"], title=r'\textbf{50 GeV}', density=False)
 
-plotting.plt_feats(cloud, [cloud_fake, cloud_fake_2, cloud_fake_3], ['G4 50GeV', 'CaloClouds', 'Heun 13 (25)', r'13 (25) $\sigma_{max}=80$'], title=r'\textbf{50 GeV}', density=True)
+plotting.plt_feats(cloud, [cloud_fake, cloud_fake_2, cloud_fake_3], ['G4 50GeV', 'CaloClouds', 'Heun 13 (25)', "wish"], title=r'\textbf{50 GeV}', density=True)
 
-plotting.plt_feats(cloud, [cloud_fake, cloud_fake_2, cloud_fake_3], ['G4 50GeV', 'CaloClouds', 'Heun 13 (25)', r'18 (25) $\sigma_{max}=80$'], title=r'\textbf{50 GeV}', scale='log', density=True)
+plotting.plt_feats(cloud, [cloud_fake, cloud_fake_2, cloud_fake_3], ['G4 50GeV', 'CaloClouds', 'Heun 13 (25)', "wish"], title=r'\textbf{50 GeV}', scale='log', density=True)
 events = []
 # get_plots(events, [events_fake, events_fake_2],
 
@@ -1122,7 +939,11 @@ importlib.reload(plotting)
 
 #          )
 
-real_list, fakes_list = plotting.get_observables_for_plotting(events, [events_fake, events_fake_2, events_fake_3])
+from pointcloud.utils.metadata import Metadata
+
+meta = Metadata(cfg)
+
+real_list, fakes_list = plotting.get_observables_for_plotting(cfg_plt, MAP, meta.half_cell_size, events, [events_fake, events_fake_2, events_fake_3])
 # pickle
 
 # with open('/beegfs/desy/user/buhmae/6_PointCloudDiffusion/output/pickle/real_list.pickle', 'wb') as f:

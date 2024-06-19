@@ -27,6 +27,18 @@ metadata = Metadata(cfg)
 
 
 
+from evaluation import generate
+
+
+
+from configs import Configs
+
+cfg = Configs()
+
+metadata = Metadata(cfg)
+
+
+
 import numpy as np
 
 import h5py

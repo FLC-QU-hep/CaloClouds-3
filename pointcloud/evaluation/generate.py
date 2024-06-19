@@ -9,16 +9,18 @@ import time
 from ..models.shower_flow import compile_HybridTanH_model
 from ..configs import Configs
 from ..utils import gen_utils
-from ..utils.misc import regularise_shower_axes
+from ..data.read_write import regularise_event_axes
 
 from ..models import epicVAE_nflows_kDiffusion as mdls
 from ..models import allCond_epicVAE_nflow_PointDiff as mdls2
+from ..models.wish import Wish
 
 
 def make_params_dict() -> dict:
     """
     Generate the default param dict for the generation of showers.
-    It is expected that the user will modify this function to suit their needs.
+    It is expected that the user will modify this function or
+    the output dict to suit their needs.
 
     Returns
     -------
@@ -80,6 +82,8 @@ def load_flow_model(
         sampled to find the moments of the shower plus the
         energy and number of points in each layer.
     """
+    if config.model_name == "wish":
+        return None, None
     flow, distribution = compile_HybridTanH_model(
         num_blocks=10,
         # when 'condioning' on additional Esum,
@@ -231,10 +235,20 @@ def load_diffusion_model(
         # joblib.load('/beegfs/desy/user/buhmae/6_PointCloudDiffusion/n_spline/spline_cm.joblib')
         n_splines = None
 
+    elif model_name == "wish":
+        if model_path is None:
+            model_path = (
+                "/home/henry/training/point-cloud-diffusion-logs/"
+                + "wish/from_rescaled_hls_v4.pt"
+            )
+        model = Wish.load(model_path)
+        n_splines = None
+        coef_real = None
+        coef_fake = None
     else:
         raise ValueError(
             f"model_name {model_name} unknown"
-            + "model_name must be one of: ddpm, edm, cm"
+            + "model_name must be one of: ddpm, edm, cm, wish"
         )
     model.eval()
     return model, coef_real, coef_fake, n_splines
@@ -271,7 +285,7 @@ def generate_showers(
     showers : np.array (params_dict["n_events"], config.max_points, 4)
         The generated showers. The third dimension is (x, y, z, e)
     cond_E : np.array (params_dict["n_events"], 1)
-        The energy of the input particle that conditions the showers.
+        The energy of the incident particle that conditions the showers.
 
     """
     # unpack params
@@ -353,17 +367,20 @@ def load_np_showers(file_path: str) -> np.array or tuple[np.array, np.array]:
         if it is present in the file.
     """
     data = np.load(file_path)
-    if isinstance(np.array, data):
-        showers = data
-        cond_E = None
-    else:
+    try:
         showers = data["fake_showers"]
         cond_E = data["energy"]
-    showers = regularise_shower_axes(showers)
+    except (KeyError, IndexError):
+        showers = data
+        cond_E = None
+    showers = regularise_event_axes(showers)
     return showers, cond_E
 
 
-if __name__ == "__main__":
+def main():
     config = Configs()
-    params_dict = make_params_dict()
-    # write_showers(config, params_dict)
+    write_showers(config, params_dict)
+
+
+if __name__ == "__main__":
+    main()

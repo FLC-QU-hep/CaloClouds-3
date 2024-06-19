@@ -8,61 +8,14 @@ from torch.utils.data import DataLoader
 from torch.nn.utils import clip_grad_norm_
 import time
 
-from pointcloud.utils.dataset import PointCloudDataset, PointCloudDatasetGH
+from pointcloud.data.dataset import PointCloudDataset, PointCloudDatasetGH
 from pointcloud.utils.misc import seed_all, get_new_log_dir, CheckpointManager
+from pointcloud.utils.training import get_comet_experiment, get_ckp_mgr, get_dataloader
 from pointcloud.models.epicVAE_nflows_kDiffusion import epicVAE_nFlow_kDiffusion
 from pointcloud.configs import Configs
 
 
-
-def main(config=Configs()):
-    seed_all(seed=config.seed)
-    start_time = time.localtime()
-
-    # Comet online logging
-    if config.log_comet:
-        with open("comet_api_key.txt", "r") as f:
-            key = f.read().strip()
-        experiment = Experiment(
-            api_key=key,
-            project_name=config.comet_project,
-            auto_metric_logging=False,
-            workspace=config.comet_workspace,
-        )
-        experiment.log_parameters(config.__dict__)
-        experiment.set_name(
-            config.name + time.strftime("%Y_%m_%d__%H_%M_%S", start_time)
-        )
-    else:
-        experiment = None
-
-    # Logging
-    log_dir = get_new_log_dir(
-        config.logdir,
-        prefix=config.name,
-        postfix="_" + config.tag if config.tag is not None else "",
-        start_time=start_time,
-    )
-    ckpt_mgr = CheckpointManager(log_dir)
-
-    # Datasets and loaders
-    if config.dataset == "x36_grid" or config.dataset == "clustered":
-        train_dset = PointCloudDataset(
-            file_path=config.dataset_path,
-            bs=config.train_bs,
-            quantized_pos=config.quantized_pos,
-        )
-    elif config.dataset == "gettig_high":
-        train_dset = PointCloudDatasetGH(
-            file_path=config.dataset_path,
-            bs=config.train_bs,
-            quantized_pos=config.quantized_pos,
-        )
-    dataloader = DataLoader(
-        train_dset, batch_size=1, num_workers=config.workers, shuffle=config.shuffle
-    )
-
-    # Model
+def get_models(config):
     model = epicVAE_nFlow_kDiffusion(config, distillation=True).to(config.device)
     model_ema_target = epicVAE_nFlow_kDiffusion(config, distillation=True).to(
         config.device
@@ -82,6 +35,22 @@ def main(config=Configs()):
         model_ema_target.load_state_dict(checkpoint["state_dict"])
         model_teacher.load_state_dict(checkpoint["state_dict"])
     print("Model loaded from: ", config.logdir + "/" + config.model_path)
+    return model, model_ema_target, model_teacher
+
+
+def main(config=Configs()):
+    seed_all(seed=config.seed)
+    start_time = time.localtime()
+
+    # Comet online logging
+    experiment = get_comet_experiment(config, start_time)
+    ckpt_mgr = get_ckp_mgr(config, start_time)
+
+    # Datasets and loaders
+    dataloader = get_dataloader(config)
+
+    # Model
+    model, model_ema_target, model_teacher = get_models(config)
 
     if config.cm_random_init:
         print(

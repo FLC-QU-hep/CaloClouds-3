@@ -1,4 +1,5 @@
 import os
+import fnmatch
 import numpy as np
 
 from ..configs import Configs
@@ -25,20 +26,32 @@ def get_metadata_folder(config=Configs()):
 
     subfolders = os.listdir(os.path.join(this_dir, "../metadata/"))
 
-    if dataset_filebase in subfolders:
-        folder = dataset_filebase
+    for folder in subfolders:
+        globbed_folder = folder.replace("W", "*")
+        if fnmatch.fnmatch(dataset_filebase, globbed_folder):
+            break
     else:
         raise NotImplementedError(
             f"Cannot find metadata for the dataset at {config.dataset_path}."
             + f" Datasets with known metadata: {subfolders}"
-            + f" If you have the metadata for this dataset, please add in a subfolder of metadata/."
-            + f" If this dataset is equivalent to another dataset, please make a symlink to the equivalent metadata."
+            + " If you have the metadata for this dataset,"
+            + " please add in a subfolder of metadata/."
+            + " If this dataset is equivalent to another dataset,"
+            + " please make a symlink to the equivalent metadata."
+            + " In these simlinks, 'W' will be treated as the glob wildcard."
         )
     data_dir = os.path.join(this_dir, "../metadata/", folder)
     return data_dir
 
 
 class Metadata:
+    """
+    By default, cooredinates are mm, and positions are in
+    the physical detector space.
+
+    Things labeled 'raw' refer to the data saved in the h5 files,
+    which may be normalised.
+    """
     def __init__(self, config=Configs()):
         """
         Object that contains metadata for a dataset.
@@ -59,6 +72,7 @@ class Metadata:
         Numpy files with pickled dictionaries are loaded with
         each key in the dictionary as an attribute of this object.
         """
+        self.found_attrs = []
         for file in os.listdir(self.metadata_folder):
             if not file.endswith(".npy"):
                 continue
@@ -68,11 +82,22 @@ class Metadata:
             if content.dtype == "O":
                 for key, value in content.item().items():
                     assert not hasattr(self, key)
+                    self.found_attrs.append(key)
                     setattr(self, key, value)
             else:
                 basename = os.path.basename(file)[: -len(".npy")]
                 assert not hasattr(self, basename)
+                self.found_attrs.append(basename)
                 setattr(self, basename, content)
+
+    def __str__(self):
+        return f"Metadata for {self.config.dataset_path}"
+
+    def __repr__(self):
+        text = str(self) + "\n"
+        for attr in self.found_attrs:
+            text += f"{attr}: {getattr(self, attr)}\n"
+        return text
 
     def load_muon_map(self):
         """
