@@ -7,6 +7,27 @@ from ..configs import Configs
 from .metadata import Metadata
 
 
+def get_offset(half_cell_size, dm):
+    """
+    Get the offset for the cell map.
+
+    Parameters
+    ----------
+    half_cell_size : float
+        Half the size of the cells in the detector,
+        perpendicular to the radial direction
+    dm : int
+        dimension split multiplicity used for the cell map
+        can be (1, 2, 3, 4, 5)
+
+    Returns
+    -------
+    offset : float
+        The cell size divided by the dimension split multiplicity
+    """
+    return half_cell_size * 2 / dm
+
+
 def create_map(
     X=None,
     Y=None,
@@ -58,14 +79,14 @@ def create_map(
     if cell_thickness is None:
         cell_thickness = metadata.cell_thickness
 
-    offset = half_cell_size * 2 / (dm)
+    offset = get_offset(half_cell_size, dm)
 
     layers = []
-    for l in range(len(layer_bottom_pos)):  # loop over layers
+    for layer_n in range(len(layer_bottom_pos)):  # loop over layers
         # layers are well seperated, so take a 0.5 buffer either side
         idx = np.where(
-            (Y <= (layer_bottom_pos[l] + cell_thickness * 1.5))
-            & (Y >= layer_bottom_pos[l] - cell_thickness / 2)
+            (Y <= (layer_bottom_pos[layer_n] + cell_thickness * 1.5))
+            & (Y >= layer_bottom_pos[layer_n] - cell_thickness / 2)
         )
 
         xedges = np.array([])
@@ -167,10 +188,20 @@ def floors_ceilings(layer_bottom_pos, cell_thickness, percent_buffer=0.5):
     layer_ceilings : np.array
         Array of the top positions of the layers.
     """
+    # naive calculation of the layer floors and ceilings
     layer_floors = layer_bottom_pos - percent_buffer * cell_thickness
     layer_ceilings = layer_bottom_pos + (1 + percent_buffer) * cell_thickness
-    # Don't give points twice
-    layer_ceilings[:-1] = np.minimum(layer_ceilings[:-1], layer_floors[1:])
+    # Unless the cells are thicker than the layers, (which they shouldn't be)
+    # the true ceiling for each layer is the bottom of the layer plus the thickness
+    true_ceilings = np.minimum(
+        (layer_bottom_pos + cell_thickness)[:-1], layer_bottom_pos[1:]
+    )
+    # we dont' want any extention to cross the midpoint between the true
+    # ceiling and the bottom of the next layer
+    mid_points = 0.5 * (true_ceilings + layer_bottom_pos[1:])
+    # now enforce not crossing those midpoints
+    layer_floors[1:] = np.maximum(layer_floors[1:], mid_points)
+    layer_ceilings[:-1] = np.minimum(layer_ceilings[:-1], mid_points)
     return layer_floors, layer_ceilings
 
 
@@ -205,7 +236,7 @@ def split_to_layers(points, layer_bottom_pos, cell_thickness, percent_buffer=0.5
         layer_bottom_pos, cell_thickness, percent_buffer
     )
     for floor, ceiling in zip(layer_floors, layer_ceilings):
-        mask = (y_coord >= floor) & (y_coord <= ceiling)
+        mask = (y_coord >= floor) & (y_coord < ceiling)
         yield points[mask]
 
 

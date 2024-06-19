@@ -97,6 +97,8 @@ def list_of_notebooks():
     notebooks = []
     for root, dirs, files in os.walk(path_root):
         for file in files:
+            if "/.ipynb_checkpoints" in root:
+                continue  # ignore checkpoints
             if file.endswith("pynb"):
                 notebooks.append(Path(root) / file)
     return notebooks

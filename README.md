@@ -1,4 +1,5 @@
 [![pipeline status](https://gitlab.desy.de/ftx-sft/generative/point-cloud-diffusion/badges/main/pipeline.svg?ignore_skipped=true)](https://gitlab.desy.de/ftx-sft/generative/point-cloud-diffusion/-/commits/main) 
+[![coverage](https://gitlab.desy.de/ftx-sft/generative/point-cloud-diffusion/badges/main/coverage.svg)](https://gitlab.desy.de/ftx-sft/generative/point-cloud-diffusion/-/commits/main) 
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 
 
@@ -20,9 +21,11 @@ The entry points, however, are all in the `scripts` folder.
 - `pointcloud`: The parent module for code to be imported.
     - `configs.py`: A symlink to the default configs file. Changes are ignored by git by default.
     - `config_varients`: Library of configs files that `configs.py` could point to. You can also import them directly.
+    - `data`: Data reading and writing, classes to hold data structures.
     - `evaluation`: Module containing functions for preparing data and calculating statistics for model evaluation.
     - `metadata`: Contains a set of subfolders (and symlinks to subfolders) specifying the metadata for each dataset. For example, detector geometry.
     - `models`: Model classes themselves, and some helper code specific to models.
+    - `anomalies`: Code relating to anomaly detection in the data.
     - `utils`: Misc code that is useful at multiple points.
 - `scripts`: Code that doesn't get imported. Every file below this directory is an entry point.
     - `pointcloud`: Symlink back to the parent module, so that scripts can import code from it without messing with the path.
@@ -33,6 +36,7 @@ The entry points, however, are all in the `scripts` folder.
     - `pointcloud`: Symlink back to the parent module, so that tests can import code from it without messing with the path.
     - `scripts`: Symlink to scripts module; some scripts there get regression tests and thus need to be imported.
     - `programming_utils`: Symlink to programming utilities module, to allow for CI to check the repository is well maintained.
+- `externals`: other repos, containing other packages that are treated as submodules for convenience.
 
 
 ---
@@ -68,6 +72,37 @@ But if you are connected to `beegfs` you can also find the relevant goodies in A
 For example;
 `/beegfs/desy/user/akorol/data/calo-clouds/hdf5/high_granular_grid/train/10-90GeV_x36_grid_regular_524k_float32.hdf5`
 
+Also, if you would be interested in generating some data, useful code can be found at [`gitlab.desy.de/ftx-sft/generative/data_production`](https://gitlab.desy.de/ftx-sft/generative/data_production).
+
+---
+
+### Information on Wish
+
+One model in this dataset is a classical statistics model; the "wish" model.
+It lives in [`pointcloud/models/wish.py`](./pointcloud/models/wish.py).
+While it is possible to "train" this model (the parameters all have gradient), it's also possible to just set it using
+statistics accumulated from the whole dataset.
+
+The simplest possible way to do this is;
+```python
+# import an apropreate config
+from pointcloud.config_varients.wish import Configs
+configs = Configs()
+configs.dataset_path  # check that the configs points to your dataset, etc.
+
+from pointcloud.models.wish import accumulate_and_load_wish, load_wish_from_accumulator
+wish_model, accumulated_data = accumulate_and_load_wish(configs)
+
+wish_model.save("path/to/save/model.pt")
+# we don't have to save the accumulated_data, but it can be used
+# to make another wish model without reaccumulating if needed
+accumulated_data.save("path/to/save/accumulated.h5")
+
+# change some model hyperparameters
+configs.poly_degree = 5
+configs.fit_attempts = 50
+new_model = load_wish_from_accumulator("path/to/save/accumulated.h5", configs)
+```
 ---
 
 ## Code references
@@ -77,3 +112,4 @@ For example;
 - The consistency distillation is based on: https://github.com/openai/consistency_models/
 - The PointWise Net is adapted from: https://github.com/luost26/diffusion-point-cloud
 - Code base for our CaloClouds (1) model: https://github.com/FLC-QU-hep/CaloClouds
+- Code used for lazy operations on h5py arrays is from: https://github.com/catalystneuro/lazy_ops It is not installed from a repository because a bug fix was needed, and the maintainer cannot be reached. For simplicities sake, the relevant patched file is in `pointcloud/externals/lazy_ops` along with the licence file for the code.

@@ -3,22 +3,32 @@ import numpy as np
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 import matplotlib.font_manager as font_manager
+from matplotlib.patches import Rectangle
+from mpl_toolkits.mplot3d import Axes3D
+from mpl_toolkits.mplot3d.art3d import Poly3DCollection
 from scipy.stats import binned_statistic
 
 from ..utils import metrics
 from ..utils.detector_map import create_map
 from ..configs import Configs
 
-mpl.rcParams["xtick.labelsize"] = 25
-mpl.rcParams["ytick.labelsize"] = 25
-# mpl.rcParams['font.size'] = 28
-mpl.rcParams["font.size"] = 35
-mpl.rcParams["legend.frameon"] = False
-mpl.rcParams["text.usetex"] = True
-mpl.rcParams["font.family"] = "serif"
+# mpl.rcParams["xtick.labelsize"] = 25
+# mpl.rcParams["ytick.labelsize"] = 25
+## mpl.rcParams['font.size'] = 28
+# mpl.rcParams["font.size"] = 35
+# mpl.rcParams["legend.frameon"] = False
+# mpl.rcParams["text.usetex"] = True
+# mpl.rcParams["font.family"] = "serif"
 # mpl.rcParams['axes.aspect'] = 'equal'
 # mpl.rcParams['figure.autolayout'] = True # for the hit e distr.
 # mpl.rcParams['font.weight'] = 1  # Or you can use a numerical value, e.g., 700
+
+
+nice_hex = [["#00E5E3", "#8DD7BF", "#FF96C5", "#FF5768", "#FFBF65"],
+            ["#FC6238", "#FFD872", "#F2D4CC", "#E77577", "#6C88C4"],
+            ["#C05780", "#FF828B", "#E7C582", "#00B0BA", "#0065A2"],
+            ["#00CDAC", "#FF6F68", "#FFDACC", "#FF60A8", "#CFF800"],
+            ["#FF5C77", "#4DD091", "#FFEC59", "#FFA23A", "#74737A"]]
 
 
 class PltConfigs:
@@ -1447,3 +1457,275 @@ def get_plots_from_observables_singleE(
 
     plt_occupancy_singleE(occ_real_list, occ_fake_list_list, labels=labels)
     plt_esum_singleE(e_sum_real_list, e_sum_fake_list_list, labels=labels)
+
+
+def plot_line_with_devation(
+    ax,
+    colour,
+    xs,
+    ys,
+    ys_up_displacement,
+    ys_down_displacement=None,
+    clip_to_zero=False,
+    **line_kwargs,
+):
+    """
+    Plot a line with a shaded region around it. The shaded region usually represents the standard deviation of the data.
+
+    Parameters
+    ----------
+    ax : matplotlib.axes.Axes
+        The axes to plot on.
+    colour : str
+        matplotlib colour to use for the line and shaded region.
+    xs : array-like, 1D
+        The x values to plot.
+    ys : array-like, 1D
+        The y values for the central line.
+    ys_up_displacement : array-like, 1D
+        The y values for the upper edge of the shaded region.
+    ys_down_displacement : array-like, 1D, optional
+        The y values for the lower edge of the shaded region.
+        If not given, the same distance as for the upper edge is used.
+    clip_to_zero : bool, optional
+        If True, no line goes below 0.
+    **line_kwargs
+        Additional keyword arguments to pass to the `ax.plot` function
+        of the central line.
+
+    """
+    if ys_down_displacement is None:
+        ys_down_displacement = ys_up_displacement
+    ys_low = ys - ys_down_displacement
+    ys_high = ys + ys_up_displacement
+    if clip_to_zero:
+        ys = np.maximum(ys, 0)
+        ys_low = np.maximum(ys_low, 0)
+        ys_high = np.maximum(ys_high, 0)
+    ax.plot(xs, ys, color=colour, **line_kwargs)
+    ax.fill_between(xs, ys_low, ys_high, color=colour, alpha=0.2)
+
+
+def heatmap(
+    arr,
+    x_spec,
+    y_spec,
+    x_label=None,
+    y_label=None,
+    cbar_label=None,
+    title=None,
+    ax=None,
+    **pcolour_kwargs,
+):
+    if ax is None:
+        fig, ax = plt.subplots()
+    else:
+        fig = ax.get_figure()
+    ax.set_title(title)
+    ax.set_xlabel(x_label)
+    ax.set_ylabel(y_label)
+    n_x_points, n_y_points = arr.shape
+    if len(x_spec) == 2:
+        # they are limits, transform to even range
+        x_spec = np.linspace(*x_spec, n_x_points + 1)
+    if len(y_spec) == 2:
+        y_spec = np.linspace(*y_spec, n_y_points + 1)
+    cmesh = ax.pcolormesh(x_spec, y_spec, arr.T, **pcolour_kwargs)
+    cbar = fig.colorbar(cmesh)
+    cbar.set_label(cbar_label)
+    return fig, ax, cbar, cmesh
+
+
+def heatmap_tile(arr, z, X_meshgrid, Y_meshgrid, ax, cmap=plt.cm.cool, alpha=0.5):
+    """
+    Plot a heatmap as a flat slice in a 3D plot
+
+    Parameters
+    ----------
+    arr : 2D array
+        The data to plot.
+    z : float
+        The z high to put it at
+    Xmin : float
+        The minimum x value.
+    Ymin : float
+        The minimum y value.
+    Xstep_size : float
+        The step size in x.
+    Ystep_size : float
+        The step size in y.
+    cmap : matplotlib.colors.Colormap, optional
+        The colormap to use.
+    alpha : float, optional
+        The alpha value for the heatmap.
+
+    """
+
+    Z_meshgrid = np.full_like(X_meshgrid, z)
+    face_colors = cmap(arr)
+    face_colors[:, :, -1] = alpha
+    ax.plot_surface(
+        X_meshgrid,
+        Y_meshgrid,
+        Z_meshgrid,
+        facecolors=face_colors,
+        linewidth=0,
+    )
+
+
+def heatmap_stack(
+    arrs,
+    zs,
+    Xmin=0,
+    Xmax=None,
+    Ymin=0,
+    Ymax=None,
+    ax=None,
+    cmap=plt.cm.cool,
+    alpha=0.5,
+):
+    """
+    Plot a series of heatmaps as flat slices in a 3D plot
+
+    Parameters
+    ----------
+    arrs : 3D array
+        The data to plot in a grid of (x, y).
+    zs : float
+        The z high to put each slice at
+    Xmin : float, optional
+        The minimum x value.
+        Default is 0.
+    Xmax : float, optional
+        The maximum x value.
+        Default is length of the second dimension of arrs.
+    Ymin : float, optional
+        The minimum y value.
+        Default is 0.
+    Ymax : float, optional
+        The maximum y value.
+        Default is length of the third dimension of arrs.
+    cmap : matplotlib.colors.Colormap, optional
+        The colormap to use.
+    alpha : float, optional
+        The alpha value for the heatmap.
+
+    """
+    if ax is None:
+        fig = plt.figure(figsize=(5, 5))
+        ax = Axes3D(fig)
+
+    if Xmax is None:
+        Xmax = arrs.shape[1]
+    if Ymax is None:
+        Ymax = arrs.shape[2]
+
+    X_tile_centers = np.linspace(Xmin, Xmax, arrs.shape[1])
+    Y_tile_centers = np.linspace(Ymin, Ymax, arrs.shape[2])
+    X_meshgrid, Y_meshgrid = np.meshgrid(X_tile_centers, Y_tile_centers, indexing="ij")
+
+    for z, arr, alph in zip(zs, arrs, alpha):
+        heatmap_tile(arr, z, X_meshgrid, Y_meshgrid, ax, cmap, alph)
+
+    ax.set_xlim(Xmin, Xmax)
+    ax.set_ylim(Ymin, Ymax)
+    z_padding = (max(zs) - min(zs)) * 0.1
+    ax.set_zlim(min(zs) - z_padding, max(zs) + z_padding)
+    ax.get_figure().canvas.draw()
+
+
+def plot_event(
+    event_n,
+    incident_energy,
+    event,
+    energy_scale=1,
+    xz_scale=1,
+    xlim=(-150, 150),
+    zlim=(-150, 150),
+    ax=None,
+):
+    """
+    Plot a event in 3D
+
+    Parameters
+    ----------
+    event_n : int
+        The event number, for the title.
+    incident_energy : float
+        The incident energy of the event, also for the title.
+    event : np.array (n_points, 4)
+        The event to plot. The columns are (x, y, z, e).
+    energy_scale : float, optional
+        Scale factor to apply to energy before plotting.
+        Default is 1.
+    xz_scale : float, optional
+        Scale factor to apply to x and z before plotting.
+        Default is 1.
+    xlim : tuple, optional
+        The limits for the x axis.
+        Default is (-150, 150).
+    zlim : tuple, optional
+        The limits for the z axis.
+        Default is (-150, 150).
+    ax : matplotlib.axes.Axes, optional
+        The axes to plot on.
+        If not given, a new figure is created.
+        Default is None.
+
+    Returns
+    -------
+    ax : matplotlib.axes.Axes
+        The 3D axes the event was plotted on.
+
+    """
+    energy = event[:, 3]
+    mask = energy > 0
+    n_points = sum(mask)
+    energy = energy[mask] * energy_scale
+    xs = event[mask, 0] * xz_scale
+    ys = event[mask, 1]
+    zs = event[mask, 2] * xz_scale
+    if ax is None:
+        fig = plt.figure()
+        ax = fig.add_subplot(111, projection="3d")
+    ax.scatter(xs, ys, zs, c=energy, s=energy, cmap="viridis")
+    ax.set_xlabel("x")
+    ax.set_ylabel("y")
+    ax.set_zlabel("z")
+    ax.set_xlim(*xlim)
+    ax.set_zlim(*zlim)
+    # write a title
+    observed_energy = energy.sum()
+    ax.set_title(
+        f"Evt: {event_n}, $n_{{pts}}$: {n_points}, $E_{{in}}$: {incident_energy:.2f}, $E_{{vis}}$: {observed_energy:.2f}"
+    )
+    return ax
+
+
+def plot_model(incident_energy, model):
+    """
+    Using the standrd plotting function to plot the model output
+
+    Parameters
+    ----------
+    incident_energy : float
+        The incident energy to generate the event with.
+    model : Model
+        The model to generate the event with.
+        Must have an `inference` method that
+        takes an incident energy and returns an event.
+        The event should have shape (n_points, 4) where the columns are (x, y, z, e).
+
+    Returns
+    -------
+    ax : matplotlib.axes.Axes
+        The 3D axes the event was plotted on.
+
+    """
+    xs, ys, zs, es = model.inference(incident_energy)
+    event = np.empty((len(xs), 4))
+    event[:, 0] = xs
+    event[:, 1] = ys
+    event[:, 2] = zs
+    event[:, 3] = es
+    return plot_event("Modeled", incident_energy, event, energy_scale=1.0, x_scale=150)

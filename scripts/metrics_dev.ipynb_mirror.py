@@ -54,6 +54,10 @@ from pointcloud.utils.metadata import Metadata
 
 
 
+from utils.metadata import Metadata
+
+
+
 
 
 cfg = Configs()
