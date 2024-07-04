@@ -8,6 +8,7 @@ from torch.utils.data import DataLoader
 
 import k_diffusion
 import time
+import os
 
 
 from ..data.dataset import dataset_class_from_config
@@ -48,6 +49,8 @@ def get_ckp_mgr(config, start_time):
 def get_dataloader(config):
     dataset_class = dataset_class_from_config(config)
     print(f"Using dataset class: {dataset_class}")
+    if not hasattr(config, "n_dataset_files"):
+        config.n_dataset_files = 0
     train_dset = dataset_class(
         file_path=config.dataset_path,
         bs=config.train_bs,
@@ -165,3 +168,43 @@ def get_optimiser_schedular(config, model):
         else:
             scheduler_flow = None
     return optimizer, scheduler, optimizer_flow, scheduler_flow
+
+
+def get_pretrained(config, model):
+    if hasattr(config, 'uda_model_path') and os.path.isfile(config.uda_model_path):
+
+        print(f'\n Loading model from {config.uda_model_path} \n')
+        
+        #for the pretraining we lower the learning rate
+        config.lr = 5e-5        ## calochallenge -  [5-1]e-4     # Caloclouds default: 2e-3, consistency model paper: approx. 1e-5
+        config.end_lr = 1e-5  
+
+        try:
+            from pointcloud.configs import Configs
+            print("Module configs found")
+        except ModuleNotFoundError as e:
+            print("Module configs not found")
+            raise e
+
+        checkpoint = torch.load(config.uda_model_path, map_location=torch.device(config.device))    # caloclouds for uda
+        model.load_state_dict(checkpoint['others']['model_ema'], strict=False) #strict allows for partial loading
+
+        for i, layer in enumerate(model.diffusion.inner_model.layers):
+            if i in config.uda_layers: # the layer with adaptive training
+                print(f"Training layer {i}")
+                for param in layer.parameters():
+                    param.requires_grad = True
+            else:
+                print(f"Setting layer {i} to requires_grad=False")
+                for param in layer.parameters():
+                    param.requires_grad = False
+        print(f'\n Model loaded from checkpoint {config.uda_model_path} \n')
+    else:
+        print('\n Creating a new model from scratch\n')
+    
+    # Verify the 'requires_grad' status 
+        
+    for name, param in model.named_parameters():
+        print(f'\n {name}: requires_grad={param.requires_grad} \n')
+    
+    return model

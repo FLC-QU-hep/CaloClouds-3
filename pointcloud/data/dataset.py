@@ -456,6 +456,86 @@ class PointCloudAngular(PointCloudDataset):
         return cls._normalize_perpendicular(event, perpendicular_axis=2)
 
 
+class CaloChallangeDataset(Dataset):
+    def __init__(self, file_path, cfg, bs=32, max_ds_seq_len=22000):
+        dataset = h5py.File(file_path, 'r')
+
+        # Get the indices and shuffle them
+        if cfg.percentage < 1.0:
+    
+            tot_len = len(dataset['events'])
+            size = int ( tot_len * cfg.percentage)
+            idx = np.random.choice(np.arange( 0, tot_len ), size=size, replace=False)
+            idx = np.sort(idx).astype(int)
+        else:
+            cfg.percentage = 1.0
+            idx = np.arange(0, len(dataset['events'])).astype(int)
+            # idx = np.sort(idx).astype(int)
+            
+        self.dataset = {
+            'events' : dataset['events'][idx],
+            'energy' : dataset['energy'][idx]
+        }
+        self.Ymin, self.Ymax = -17, 17
+        self.Xmin, self.Xmax = -17, 17
+        self.Zmin, self.Zmax = 0, 44
+        self.bs = bs
+        self.max_ds_seq_len = max_ds_seq_len
+        self.cfg = cfg
+        
+    def get_n_points(self, data, axis=-1):
+        n_points_arr = (data[...,axis] != 0.0).sum(1)
+        return n_points_arr
+
+    def __getitem__(self, idx):
+        
+        if idx > self.bs and idx < self.__len__() - self.bs:
+            event = self.dataset['events'][idx-int(self.bs/2) : idx+int(self.bs/2)].copy()
+            energy = self.dataset['energy'][idx-int(self.bs/2) : idx+int(self.bs/2)].copy()
+        elif idx < self.bs:
+            event = self.dataset['events'][idx : idx+self.bs].copy()
+            energy = self.dataset['energy'][idx : idx+self.bs].copy()
+        else:
+            event = self.dataset['events'][idx-self.bs : idx].copy()
+            energy = self.dataset['energy'][idx-self.bs : idx].copy()
+            
+        # event[:, 3, :] = event[:, 3, :] # energy scale
+        event[:, 3, :] = event[:, 3, :] / 1000 # energy scale
+        # event[:, 3, :] = event[:, 3, :] / energy # energy scale E_depos/E_insident
+
+
+        max_len = (event[:, -1, :] > 0).sum(axis=1).max()
+        event = event[:, :, :max_len]
+        
+        
+        event[:, 0, :] = (event[:, 0, :] - self.Xmin) * 2 / (self.Xmax - self.Xmin) - 1 # x coordinate normalization
+        event[:, 1, :] = (event[:, 1, :] - self.Ymin) * 2 / (self.Ymax - self.Ymin) - 1 # y coordinate normalization
+        event[:, 2, :] = (event[:, 2, :] - self.Zmin) * 2 / (self.Zmax - self.Zmin) - 1 # z coordinate normalization
+        
+
+        event = event[:, [0, 1, 2, 3]]
+        
+        event = np.moveaxis(event, -1, -2)
+        
+        event[event[:, :, -1] == 0] = 0
+
+        # nPoints
+        points = self.get_n_points(event, axis=-1).reshape(-1,1)
+
+
+        if self.cfg.norm_cond:
+            energy = np.log((energy + 1e-5)/self.cfg.min_energy) / np.log(self.cfg.max_energy/self.cfg.min_energy)
+            points = np.log((points + 1)/self.cfg.min_points) / np.log(self.cfg.max_points/self.cfg.min_points)
+        
+
+        return {'event' : event,
+                'energy' : energy,
+                'points' : points}
+
+    def __len__(self):
+        return len(self.dataset['events'])
+
+
 def dataset_class_from_config(config):
     """
     Return the correct dataset class based on the config.
@@ -477,6 +557,8 @@ def dataset_class_from_config(config):
         correct_class = PointCloudDataset
     elif config.dataset == "getting_high":
         correct_class = PointCloudDatasetGH
+    elif config.dataset == "calo_challenge":
+        correct_class = CaloChallangeDataset
     else:
         raise ValueError(f"Don't know how to handle dataset {config.dataset}")
     # ensure the metadata is for the config supplied rather than the default
