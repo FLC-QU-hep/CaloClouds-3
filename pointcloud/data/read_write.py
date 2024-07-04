@@ -196,6 +196,8 @@ def read_raw_regaxes(config, pick_events=None, total_size=None):
         the third is the coordinate number in xyze format
 
     """
+    if not hasattr(config, "n_dataset_files"):
+        config.n_dataset_files = 0
     n_events = get_n_events(config.dataset_path, config.n_dataset_files)
     n_total_events = np.sum(n_events)
     if total_size is None:

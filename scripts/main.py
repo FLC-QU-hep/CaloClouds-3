@@ -13,6 +13,7 @@ from pointcloud.utils.training import (
     get_dataloader,
     get_sample_density,
     get_optimiser_schedular,
+    get_pretrained,
 )
 from pointcloud.configs import Configs
 
@@ -67,6 +68,9 @@ def main(config=Configs()):
     optimizer, scheduler, optimizer_flow, scheduler_flow = get_optimiser_schedular(
         config, model
     )
+
+    #loading a pretrained model, if the path is provided
+    model = get_pretrained(config, model)
 
     # set variable for printing to avoid errors due to models that don't use them
     if not hasattr(config, "kl_weight"):
