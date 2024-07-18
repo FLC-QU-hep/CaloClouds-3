@@ -23,7 +23,7 @@ The entry points, however, are all in the `scripts` folder.
     - `config_varients`: Library of configs files that `configs.py` could point to. You can also import them directly.
     - `data`: Data reading and writing, classes to hold data structures.
     - `evaluation`: Module containing functions for preparing data and calculating statistics for model evaluation.
-    - `metadata`: Contains a set of subfolders (and symlinks to subfolders) specifying the metadata for each dataset. For example, detector geometry.
+    - `metadata`: Contains a set of subfolders (and symlinks to subfolders) specifying the metadata for each dataset. For example, detector geometry. See [`metadata.md`](./metadata.md) for more details.
     - `models`: Model classes themselves, and some helper code specific to models.
     - `anomalies`: Code relating to anomaly detection in the data.
     - `utils`: Misc code that is useful at multiple points.
