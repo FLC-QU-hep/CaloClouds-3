@@ -136,7 +136,7 @@ class Configs:
     @property
     def dataset_path(self):
         if self.dataset_path_in_storage:
-            return self.storage_base + self._dataset_path
+            return os.path.join(str(self.storage_base), str(self._dataset_path))
         else:
             return self._dataset_path
 
@@ -153,7 +153,7 @@ class Configs:
     @property
     def logdir(self):
         if self.logdir_in_storage:
-            return self.storage_base + self._logdir
+            return os.path.join(str(self.storage_base), str(self._logdir))
         else:
             return self._logdir
 
