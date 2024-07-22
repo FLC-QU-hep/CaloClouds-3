@@ -76,6 +76,26 @@ Also, if you would be interested in generating some data, useful code can be fou
 
 ---
 
+### Evaluating models
+
+There are tools for quickly generating some standard metrics for comparing model performance.
+The functions and classes in [`pointcloud/evaluation/bin_standard_metrics.py`](./pointcloud/evaluation/bin_standard_metrics.py) work with the script [`scripts/create_standard_metrics.py`](./scripts/create_standard_metrics.py) to generate and save some kinematic bins for standard variables,
+which are saved as `.npz` in the log directory (as specified by the configs).
+
+These can then be plotted using [`scripts/plotting/standard_metrics.ipynb`](./scripts/plotting/standard_metrics.ipynb), which also has some reference values for comparison.
+
+If you have a new model, and it has been trained for the ILD detector, it would be good to add it to this comparison. To add a new model;
+
+1. Ensure that the `gen_condE_showers_batch` function in [`pointcloud/utils/gen_utils.py`](./pointcloud/utils/gen_utils.py) can correctly generate data for your model. This is what will sample your model. Potentially adding a new `inner_batch_func`.
+2. Add a function to [`pointcloud/evaluation/bin_standard_metrics.py`](./pointcloud/evaluation/bin_standard_metrics.py) in the same format as the `get_caloclouds_models` or `get_wish_models` functions. This is where your model is loaded.
+3. In [`scripts/create_standard_metrics.py`](./scripts/create_standard_metrics.py) import and call your model creation function and add the new entries to the `models` dict.
+4. In [`scripts/plotting/standard_metrics.ipynb`](./scripts/plotting/standard_metrics.ipynb) add your model name to the `model_names` list, so that it is picked up in the plots.
+5. Rerun [`scripts/create_standard_metrics.py`](./scripts/create_standard_metrics.py) and [`scripts/plotting/standard_metrics.ipynb`](./scripts/plotting/standard_metrics.ipynb).
+
+Done.
+
+---
+
 ### Information on Wish
 
 One model in this dataset is a classical statistics model; the "wish" model.
