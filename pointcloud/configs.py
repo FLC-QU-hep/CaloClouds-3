@@ -1,1 +1,1 @@
-config_varients/caloclouds_3.py
+config_varients/wish_maxwell.py

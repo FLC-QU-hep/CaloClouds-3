@@ -5,8 +5,8 @@ import os
 import torch
 from pointcloud.config_varients import default, wish
 from pointcloud.evaluation import generate
-from pointcloud.models.shower_flow import compile_HybridTanH_model
-from pointcloud.models.wish import Wish
+
+from helpers.sample_models import write_fake_flow_model, write_fake_wish_model
 
 
 def make_config(use_wish=False):
@@ -35,24 +35,6 @@ def test_make_params_dict():
     assert "n_scaling" in params_dict
     assert "out_path" in params_dict
     assert "prefix" in params_dict
-
-
-def write_fake_flow_model(config, file_path):
-    """
-    The flow models are too large to be stored in the repo, so we write a fake one.
-    """
-    flow, distribution = compile_HybridTanH_model(
-        num_blocks=10,
-        num_inputs=65,
-        num_cond_inputs=1,
-        device=config.device,
-    )
-    torch.save({"model": flow.state_dict()}, file_path)
-
-
-def write_fake_wish_model(config, file_path):
-    model = Wish(config)
-    model.save(file_path)
 
 
 def test_load_flow_model_caloclouds(tmpdir):
