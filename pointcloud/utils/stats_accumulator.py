@@ -8,9 +8,9 @@ import h5py
 import numpy as np
 from matplotlib import pyplot as plt
 
-from pointcloud.utils.detector_map import split_to_layers
 from pointcloud.utils.plotting import heatmap_stack
 from pointcloud.utils.optimisers import curve_fit
+from pointcloud.utils.detector_map import split_to_layers
 from pointcloud.data.dataset import dataset_class_from_config
 from pointcloud.data.read_write import read_raw_regaxes, get_n_events
 from pointcloud.configs import Configs
@@ -101,9 +101,11 @@ class StatsAccumulator:
             - x coordinates
             - z coordinates
             This is the finest possible bins
-            We don't need this for wish calculations, just gathering it for visulisation.
+            We don't need this for wish calculations,
+            just gathering it for visulisation.
             Formula;
-                Sum_{events} Sum_{point_i} E(layer, incident_energy, event, x, z, point_i)
+                Sum_{events} Sum_{point_i}
+                E(layer, incident_energy, event, x, z, point_i)
         energy_sq_hist: array (n_incident_bins + 2, n_layers, n_x_bins, n_z_bins)
             Energy of the points squared in each bin summed over events, bins being
             - incident energy with under and overflow bins
@@ -111,16 +113,19 @@ class StatsAccumulator:
             - x coordinates
             - z coordinates
             This is the finest possible bins
-            We don't need this for wish calculations, just gathering it for visulisation.
+            We don't need this for wish calculations,
+            just gathering it for visulisation.
             Formula;
-                Sum_{events} Sum_{point_i} E(layer, incident_energy, event, x, z, point_i)^2
+                Sum_{events} Sum_{point_i}
+                E(layer, incident_energy, event, x, z, point_i)^2
         evt_mean_E_hist: array (n_incident_bins + 2, n_layers)
             Mean energy of the points in each bin summed over events, bins being
             - incident energy with under and overflow bins
             - layers
             So we are binning at the incident energy and layer level.
             Formula;
-                Sum_{events} ((Sum_{x, z, point_i} E(layer, incident_energy, event, x, z, point_i))
+                Sum_{events} ((Sum_{x, z, point_i}
+                              E(layer, incident_energy, event, x, z, point_i))
                               / (Sum_{x, z} N(layer, incident_energy, event, x, z)))
         evt_mean_E_sq_hist: array (n_incident_bins + 2, n_layers)
             Mean energy squared of the points in each bin summed over events, bins being
@@ -128,16 +133,18 @@ class StatsAccumulator:
             - layers
             So we are binning at the incident energy and layer level.
             Formula;
-                Sum_{events} ((Sum_{x, z, point_i} E(layer, incident_energy, event, x, z, point_i))
+                Sum_{events} ((Sum_{x, z, point_i}
+                              E(layer, incident_energy, event, x, z, point_i))
                               / (Sum_{x, z} N(layer, incident_energy, event, x, z)))^2
         pnt_mean_E_sq_hist: array (n_incident_bins + 2, n_layers)
-            Mean of the square of the energy of each point in each bin summed over events,
-            bins being
+            Mean of the square of the energy of
+            each point in each bin summed over events, bins being
             - incident energy with under and overflow bins
             - layers
             So we are binning at the incident energy and layer level.
             Formula;
-                Sum_{events} ((Sum_{x, z, point_i} E(layer, incident_energy, event, x, z, point_i)^2)
+                Sum_{events} ((Sum_{x, z, point_i}
+                              E(layer, incident_energy, event, x, z, point_i)^2)
                               / (Sum_{x, z} N(layer, incident_energy, event, x, z)))
         evt_mean_counts_hist: array (n_incident_bins + 2, n_layers, n_x_bins, n_z_bins)
             Mean number of points per event in each bin summed, bins being
@@ -206,6 +213,45 @@ class StatsAccumulator:
             (n_incident_bins + 2, self.n_layers, n_x_bins, n_z_bins)
         )
 
+    def layer_hists(self, points_in_layer):
+        n_pts_hist, _, _ = np.histogram2d(
+            points_in_layer[:, 0],
+            points_in_layer[:, 2],
+            bins=(self.lateral_x_bin_boundaries, self.lateral_z_bin_boundaries),
+        )
+        energies_hist, _, _ = np.histogram2d(
+            points_in_layer[:, 0],
+            points_in_layer[:, 2],
+            bins=(self.lateral_x_bin_boundaries, self.lateral_z_bin_boundaries),
+            weights=points_in_layer[:, 3],
+        )
+        energies_hist_sq, _, _ = np.histogram2d(
+            points_in_layer[:, 0],
+            points_in_layer[:, 2],
+            bins=(self.lateral_x_bin_boundaries, self.lateral_z_bin_boundaries),
+            weights=points_in_layer[:, 3] ** 2,
+        )
+        return n_pts_hist, energies_hist, energies_hist_sq
+
+    def add_event(self, incident_bin, counts, energies, energies_sq):
+        self.counts_hist[incident_bin] += counts
+        self.counts_sq_hist[incident_bin] += counts**2
+        sum_counts = np.sum(counts, axis=(1, 2))
+        total_counts = np.sum(sum_counts)
+        if total_counts:
+            self.evt_mean_counts_hist[incident_bin] += counts / total_counts
+        self.energy_hist[incident_bin] += energies
+        self.energy_sq_hist[incident_bin] += energies_sq
+        self.evt_counts_sq_hist[incident_bin] += sum_counts**2
+        # we don't want zeros here, as it will create nans in the division
+        sum_counts[sum_counts <= 0] = 1.0
+        mean_E = np.sum(energies, axis=(1, 2)) / sum_counts
+        self.evt_mean_E_hist[incident_bin] += mean_E
+        self.evt_mean_E_sq_hist[incident_bin] += mean_E**2
+        self.pnt_mean_E_sq_hist[incident_bin] += (
+            np.sum(energies_sq, axis=(1, 2)) / sum_counts
+        )
+
     def add(self, idxs, energy, events):
         """
         Add events to the accumulator.
@@ -239,44 +285,14 @@ class StatsAccumulator:
             for layer_n, points_in_layer in enumerate(
                 split_to_layers(event, self.layer_bottom, self.cell_thickness)
             ):
-                n_pts_hist, _, _ = np.histogram2d(
-                    points_in_layer[:, 0],
-                    points_in_layer[:, 2],
-                    bins=(self.lateral_x_bin_boundaries, self.lateral_z_bin_boundaries),
-                )
-                energies_hist, _, _ = np.histogram2d(
-                    points_in_layer[:, 0],
-                    points_in_layer[:, 2],
-                    bins=(self.lateral_x_bin_boundaries, self.lateral_z_bin_boundaries),
-                    weights=points_in_layer[:, 3],
-                )
-                energies_hist_sq, _, _ = np.histogram2d(
-                    points_in_layer[:, 0],
-                    points_in_layer[:, 2],
-                    bins=(self.lateral_x_bin_boundaries, self.lateral_z_bin_boundaries),
-                    weights=points_in_layer[:, 3] ** 2,
+                n_pts_hist, energies_hist, energies_hist_sq = self.layer_hists(
+                    points_in_layer
                 )
                 event_counts[layer_n] = n_pts_hist
                 event_energies[layer_n] = energies_hist
                 event_energies_sq[layer_n] = energies_hist_sq
-            self.counts_hist[incident_bin] += event_counts
-            self.counts_sq_hist[incident_bin] += event_counts**2
-            sum_event_counts = np.sum(event_counts, axis=(1, 2))
-            total_event_counts = np.sum(sum_event_counts)
-            if total_event_counts:
-                self.evt_mean_counts_hist[incident_bin] += (
-                    event_counts / total_event_counts
-                )
-            self.energy_hist[incident_bin] += event_energies
-            self.energy_sq_hist[incident_bin] += event_energies_sq
-            self.evt_counts_sq_hist[incident_bin] += sum_event_counts**2
-            # we don't want zeros here, as it will create nans in the division
-            sum_event_counts[sum_event_counts <= 0] = 1.0
-            event_mean_E = np.sum(event_energies, axis=(1, 2)) / sum_event_counts
-            self.evt_mean_E_hist[incident_bin] += event_mean_E
-            self.evt_mean_E_sq_hist[incident_bin] += event_mean_E**2
-            self.pnt_mean_E_sq_hist[incident_bin] += (
-                np.sum(event_energies_sq, axis=(1, 2)) / sum_event_counts
+            self.add_event(
+                incident_bin, event_counts, event_energies, event_energies_sq
             )
 
     @classmethod
@@ -339,7 +355,7 @@ class StatsAccumulator:
                 f.create_dataset(dataset, data=getattr(self, dataset))
 
     @classmethod
-    def load(cls, path):
+    def load(cls, path, **additional_kwargs):
         """
         Alternative constructor to load an accumulator from a file.
 
@@ -356,6 +372,7 @@ class StatsAccumulator:
         with h5py.File(path, "r") as f:
             # attrs are all arguments to the constructor
             kwargs = {attr: f.attrs[attr] for attr in cls.get_saved_attrs()}
+            kwargs.update(additional_kwargs)
             # create a new accumulator
             new_accumulator = cls(**kwargs)
 
@@ -504,7 +521,9 @@ class StatsAccumulator:
         ax.scatter(xx, yy, zz, c=colours, alpha=alpha)
 
 
-def read_section_to(config, save_to, num_sections, section_number, batch_size=100):
+def read_section_to(
+    config, save_to, num_sections, section_number, batch_size=100
+):
     """
     Read a section of the dataset and save the statistics to file.
 
@@ -533,6 +552,11 @@ def read_section_to(config, save_to, num_sections, section_number, batch_size=10
 
     # the data will be rescaled to the unit cube, so no
     # need to pass Xmin etc.
+    acc = None
+
+    def noop(*args, **kwargs):
+        pass
+
     acc = StatsAccumulator()
 
     n_events = np.sum(get_n_events(config.dataset_path, config.n_dataset_files))
@@ -552,6 +576,8 @@ def read_section_to(config, save_to, num_sections, section_number, batch_size=10
     if save_to:
         print(f"Saving to {save_to}")
         acc.save(save_to)
+    else:
+        print("Not saving the results")
 
     return acc
 
@@ -572,6 +598,9 @@ def save_location(config, num_sections, section_number):
     """
     path_segments = [config.logdir, "dataset_accumulators"]
     dataset_basename = config.dataset_path.split("/")[-1].split(".")[0]
+    if "{" in dataset_basename:
+        dataset_basename = dataset_basename.format("All")
+    dataset_basename = dataset_basename.replace("_all_steps", "")
     if num_sections > 1:
         path_segments.append(dataset_basename)
         path_segments.append(f"{num_sections}_sections")
@@ -640,7 +669,7 @@ class HighLevelStats:
         )
         return n_pts / self.total_events_per_incedent_energy
 
-    def n_pts(self, layer):
+    def n_pts(self, layer, no_fit=False):
         """
         Calculate the coefficients for the number of points in each layer with
         the incident energy.
@@ -658,13 +687,15 @@ class HighLevelStats:
             in the layer with the incident energy
         """
         n_pts = self.get_n_pts_vs_incident_energy(layer)
+        if no_fit:
+            return self.incident_energy_bin_centers, n_pts
         # use polyfit to get a linear fit
         n_pts_coeffs = np.polyfit(
             self.incident_energy_bin_centers, n_pts, self.poly_degree
         )
         return n_pts_coeffs
 
-    def stddev_n_pts(self, layer):
+    def stddev_n_pts(self, layer, no_fit=False):
         """
         Calculate the coefficients for the fit of the standard devation
         of number of points per event in each layer with the incident energy.
@@ -687,13 +718,15 @@ class HighLevelStats:
             / self.total_events_per_incedent_energy
         )
         stddev_n_pts = np.sqrt(mean_n_pts_sq - mean_n_pts**2)
+        if no_fit:
+            return self.incident_energy_bin_centers, stddev_n_pts
         # use polyfit to get a linear fit
         stddev_n_pts_coeffs = np.polyfit(
             self.incident_energy_bin_centers, stddev_n_pts, self.poly_degree
         )
         return stddev_n_pts_coeffs
 
-    def event_mean_point_energy(self, layer):
+    def event_mean_point_energy(self, layer, no_fit=False):
         """
         Calculate the coefficients for th fit of the mean point energy
         per event in each layer with the incident energy.
@@ -715,13 +748,15 @@ class HighLevelStats:
             self.accumulator.evt_mean_E_hist[1:-1][self.event_mask, layer]
             / self.total_events_per_incedent_energy
         )
+        if no_fit:
+            return self.incident_energy_bin_centers, mean_point_E
         # use polyfit to get a linear fit
         energy_mean_coeffs = np.polyfit(
             self.incident_energy_bin_centers, mean_point_E, self.poly_degree
         )
         return energy_mean_coeffs
 
-    def stddev_event_mean_point_energy(self, layer):
+    def stddev_event_mean_point_energy(self, layer, no_fit=False):
         """
         Calculate the coeffients for the fit of the standard devation
         of mean point energy per event in each layer with the incident energy.
@@ -747,13 +782,15 @@ class HighLevelStats:
             / self.total_events_per_incedent_energy
         )
         stddev_point_E = np.sqrt(mean_point_E_sq - mean_point_E**2)
+        if no_fit:
+            return self.incident_energy_bin_centers, stddev_point_E
         # use polyfit to get a linear fit
         stddev_energy_mean_coeffs = np.polyfit(
             self.incident_energy_bin_centers, stddev_point_E, self.poly_degree
         )
         return stddev_energy_mean_coeffs
 
-    def stddev_point_energy_in_evt(self, layer):
+    def stddev_point_energy_in_evt(self, layer, no_fit=False):
         """
         Calculate the mean standard devation of the energy point points
         in each event in each layer with the incident energy.
@@ -779,6 +816,8 @@ class HighLevelStats:
             / self.total_events_per_incedent_energy
         )
         stddev_point_E = np.sqrt(pnt_mean_E_sq - mean_point_E_sq)
+        if no_fit:
+            return self.incident_energy_bin_centers, stddev_point_E
         # use polyfit to get a linear fit
         stddev_energy_coeffs = np.polyfit(
             self.incident_energy_bin_centers, stddev_point_E, self.poly_degree
@@ -822,7 +861,8 @@ class HighLevelStats:
         x_bin_centers, _, z_bin_centers = self.accumulator._get_bin_centers()
         # then make a meshgrid of the locations
         x_mesh, z_mesh = np.meshgrid(x_bin_centers, z_bin_centers)
-        # and zip it together so that when the bin heights are flattened they can be treated as weights
+        # and zip it together so that when the bin heights are
+        # flattened they can be treated as weights
         xz_mesh = np.vstack((x_mesh.flatten(), z_mesh.flatten()))
         for i, evt_mean_counts in enumerate(evt_mean_counts_all_i):
             cov_matrix = np.cov(xz_mesh, aweights=evt_mean_counts.flatten())

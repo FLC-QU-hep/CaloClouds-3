@@ -152,6 +152,8 @@ for model_name in model_names:
 
         continue
 
+    print(save_path)
+
     binned = BinnedData.load(save_path)
 
     to_compare[model_name] = binned
@@ -256,6 +258,10 @@ for semilogy in [False, True]:
 
                      histtype="stepfilled", color="grey", alpha=0.5)
 
+
+
+        #print(f"Sum g4 weights {np.sum(weights)}")
+
     
 
         
@@ -325,6 +331,12 @@ for semilogy in [False, True]:
             #model_weights = model.counts[hist_idx]
 
             model_weights = model.normed(hist_idx)
+
+
+
+            #print(f"Sum {model_name} weights {np.sum(weights)}")
+
+            
 
             
 

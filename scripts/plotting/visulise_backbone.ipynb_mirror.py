@@ -84,7 +84,7 @@ from pointcloud.models.wish import load_wish_from_accumulator
 
 import numpy as np
 
-from pointcloud.config_varients.wish_maxwell import Configs
+from pointcloud.config_varients.wish import Configs
 
 from pointcloud.utils.metadata import Metadata
 
@@ -102,9 +102,9 @@ meta = Metadata(configs)
 
 remake_wish = False
 
-redo_wish_data = True
+redo_wish_data = False
 
-redo_g4_data = True
+redo_g4_data = False
 
 
 
@@ -118,7 +118,7 @@ varient = ""  # could also use "_0p25", or "_0"
 
 #file_path = f"../../../point-cloud-diffusion-logs/wish/dataset_accumulators/initial_accumulation.h5"
 
-file_path = f"../../../point-cloud-diffusion-logs/wish/dataset_accumulators/p22_th90_ph90_en10-100_accumulator.h5"
+file_path = f"../../../point-cloud-diffusion-logs/wish/dataset_accumulators/p22_th90_ph90_en10-1/p22_th90_ph90_en10-100_seedAll_all_steps.h5"
 
 
 
@@ -147,7 +147,6 @@ g4_observed_energies = g4_observed_energies[1:-1]
 g4_observed_hits = np.sum(accumulated_stats.counts_hist, axis=(1, 2, 3))/non_zero_total_events
 
 g4_observed_hits = g4_observed_hits[1:-1]
-# ## 
 # Get the model under comparison.
 
 
@@ -155,7 +154,9 @@ from pointcloud.models.wish import Wish
 
 
 
-wish_path = "../../../point-cloud-diffusion-logs/wish/dataset_accumulators/10-90GeV_x36_grid_regular_524k_float32/wish_from_10.pt"
+#wish_path = "../../../point-cloud-diffusion-logs/wish/dataset_accumulators/10-90GeV_x36_grid_regular_524k_float32/wish_from_10.pt"
+
+wish_path = "../../../point-cloud-diffusion-logs/wish/dataset_accumulators/p22_th90_ph90_en10-1/wish_poly3.pt"
 
 
 
@@ -326,7 +327,7 @@ for intrest_n, layer_n in enumerate(layers_of_intrest):
 
     mean_n_hits, std_n_hits = get_n_pts(layer_n)
 
-    plot_line_with_devation(ax_hits, nice_hex[2][intrest_n], points, mean_n_hits, std_n_hits, clip_to_zero=True, label=f"layer {layer_n}")
+    plot_line_with_devation(ax_hits, nice_hex[c_row][intrest_n], points, mean_n_hits, std_n_hits, clip_to_zero=True, label=f"layer {layer_n}")
 
 
 
@@ -334,7 +335,7 @@ for intrest_n, layer_n in enumerate(layers_of_intrest):
 
     mean_meanE, std_meanE = get_meanE(layer_n)
 
-    plot_line_with_devation(ax_meanE, nice_hex[2][intrest_n], points, mean_meanE, std_meanE, clip_to_zero=True, label=f"layer {layer_n}")
+    plot_line_with_devation(ax_meanE, nice_hex[c_row][intrest_n], points, mean_meanE, std_meanE, clip_to_zero=True, label=f"layer {layer_n}")
 
 
 
@@ -342,7 +343,7 @@ for intrest_n, layer_n in enumerate(layers_of_intrest):
 
     std_layerE = get_rangeE(layer_n)
 
-    plot_line_with_devation(ax_rangeE, nice_hex[2][intrest_n], points, std_layerE, 0, clip_to_zero=True, label=f"layer {layer_n}")
+    plot_line_with_devation(ax_rangeE, nice_hex[c_row][intrest_n], points, std_layerE, 0, clip_to_zero=True, label=f"layer {layer_n}")
 
     
 
@@ -519,7 +520,9 @@ else:
         
 import numpy as np
 
-fig, (ax_e, ax_hit) = plt.subplots(1, 2, figsize=(15, 5))
+fig, ((ax_e, ax_hit), (ax_e_ratio, ax_hit_ratio)) =\
+
+    plt.subplots(2, 2, figsize=(15, 7), gridspec_kw={'height_ratios':[3, 1]})
 
 
 
@@ -551,6 +554,10 @@ ax_e.legend()
 
 
 
+ax_e_ratio.plot(points, wish_observed_sum_E_means/g4_observed_energies, c=nice_hex[2][2])
+
+
+
 #hits
 
 ax_hit.semilogy()
@@ -572,6 +579,14 @@ ax_hit.set_xlabel("Incident energy")
 ax_hit.set_ylabel("Observed hits")
 
 ax_hit.legend()
+
+
+
+ax_hit_ratio.plot(points, wish_observed_sum_hits_means/g4_observed_hits, c=nice_hex[2][2])
+
+
+
+plt.tight_layout()
 # Note that what is being compared here is wish to the accumulated stats. It would show issues in the converstion from stats to model.
 # Also, look at then energies in some layers;
 fig, axes = plt.subplots(n_intrest, 2, figsize=(15, 3*n_intrest))
@@ -653,11 +668,11 @@ fig.tight_layout()
 
 import h5py
 
-file_path = "../../../point-cloud-diffusion-data/even_batch_10k.h5"
+file_path = "/mnt/beegfs/desy/user/dayhallh/data/ILCsoftEvents/p22_th90_ph90_en10-100_joined/p22_th90_ph90_en10-100_seed42_all_steps.hdf5"
 
 opened_g4 = h5py.File(file_path)
 
-g4_events = opened_g4['event'][0]
+g4_events = opened_g4['events']
 
 incidents = np.squeeze(opened_g4['energy'])
 
@@ -709,7 +724,7 @@ else:
     opened_wish.create_dataset("energy", data=incidents)
 
     opened_wish.close()
-# Now scatters like the things that where histogrammed above.
+# Now scatters like the things that were histogrammed above.
 import plotly.express as px
 
 from plotly.subplots import make_subplots

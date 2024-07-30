@@ -34,9 +34,9 @@ def extract(notebook_path):
     extracted = ""
     for cell in notebook["cells"]:
         if cell["cell_type"] == "code":
-            extracted += "\n".join(cell["source"]) + "\n"
+            extracted += "".join(cell["source"]) + "\n"
         elif cell["cell_type"] == "markdown":
-            extracted += "\n".join("# " + line for line in cell["source"]) + "\n"
+            extracted += "".join("# " + line for line in cell["source"]) + "\n"
     return extracted
 
 

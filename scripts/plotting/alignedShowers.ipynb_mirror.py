@@ -68,7 +68,7 @@ dataset_class = dataset_class_from_config(configs)
 
 
 
-align_center = "Mean" if False else "Peak"
+align_center = "Mean" if True else "Peak"
 
 align_even = f"align{align_center}Even"
 

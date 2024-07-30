@@ -70,7 +70,7 @@ configs = MaxwellConfigs()
 
 defaults = DefaultConfigs()
 
-configs.poly_degree = 3
+configs.poly_degree = 1
 
 #configs.dataset_path_in_storage = False
 
@@ -78,7 +78,7 @@ configs.poly_degree = 3
 
 #configs.dataset_path = "../../../data_production/ILCsoftEvents/p22_r0_th90_ph90_en10-90_downsampled.h5"
 
-configs.dataset_path = "/home/dayhallh/Data/p22_th90_ph90_en10-100_joined/p22_th90_ph90_en10-100_seed42_all_steps.hdf5"
+#configs.dataset_path = "/home/dayhallh/Data/p22_th90_ph90_en10-100_joined/p22_th90_ph90_en10-100_seed42_all_steps.hdf5"
 
 #configs.dataset_path_in_storage = True
 
@@ -171,22 +171,6 @@ for event_n in [ 24,   0, 189,   5,  33,   3,  22, 298, 877,  23 ]:
 
     plot_event(event_n, energy_in, use_event, energy_scale=1000)
 
-    
-
-#for event_n in [0, 2, 15, 98]:
-
-for event_n in [0, 2, 15, 98]:
-
-    # make a 3d plot of the x, y, z points in the events array
-
-    
-
-    energy_in = energies[event_n]
-
-    use_event = events[event_n]
-
-    plot_event(event_n, energy_in, use_event, x_scale=150, energy_scale=1000)
-
 # ### Wish
 
 # 
@@ -200,7 +184,7 @@ from pointcloud.models.wish import Wish, load_wish_from_accumulator
 
 #wish_path = "../../../point-cloud-diffusion-logs/wish/dataset_accumulators/10-90GeV_x36_grid_regular_524k_float32/wish_from_10.pt"
 
-wish_path = "../../../point-cloud-diffusion-logs/wish/dataset_accumulators/p22_th90_ph90_en10-100_wish.pt"
+wish_path = "../../../point-cloud-diffusion-logs/wish/dataset_accumulators/p22_th90_ph90_en10-1/wish_poly1.pt"
 
 accumulator_path = "../../../point-cloud-diffusion-logs/wish/dataset_accumulators/p22_th90_ph90_en10-100_accumulator.h5"
 
