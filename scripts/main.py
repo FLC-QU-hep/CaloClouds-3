@@ -17,27 +17,27 @@ from pointcloud.utils.training import (
 )
 from pointcloud.configs import Configs
 
-from pointcloud.models.vae_flow import VAEFlow
-from pointcloud.models.allCond_epicVAE_nflow_PointDiff import (
-    AllCond_epicVAE_nFlow_PointDiff,
-)
-from pointcloud.models.epicVAE_nflows_kDiffusion import epicVAE_nFlow_kDiffusion
-from pointcloud.models.wish import Wish, accumulate_and_load_wish
+from pointcloud.models.load import get_model_class
+from pointcloud.models.wish import accumulate_and_load_wish
 
 
 def get_model(config):
+    model_class = get_model_class(config)
     if config.model_name == "flow":
-        model = VAEFlow(config).to(config.device)
+        model = model_class(config).to(config.device)
         model_ema = None
-    elif config.model_name == "AllCond_epicVAE_nFlow_PointDiff":
-        model = AllCond_epicVAE_nFlow_PointDiff(config).to(config.device)
-        model_ema = AllCond_epicVAE_nFlow_PointDiff(config).to(config.device)
-    elif config.model_name == "epicVAE_nFlow_kDiffusion":
-        model = epicVAE_nFlow_kDiffusion(config).to(config.device)
-        model_ema = epicVAE_nFlow_kDiffusion(config).to(config.device)
+    elif config.model_name in [
+        "AllCond_epicVAE_nFlow_PointDiff",
+        "epicVAE_nFlow_kDiffusion",
+    ]:
+        model = model_class(config).to(config.device)
+        model_ema = model_class(config).to(config.device)
     elif config.model_name == "wish":
-        model, _ = accumulate_and_load_wish(config)
-        model_ema = Wish(config)
+        if hasattr(config, "load_checkpoint"):
+            model = model_class.load(config.load_checkpoint)
+        else:
+            model, _ = accumulate_and_load_wish(config)
+        model_ema = model_class(config)
     else:
         raise NotImplementedError(
             f"Model {config.model_name} not implemented, known models: "
@@ -69,7 +69,7 @@ def main(config=Configs()):
         config, model
     )
 
-    #loading a pretrained model, if the path is provided
+    # loading a pretrained model, if the path is provided
     model = get_pretrained(config, model)
 
     # set variable for printing to avoid errors due to models that don't use them
@@ -83,7 +83,6 @@ def main(config=Configs()):
         e = batch["energy"][0].float().to(config.device)  # B, 1
         n = batch["points"][0].float().to(config.device)  # B, 1
 
-        print(f"Shape of x: {x.shape}, shape of e: {e.shape}, shape of n: {n.shape}")
         # Reset grad and model state
         optimizer.zero_grad()
         if (

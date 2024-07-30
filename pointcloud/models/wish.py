@@ -16,32 +16,15 @@ from ..configs import Configs
 from ..utils.metadata import Metadata
 from ..utils.detector_map import split_to_layers
 from ..utils import stats_accumulator
+from ..utils.maths import (
+    _TORCH_TINY,
+    _TORCH_MAX,
+    torch_polyval,
+    weibull_params,
+    logNorm_params,
+)
 
 from .custom_torch_distributions import GFlashRadial, RadialPlane
-
-
-def torch_polyval(coefficients, x):
-    """
-    Same as numpy's polyval, only if either the coefficients or x are torch tensors,
-    it preserves their tensor behaviour and gradient.
-
-    Parameters
-    ----------
-    coefficients : torch.Tensor (n_coeffs,)
-        The polynomial coefficients, from the highest order term to the constant term.
-    x : torch.Tensor
-        The independent variable.
-    Returns
-    -------
-    y : torch.Tensor
-        The value of the polynomial at x.
-    """
-    n_coeffs = len(coefficients)
-    y = sum(
-        coeff * x ** (n_coeffs - 1 - exponent)
-        for exponent, coeff in enumerate(coefficients)
-    )
-    return y
 
 
 def construct_symmetric_2by2(first_eigenvector_angle, eigenvalues):
@@ -143,7 +126,6 @@ class AbsPolyFit1DDistribution:
         distribution,
         mean_coeffs,
         standarddev_coeffs,
-        only_positive_domain=False,
     ):
         """
         A 1 dimensional distribution where mean and standarddev
@@ -159,14 +141,10 @@ class AbsPolyFit1DDistribution:
         standarddev_coeffs : torch.Tensor
             The polynomial coefficients of the standard devation with
             respect to the independent variable.
-        only_positive_domain : bool, optional
-            Force the domain to be positive. This modifies the distribution.
-            Default is False.
         """
         self._distribution = distribution
         self.mean_coeffs = mean_coeffs
         self.standarddev_coeffs = standarddev_coeffs
-        self.only_positive_domain = only_positive_domain
 
     def get_distribution_args(self, variable):
         """
@@ -203,9 +181,9 @@ class AbsPolyFit1DDistribution:
         standarddev : torch.Tensor
             Standard devation matrix of the gaussian distribution.
         """
-        eps = torch.tensor(1e-10)
         standarddev = torch_polyval(self.standarddev_coeffs, variable)
-        return standarddev.abs() + eps
+        standarddev = torch.clip(standarddev, _TORCH_TINY, None)
+        return standarddev
 
     def get_mean(self, variable):
         """
@@ -257,15 +235,9 @@ class AbsPolyFit1DDistribution:
         -------
         sample : 1-D array_like, of length (n_samples, N)
         """
-        # TODO, warning, if self.only_positive_domain is True, the mean is not
-        # the mean of the distributions, it's just a parameter....
         if not hasattr(n_samples, "__iter__"):
             n_samples = [n_samples]
         distribution = self._distribution(*self.get_distribution_args(variable))
-        if self.only_positive_domain:
-            distribution = transformed_distribution.TransformedDistribution(
-                distribution, transforms.AbsTransform()
-            )
         sample = distribution.sample(n_samples)
         return sample.flatten()
 
@@ -275,7 +247,6 @@ class PolyFit1DGauss(AbsPolyFit1DDistribution):
         self,
         mean_coeffs,
         standarddev_coeffs,
-        only_positive_domain=False,
     ):
         """
         A 1 dimensional gaussian distribution where mean and standarddev
@@ -289,15 +260,11 @@ class PolyFit1DGauss(AbsPolyFit1DDistribution):
         standarddev_coeffs : torch.Tensor
             The polynomial coefficients of the standard devation with
             respect to the independent variable.
-        only_positive_domain : bool, optional
-            Force the domain to be positive. This modifies the distribution.
-            Default is False.
         """
         super().__init__(
             Normal,
             mean_coeffs,
             standarddev_coeffs,
-            only_positive_domain,
         )
 
 
@@ -364,8 +331,29 @@ class PolyFit1DLogNormal(AbsPolyFit1DDistribution):
             Probability of the position(s) in the 2 dimensional space.
         """
         distribution = self._distribution(*self.get_distribution_args(variable))
-        position = torch.clip(position, torch.finfo(position.dtype).tiny, None)
+        position = torch.clip(position, _TORCH_TINY, None)
         return distribution.log_prob(position)
+
+    def get_distribution_args(self, variable):
+        """
+        The construction arguments for the LogNormal distribution.
+        These are (loc, scale).
+
+        Parameters
+        ----------
+        variable : float
+            The value of the independent variable.
+        Returns
+        -------
+        loc : torch.Tensor
+            The loc of the distribution.
+        scale : torch.Tensor
+            The scale of the distribution.
+        """
+        mean = self.get_mean(variable)
+        standarddev = self.get_standarddev(variable)
+        loc, scale = logNorm_params(mean, standarddev)
+        return loc, scale
 
 
 class PolyFit1DWeibull(AbsPolyFit1DDistribution):
@@ -412,6 +400,8 @@ class PolyFit1DWeibull(AbsPolyFit1DDistribution):
         try:
             # do a regular sampling
             sample = super().draw_sample(variable, n_samples)
+            if not torch.isfinite(sample).all():
+                raise ValueError
         except ValueError:
             # something weird, just return zeros
             # weibull distribution has bad limiting cases at 0
@@ -438,17 +428,11 @@ class PolyFit1DWeibull(AbsPolyFit1DDistribution):
         concentration : torch.Tensor
             The concentration of the distribution.
         """
-        finfo = torch.finfo(self.mean_coeffs.dtype)
-        small_value = finfo.tiny
-
         # make sure we start with reasonable values
-        mean = torch.clip(self.get_mean(variable), small_value, None)
-        standarddev = torch.clip(self.get_standarddev(variable), small_value, None)
-
+        mean = torch.clip(self.get_mean(variable), _TORCH_TINY, None)
+        standarddev = self.get_standarddev(variable)
         # do the standard calculation
-        concentration = (mean / standarddev) ** (1.086)
-        denominator = (1 + 1 / concentration).lgamma().exp()
-        scale = torch.clip(mean / denominator, small_value, None)
+        scale, concentration = weibull_params(mean, standarddev)
 
         return scale, concentration
 
@@ -468,9 +452,8 @@ class PolyFit1DWeibull(AbsPolyFit1DDistribution):
         probability : torch.Tensor or 1-D torch.Tensor, of length n_pts
             Probability of the position(s) in the 2 dimensional space.
         """
-        eps = torch.tensor(1e-10)
         distribution = self._distribution(*self.get_distribution_args(variable))
-        position = torch.clip(position, eps, None)
+        position = torch.clip(position, _TORCH_TINY, None)
         return distribution.log_prob(position)
 
 
@@ -594,13 +577,12 @@ class PolyFit2DGFlash:
         p : torch.Tensor
             The p parameter for the GFlash model.
         """
-        eps = torch.tensor(0.00001)
         Rc = torch_polyval(self.Rc_coeffs, variable)
-        Rc = torch.clamp(Rc, min=eps)
+        Rc = torch.clamp(Rc, min=_TORCH_TINY)
         Rt_extend = torch_polyval(self.Rt_coeffs, variable)
-        Rt_extend = torch.clamp(Rt_extend, min=eps)
+        Rt_extend = torch.clamp(Rt_extend, min=_TORCH_TINY)
         p = torch_polyval(self.p_coeffs, variable)
-        p = torch.clamp(p, min=eps, max=1 - eps)
+        p = torch.clamp(p, min=_TORCH_TINY, max=1 - _TORCH_TINY)
         return Rc, Rt_extend, p
 
     def calculate_probability(self, variable, position):
@@ -621,7 +603,9 @@ class PolyFit2DGFlash:
             Probability of the position(s) in the 2 dimensional space.
         """
         distribution = self.distribution(*self.get_distribution_args(variable))
-        return distribution.prob(position)
+        # This distribution has a singularity at 0, so take nan to be 0
+        found = torch.nan_to_num(distribution.prob(position))
+        return found
 
     def calculate_log_probability(self, variable, position):
         """
@@ -733,7 +717,6 @@ class LayersBackBone:
             # energy_fit = PolyFit1DGauss(
             #    mean_coeffs,
             #    standarddev_coeffs,
-            #    only_positive_domain=True,
             # )
             energy_fit = PolyFit1DLogNormal(mean_coeffs, standarddev_coeffs)
             self.energy_fits.append(energy_fit)
@@ -878,7 +861,7 @@ class LayersBackBone:
                 .calculate_log_probability(incident_energy, n_pts)
                 .sum()
             )
-            if n_pts:
+            if int(n_pts):
                 mean_energy = energy.sum() / n_pts
                 log_likelihood += torch.sum(
                     self.energy_fits[layer_n].calculate_log_probability(

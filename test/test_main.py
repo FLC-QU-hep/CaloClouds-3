@@ -9,7 +9,9 @@ from scripts.main import main
 def customise_configs(configs, my_tmpdir):
     configs.log_comet = False
     test_dir = os.path.dirname(os.path.realpath(__file__))
+    print(f"Test dir: {test_dir}")
     configs.dataset_path = os.path.join(test_dir, "mini_data_sample.hdf5")
+    print(f"Dataset path: {configs.dataset_path}")
     configs.max_iters = 2
     configs.logdir = my_tmpdir.mkdir("logs")
     configs.device = "cpu"

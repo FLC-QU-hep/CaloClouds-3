@@ -31,41 +31,59 @@ from pointcloud.evaluation.bin_standard_metrics import (
 # the configs should hold correct hyperparameters for the model,
 # but the dataset_path may be incorrect.
 models = {}
+log_base = "../point-cloud-diffusion-logs/"
+log_base = "/beegfs/desy/user/dayhallh/point-cloud-diffusion-logs/"
+data_base = "../point-cloud-diffusion-data/"
+data_base = "/beegfs/desy/user/dayhallh/point-cloud-diffusion-data/"
 try:
+    pass
+    wish_path = os.path.join(
+        log_base, "wish/dataset_accumulators/p22_th90_ph90_en10-1/try2_wish_poly{}.pt"
+    )
     models.update(
         get_wish_models(
-            wish_path="../point-cloud-diffusion-logs/wish/dataset_accumulators"
-            "/p22_th90_ph90_en10-1/wish_poly{}.pt",
+            wish_path=wish_path,
             n_poly_degrees=4,
         )
     )
-except FileNotFoundError:
-    pass
+except FileNotFoundError as e:
+    print("Wish models not found")
+    print(e)
 
 try:
+    pass
+    caloclouds_path = os.path.join(
+        log_base,
+        "p22_th90_ph90_en10-100/CD_2024_05_24__14_47_04/ckpt_0.000000_990000.pt",
+    )
+    showerflow_path = os.path.join(data_base, "showerFlow/ShowerFlow_best.pth")
     models.update(
         get_caloclouds_models(
-            caloclouds_path="../point-cloud-diffusion-logs/p22_th90_ph90_en10-100"
-            + "/CD_2024_05_24__14_47_04/ckpt_0.000000_990000.pt",
-            showerflow_path="../point-cloud-diffusion-data/showerFlow/ShowerFlow_best.pth",
+            caloclouds_path=caloclouds_path, showerflow_path=showerflow_path
         )
     )
-except FileNotFoundError:
-    pass
+except FileNotFoundError as e:
+    print("CaloClouds models not found")
+    print(e)
 
 
 # Toggle the redo flags to ignore files already on disk and redo datasets
 # for example if you have retrained a model.
+accum_path = os.path.join(
+    log_base,
+    "wish/dataset_accumulators/p22_th90_ph90_en10-1/p22_th90_ph90_en10-100_seedAll_all_steps.h5",
+)
+
+
 def main(
     configs=Configs(),
-    redo_g4_data=False,
-    redo_g4_acc_data=False,
-    redo_model_data=False,
+    redo_g4_data=True,
+    redo_g4_acc_data=True,
+    redo_model_data=True,
     max_g4_events=0,
     max_model_events=0,
     models=models,
-    accumulator_path="../point-cloud-diffusion-logs/wish/dataset_accumulators/"
-    "p22_th90_ph90_en10-1/p22_th90_ph90_en10-100_seedAll_all_steps.h5",
+    accumulator_path=accum_path,
 ):
     """
     Run me like a script to create the metrics used in
@@ -142,10 +160,11 @@ def main(
     model_data = []
 
     for model_name in models:
-        model, shower_flow, configs = models[model_name]
+        model, shower_flow, model_configs = models[model_name]
         # configs.logdir = "/home/dayhallh/training/point-cloud-diffusion-logs"
-        configs.dataset_path = dataset_path
-        configs.n_dataset_files = 10
+        model_configs.dataset_path = dataset_path
+        model_configs.n_dataset_files = 10
+
         save_path = get_path(configs, model_name)
 
         if redo_model_data or not os.path.exists(save_path):
@@ -155,28 +174,37 @@ def main(
                 n_events = min(n_g4_events, max_model_events)
             else:
                 n_events = n_g4_events
+
+            # Standard normalised model output
             xyz_limits = [[-1, 1], [0, 29], [-1, 1]]
-            if "caloclouds" in model_name.lower():  # this model norms itself.
+            layer_bottom_pos = np.linspace(-0.1, 28.9, 30)
+            cell_thickness = 0.5
+            rescale_energy = 1e3
+            gun_pos = np.array([0, -70])
+
+            if "caloclouds" in model_name.lower():  # this model unnorms itself.
                 xyz_limits = [
                     [meta.Xmin, meta.Xmax],
                     [floors[0], ceilings[-1]],
                     [meta.Zmax, meta.Zmin],
                 ]
-            layer_bottom_pos = np.linspace(-0.1, 28.9, 30)
-            cell_thickness = 1
-            gun_pos = np.array([0, -70])
+                layer_bottom_pos = meta.layer_bottom_pos_raw
+                rescale_energy = 1e3
+                gun_pos = np.array([0, -70])
+
             binned = BinnedData(
                 model_name,
                 xyz_limits,
-                1000.0,
+                rescale_energy,
                 layer_bottom_pos,
                 cell_thickness,
                 gun_pos,
             )
             some_energies, some_events = sample_model(
-                configs, binned, n_events, model, shower_flow
+                model_configs, binned, n_events, model, shower_flow
             )
 
+            print(f"Saving {model_name} to {save_path}")
             binned.save(save_path)
         else:
             binned = BinnedData.load(save_path)
@@ -192,9 +220,15 @@ def main(
         xyz_limits = [[-1, 1], [0, 29], [-1, 1]]
         layer_bottom_pos = np.linspace(-0.1, 28.9, 30)
         cell_thickness = 1
-        gun_pos = np.array([0, -60])
+        gun_pos = np.array([0, -70])
+        rescale_energy = 1e4
         binned_acc = BinnedData(
-            acc_name, xyz_limits, 1000.0, layer_bottom_pos, cell_thickness, gun_pos
+            acc_name,
+            xyz_limits,
+            rescale_energy,
+            layer_bottom_pos,
+            cell_thickness,
+            gun_pos,
         )
 
         acc = StatsAccumulator.load(accumulator_path)
@@ -203,23 +237,34 @@ def main(
     else:
         binned_acc = BinnedData.load(acc_save_path)
 
-    # Print some stats for a sanity check
-    g4_energy, g4_events = read_raw_regaxes(configs, pick_events=slice(0, 100))
-    for name, type_events in {"g4": g4_events, "model": some_events}.items():
-        print(name)
-        es = type_events[:, :, 3]
-        mask = es > 0
-        es = es[mask]
-        xs = type_events[:, :, 0][mask]
-        ys = type_events[:, :, 1][mask]
-        zs = type_events[:, :, 2][mask]
+    try:
+        # Print some stats for a sanity check
+        g4_energy, g4_events = read_raw_regaxes(configs, pick_events=slice(0, 100))
+        some_energies = some_energies.detach().cpu().numpy()
+        for name, (
+            type_inci,
+            type_events,
+        ) in {
+            "g4": (g4_energy, g4_events),
+            "model": (some_energies, some_events),
+        }.items():
+            print(name)
+            es = type_events[:, :, 3]
+            mask = es > 0
+            es = es[mask]
+            xs = type_events[:, :, 0][mask]
+            ys = type_events[:, :, 1][mask]
+            zs = type_events[:, :, 2][mask]
 
-        for func in [np.min, np.max, np.mean, np.std]:
-            print(
-                f"{func.__name__} \t({func(xs):.2f}, {func(ys):.2f},"
-                f"{func(zs):.2f}, {func(es*100):.2f})"
-            )
-        print()
+            for func in [np.min, np.max, np.mean, np.std]:
+                print(
+                    f"{func.__name__} \t [{func(type_inci):.2f}] -> "
+                    f"({func(xs):.2f}, {func(ys):.2f}, "
+                    f"{func(zs):.2f}, {func(es*100):.2f})"
+                )
+            print()
+    except Exception:
+        print("Could not print stats")
 
 
 if __name__ == "__main__":

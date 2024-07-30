@@ -45,7 +45,6 @@ class BinnedData:
     Agrigate key metrics for calorimeter models
     into bins for easy plotting and comparison.
     """
-
     true_xyz_limits = [
         [meta.Xmin, meta.Xmax],
         [floors[0], ceilings[-1]],

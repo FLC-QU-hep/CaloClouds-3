@@ -4,6 +4,7 @@ from torch.nn import Module
 from .common import reparameterize_gaussian, gaussian_entropy, standard_normal_logprob, truncated_normal_
 from .encoders.pointnet import PointNetEncoder
 from .diffusion import DiffusionPoint
+from .flow import build_latent_flow
 
 
 class VAEFlow(Module):

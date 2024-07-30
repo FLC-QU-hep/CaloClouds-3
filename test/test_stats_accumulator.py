@@ -125,7 +125,6 @@ def test_read_section(tmpdir):
     assert np.sum(acc.total_events) == 3
 
 
-
 def test_HighLevelStats():
     acc = make_test_accumulator()
 
