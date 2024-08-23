@@ -7,6 +7,7 @@ class Configs(default.Configs):
 
         self.log_comet = False
         self.latent_dim = 0  # no latent flow in new calocloud
+        self.storage_base = "/gpfs/dust/maxwell/user/"
         self._dataset_path = 'dayhallh/data/ILCsoftEvents/p22_th90_ph90_en10-100_joined/p22_th90_ph90_en10-100_seed{}_all_steps.hdf5'
         self.n_dataset_files = 10
         self.Acomment = (
