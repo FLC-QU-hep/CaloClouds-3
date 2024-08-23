@@ -6,37 +6,88 @@ import k_diffusion
 from .common import ConcatSquashLinear, KLDloss, reparameterize_gaussian
 from .encoders.epic_encoder_cond import EPiC_encoder_cond
 
-# This import is a bit fragile, it only works if the directory above is on the python path
-# That happens natrually if the directory above is where you started python
-# but we could fix it by either expicitly adding the directory above to the path
-# or by making a deeper directory structure so thi could be a relative import
 from ..utils.misc import get_flow_model, mean_flat
 
 
-
 class epicVAE_nFlow_kDiffusion(Module):
+    """
+    Default Caloclouds diffusion model for generating points.
+    This diffusion model produces indeviual points, drawn independently from the distribution.
+    It is conditioned on number of points and incident energy.
+    """
 
-    def __init__(self, args, distillation = False):
+    def __init__(self, args, distillation=False):
+        """
+        Constructor for the model, for both training and sampling.
+
+        Parameters
+        ----------
+        args : pointcloud.configs
+            Configuration object for the model.
+            Has the following attributes:
+                device : str, device to run the model on, 'cuda' or 'cpu'
+                latent_dim : int, 0 if not used
+                features : int, number of features per point
+                cond_features : int, number of features for conditioning
+                residual : bool, if residual connections should be used
+                dropout_rate : float, dropout rate for training
+                dropout_mode : str, location of dropout layers, either 'all' or 'mid'
+                sigma_min : float, minimum value for sigma
+                model : dict, model parameters, including sigma_data
+        distillation : bool, optional
+            If true, this model is disstilld from recent iterations of the
+            primary model being trained.
+
+        """
         super().__init__()
         self.args = args
         self.distillation = distillation
         if args.latent_dim > 0:
-            self.encoder = EPiC_encoder_cond(args.latent_dim, input_dim=args.features, cond_features=args.cond_features)
+            self.encoder = EPiC_encoder_cond(
+                args.latent_dim,
+                input_dim=args.features,
+                cond_features=args.cond_features,
+            )
             self.flow = get_flow_model(args)
 
         if args.dropout_rate == 0.0:
-            net = PointwiseNet_kDiffusion(point_dim=args.features, context_dim=args.latent_dim+args.cond_features, residual=args.residual)
+            net = PointwiseNet_kDiffusion(
+                point_dim=args.features,
+                context_dim=args.latent_dim + args.cond_features,
+                residual=args.residual,
+            )
         else:
-            if args.dropout_mode == 'all':
-                net = PointwiseNet_kDiffusion_Dropout(point_dim=args.features, context_dim=args.latent_dim+args.cond_features, residual=args.residual, dropout_rate=args.dropout_rate)
-            elif args.dropout_mode == 'mid':
-                net = PointwiseNet_kDiffusion_Dropout_mid(point_dim=args.features, context_dim=args.latent_dim+args.cond_features, residual=args.residual, dropout_rate=args.dropout_rate)
-            else: 
-                raise NotImplementedError('dropout mode not implemented')
+            if args.dropout_mode == "all":
+                net = PointwiseNet_kDiffusion_Dropout(
+                    point_dim=args.features,
+                    context_dim=args.latent_dim + args.cond_features,
+                    residual=args.residual,
+                    dropout_rate=args.dropout_rate,
+                )
+            elif args.dropout_mode == "mid":
+                net = PointwiseNet_kDiffusion_Dropout_mid(
+                    point_dim=args.features,
+                    context_dim=args.latent_dim + args.cond_features,
+                    residual=args.residual,
+                    dropout_rate=args.dropout_rate,
+                )
+            else:
+                raise NotImplementedError("dropout mode not implemented")
         if not distillation:
-            self.diffusion = Denoiser(net, sigma_data = args.model['sigma_data'], device=args.device, diffusion_loss=args.diffusion_loss)
+            self.diffusion = Denoiser(
+                net,
+                sigma_data=args.model["sigma_data"],
+                device=args.device,
+                diffusion_loss=args.diffusion_loss,
+            )
         else:
-            self.diffusion = Denoiser(net, sigma_data = args.model['sigma_data'], device=args.device, distillation=True, sigma_min=args.sigma_min)
+            self.diffusion = Denoiser(
+                net,
+                sigma_data=args.model["sigma_data"],
+                device=args.device,
+                distillation=True,
+                sigma_min=args.sigma_min,
+            )
         # self.diffusion = k_diffusion.config.make_denoiser_wrapper(args.__dict__)(net)
         # self.diffusion = DiffusionPoint(
         #     net = PointwiseNet_kDiffusion(point_dim=args.features, context_dim=args.latent_dim+args.cond_features, residual=args.residual),
@@ -46,16 +97,35 @@ class epicVAE_nFlow_kDiffusion(Module):
         #         beta_T=args.beta_T,
         #         mode=args.sched_mode
         #     ))
-            
+
         self.kld = KLDloss()
 
-    def get_loss(self, x, noise, sigma, cond_feats, kl_weight, writer=None, it=None, kld_min=0.0):
+    def get_loss(
+        self, x, noise, sigma, cond_feats, kl_weight, writer=None, it=None, kld_min=0.0
+    ):
         """
-        Args:
-            x:  Input point clouds, (B, N, d).
-            noise: Noise point cloud (B, N, d).
-            sigma: Time (B, ).
-            cond_feats: conditioning features (B, C)
+        Calculate the loss of one or mode batches of data.
+        Data may be zero padded, points with 0 energy are padding.
+
+        Parameters
+        ----------
+        x : torch.Tensor (batch_size, max_num_points, features)
+            Data to compare to.
+        noise : torch.Tensor (batch_size, max_num_points, features)
+            Random tensor for adding noise to data.
+        sigma : torch.Tensor (batch_size)
+            Time for diffusion.
+        cond_feats : torch.Tensor (batch_size, cond_features)
+            Features to condition on, normally energy and number of points.
+
+        Returns
+        -------
+        loss : torch.Tensor (1,)
+            Loss of the model.
+        loss_prior : torch.Tensor (1,), or None
+            If there is a flow model forming the latent dimension,
+            this creates a prior loss for the flow model.
+
         """
         # batch_size, _, _ = x.size()
         # VAE encoder
@@ -63,27 +133,32 @@ class epicVAE_nFlow_kDiffusion(Module):
         if self.args.latent_dim > 0:
             z_mu, z_sigma = self.encoder(x, cond_feats)
             z = reparameterize_gaussian(mean=z_mu, logvar=z_sigma)  # (B, functional)
-            
+
             # VAE-like loss for encoder
             loss_kld = self.kld(mu=z_mu, logvar=z_sigma)
             loss_kld_clamped = torch.clamp(loss_kld, min=kld_min)
 
             # P(z), Prior probability, parameterized by the flow: z -> w.
-            nll = - self.flow.log_prob(z.detach().clone(), cond_feats)    # detach from computational graph if optimizing encoder+diffuison seperate from flow
+            nll = -self.flow.log_prob(
+                z.detach().clone(), cond_feats
+            )  # detach from computational graph if optimizing encoder+diffuison seperate from flow
             loss_prior = nll.mean()
 
             # Diffusion MSE loss: Negative ELBO of P(X|z)
             z = torch.cat([z, cond_feats], -1)
         else:
             z = cond_feats
-        #loss_diffusion = self.diffusion.get_loss(x, z)    # diffusion loss
-        loss_diffusion = self.diffusion.loss(x, noise, sigma, context=z).mean()    # diffusion loss
+        # loss_diffusion = self.diffusion.get_loss(x, z)    # diffusion loss
+        data_mask = x[..., 3] > 0
+        loss_diffusion = self.diffusion.loss(
+            x, noise, sigma, context=z, input_mask=data_mask
+        ).mean()  # diffusion loss
         # print('max values: ', loss_diffusion.max().item(), loss_diffusion.min().item())
         # print('shape of loss_diffusion: ', loss_diffusion.shape)
 
         # Total loss
         if self.args.latent_dim > 0:
-            loss = kl_weight*(loss_kld_clamped) + loss_diffusion
+            loss = kl_weight * (loss_kld_clamped) + loss_diffusion
         else:
             loss_prior = None
             loss = loss_diffusion
@@ -102,49 +177,59 @@ class epicVAE_nFlow_kDiffusion(Module):
 
         return loss, loss_prior
 
-
     def sample(self, cond_feats, num_points, config):
         batch_size, _ = cond_feats.size()
 
         # contect / latent space
         if self.args.latent_dim > 0:
-            z = self.flow.sample(context=cond_feats, num_samples=1).view(batch_size, -1)  # B,functional
-            z = torch.cat([z, cond_feats], -1)   # B, functional+C
+            z = self.flow.sample(context=cond_feats, num_samples=1).view(
+                batch_size, -1
+            )  # B,functional
+            z = torch.cat([z, cond_feats], -1)  # B, functional+C
         else:
             z = cond_feats  # B, C
 
-        x_T = torch.randn([z.size(0), num_points, config.features], device=z.device) * config.sigma_max
+        x_T = (
+            torch.randn([z.size(0), num_points, config.features], device=z.device)
+            * config.sigma_max
+        )
 
         if not self.distillation:
 
-            sigmas = k_diffusion.sampling.get_sigmas_karras(config.num_steps, config.sigma_min, config.sigma_max, rho=config.rho, device=z.device)
+            sigmas = k_diffusion.sampling.get_sigmas_karras(
+                config.num_steps,
+                config.sigma_min,
+                config.sigma_max,
+                rho=config.rho,
+                device=z.device,
+            )
 
-            sampler_kw_args = {'extra_args': {'context': z}, 'disable': True}
-            if config.sampler == 'euler':
+            sampler_kw_args = {"extra_args": {"context": z}, "disable": True}
+            if config.sampler == "euler":
                 sampler_class = k_diffusion.sampling.sample_euler
-            elif config.sampler == 'heun':
+            elif config.sampler == "heun":
                 sampler_class = k_diffusion.sampling.sample_heun
-                sampler_kw_args['s_churn'] = config.s_churn
-                sampler_kw_args['s_noise'] = config.s_noise
-            elif config.sampler == 'dpmpp_2m':
+                sampler_kw_args["s_churn"] = config.s_churn
+                sampler_kw_args["s_noise"] = config.s_noise
+            elif config.sampler == "dpmpp_2m":
                 sampler_class = k_diffusion.sampling.sample_dpmpp_2m
-            elif config.sampler == 'dpmpp_2s_ancestral':
+            elif config.sampler == "dpmpp_2s_ancestral":
                 sampler_class = k_diffusion.sampling.sample_dpmpp_2s_ancestral
-            elif config.sampler == 'sample_euler_ancestral':
+            elif config.sampler == "sample_euler_ancestral":
                 sampler_class = k_diffusion.sampling.sample_euler_ancestral
-            elif config.sampler == 'sample_lms':
+            elif config.sampler == "sample_lms":
                 sampler_class = k_diffusion.sampling.sample_lms
-            elif config.sampler == 'sample_dpmpp_2m_sde':
+            elif config.sampler == "sample_dpmpp_2m_sde":
                 sampler_class = k_diffusion.sampling.sample_dpmpp_2m_sde
             else:
-                raise NotImplementedError(f'Sampler {config.sampler} not implemented')
+                raise NotImplementedError(f"Sampler {config.sampler} not implemented")
             x_0 = sampler_class(self.diffusion, x_T, sigmas, **sampler_kw_args)
-            
+
         else:  # one step for consistency model
             x_0 = self.diffusion.forward(x_T, config.sigma_max, context=z)
 
         return x_0
-    
+
     # def inference(self, num_points, cfg, num_samples=256):
     #     with torch.no_grad():
     #         z = torch.randn([num_samples, cfg.latent_dim]).to(cfg.device)
@@ -157,7 +242,6 @@ class epicVAE_nFlow_kDiffusion(Module):
     #     z = torch.cat([z, cond_feats], -1)   # B,functional+C
     #     samples = self.diffusion.sample(num_points, context=z, flexibility=flexibility)
     #     return samples
-
 
     def get_cd_loss(self, x, cond_feats, model_teacher, model_target, config):
         """
@@ -173,70 +257,117 @@ class epicVAE_nFlow_kDiffusion(Module):
         if self.args.latent_dim > 0:
             with torch.no_grad():
                 z_mu, z_sigma = self.encoder(x, cond_feats)
-                z = reparameterize_gaussian(mean=z_mu, logvar=z_sigma)  # (B, functional)
-                z = torch.cat([z, cond_feats], -1)   # B,functional+C
+                z = reparameterize_gaussian(
+                    mean=z_mu, logvar=z_sigma
+                )  # (B, functional)
+                z = torch.cat([z, cond_feats], -1)  # B,functional+C
         else:
             z = cond_feats
 
-        loss = self.diffusion.consistency_loss(x, model_teacher.diffusion, model_target.diffusion, config, context=z).mean()    # consistency loss
+        loss = self.diffusion.consistency_loss(
+            x, model_teacher.diffusion, model_target.diffusion, config, context=z
+        ).mean()  # consistency loss
 
         return loss
-    
 
 
-# from: https://github.com/crowsonkb/k-diffusion/blob/master/k_diffusion/layers.py#L12
 class Denoiser(torch.nn.Module):
-    """A Karras et al. preconditioner for denoising diffusion models."""
+    """
+    A Karras et al. preconditioner for denoising diffusion models.
+    from: https://github.com/crowsonkb/k-diffusion/blob/master/k_diffusion/layers.py#L12
 
-    def __init__(self, inner_model, sigma_data=0.5, device='cuda', distillation = False, sigma_min = 0.002, diffusion_loss='l2'):
+    Slightly extended to allow filtering of input data when calculating loss.
+    """
+
+    def __init__(
+        self,
+        inner_model,
+        sigma_data=0.5,
+        device="cuda",
+        distillation=False,
+        sigma_min=0.002,
+        diffusion_loss="l2",
+    ):
         super().__init__()
         self.inner_model = inner_model
         if isinstance(sigma_data, float):
             sigma_data = [sigma_data, sigma_data, sigma_data, sigma_data]
         if len(sigma_data) != 4:
-            raise ValueError('sigma_data must be either a float or a list of 4 floats.')
+            raise ValueError("sigma_data must be either a float or a list of 4 floats.")
         # self.sigma_data = sigma_data   # B,
-        self.sigma_data = torch.tensor(sigma_data, device=device)   # 4,
+        self.sigma_data = torch.tensor(sigma_data, device=device)  # 4,
         self.distillation = distillation
         self.sigma_min = sigma_min
         self.diffusion_loss = diffusion_loss
 
-    def get_scalings(self, sigma):   # B,
-        sigma_data = self.sigma_data.expand(sigma.shape[0], -1)   # B, 4
+    def get_scalings(self, sigma):  # B,
+        sigma_data = self.sigma_data.expand(sigma.shape[0], -1)  # B, 4
         sigma = k_diffusion.utils.append_dims(sigma, sigma_data.ndim)  # B, 4
-        c_skip = sigma_data ** 2 / (sigma ** 2 + sigma_data ** 2)  # B, 4
-        c_out = sigma * sigma_data / (sigma ** 2 + sigma_data ** 2) ** 0.5  # B, 4
-        c_in = 1 / (sigma ** 2 + sigma_data ** 2) ** 0.5  # B, 4
-        return c_skip, c_out, c_in
-    
-    def get_scalings_for_boundary_condition(self, sigma):   # B,   # for consistency model
-        sigma_data = self.sigma_data.expand(sigma.shape[0], -1)   # B, 4
-        sigma = k_diffusion.utils.append_dims(sigma, sigma_data.ndim)  # B, 4
-        c_skip = sigma_data**2 / (
-            (sigma - self.sigma_min) ** 2 + sigma_data**2
-        )   # B, 4
-        c_out = (
-            (sigma - self.sigma_min)
-            * sigma_data
-            / (sigma**2 + sigma_data**2) ** 0.5
-        )   # B, 4
-        c_in = 1 / (sigma ** 2 + sigma_data ** 2) ** 0.5  # B, 4
+        c_skip = sigma_data**2 / (sigma**2 + sigma_data**2)  # B, 4
+        c_out = sigma * sigma_data / (sigma**2 + sigma_data**2) ** 0.5  # B, 4
+        c_in = 1 / (sigma**2 + sigma_data**2) ** 0.5  # B, 4
         return c_skip, c_out, c_in
 
-    def loss(self, input, noise, sigma, **kwargs):
+    def get_scalings_for_boundary_condition(
+        self, sigma
+    ):  # B,   # for consistency model
+        sigma_data = self.sigma_data.expand(sigma.shape[0], -1)  # B, 4
+        sigma = k_diffusion.utils.append_dims(sigma, sigma_data.ndim)  # B, 4
+        c_skip = sigma_data**2 / ((sigma - self.sigma_min) ** 2 + sigma_data**2)  # B, 4
+        c_out = (
+            (sigma - self.sigma_min) * sigma_data / (sigma**2 + sigma_data**2) ** 0.5
+        )  # B, 4
+        c_in = 1 / (sigma**2 + sigma_data**2) ** 0.5  # B, 4
+        return c_skip, c_out, c_in
+
+    def loss(self, input, noise, sigma, input_mask=None, **kwargs):
+        """
+        Calculate the loss of the model for a batch of data.
+
+        Parameters
+        ----------
+        input : torch.Tensor (batch_size, ...)
+            Data to compare to.
+        noise : torch.Tensor, same shape as input
+            Random tensor for adding noise to data.
+        sigma : torch.Tensor, (batch_size,)
+            Time for diffusion.
+        input_mask : torch.Tensor, same shape as input, optional
+            Mask for filtering input data, only calculate loss for True values.
+        **kwargs
+            Passed straight to the inner model.
+
+        Returns
+        -------
+        loss : torch.Tensor (batch_size,)
+            Mean loss of each batch.
+            
+        """
         # c_skip, c_out, c_in = [k_diffusion.utils.append_dims(x, input.ndim) for x in self.get_scalings(sigma)]   # B,1,1
-        c_skip, c_out, c_in = [x.unsqueeze(1) for x in self.get_scalings(sigma)]   # B,1,4
+        c_skip, c_out, c_in = [
+            x.unsqueeze(1) for x in self.get_scalings(sigma)
+        ]  # B,1,4
         noised_input = input + noise * k_diffusion.utils.append_dims(sigma, input.ndim)
         model_output = self.inner_model(noised_input * c_in, sigma, **kwargs)
         target = (input - c_skip * noised_input) / c_out
-        if self.diffusion_loss == 'l2':
-            return (model_output - target).pow(2).flatten(1).mean(1)
-        elif self.diffusion_loss == 'l1':
-            return (model_output - target).abs().flatten(1).mean(1)
+        if self.diffusion_loss == "l2":
+            distance = (model_output - target).pow(2)
+        elif self.diffusion_loss == "l1":
+            distance = (model_output - target).abs()
         else:
-            raise ValueError('diffusion_loss must be either l1 or l2')
+            raise ValueError("diffusion_loss must be either l1 or l2")
+        # now the dimensionality is taken down to the batch size.
+        if input_mask is None:
+            mean_distance = distance.flatten(1).mean(1)
+        else:
+            # don't modify anything in place, torch needs to backpropagate through the mask
+            counts_per_batch = input_mask.sum(1)*input.shape[2]
+            mean_distance = (distance.sum(2) * input_mask).sum(1) / counts_per_batch
+        return mean_distance
 
-    def forward(self, input, sigma, **kwargs):   # same as "denoise" in KarrasDenoiser of CM code
+    def forward(
+        self, input, sigma, **kwargs
+    ):  # same as "denoise" in KarrasDenoiser of CM code
         if isinstance(sigma, float) or isinstance(sigma, int):
             sigma = (
                 torch.tensor([sigma] * input.shape[0], dtype=torch.float32)
@@ -245,12 +376,16 @@ class Denoiser(torch.nn.Module):
             )
         # c_skip, c_out, c_in = [k_diffusion.utils.append_dims(x, input.ndim) for x in self.get_scalings(sigma)]
         if not self.distillation:
-            c_skip, c_out, c_in = [x.unsqueeze(1) for x in self.get_scalings(sigma)]   # B,1,4
+            c_skip, c_out, c_in = [
+                x.unsqueeze(1) for x in self.get_scalings(sigma)
+            ]  # B,1,4
         else:
-            c_skip, c_out, c_in = [x.unsqueeze(1) for x in self.get_scalings_for_boundary_condition(sigma)]
+            c_skip, c_out, c_in = [
+                x.unsqueeze(1) for x in self.get_scalings_for_boundary_condition(sigma)
+            ]
         # CM code did an additional resacling of the time sigma for the time conditing
         return self.inner_model(input * c_in, sigma, **kwargs) * c_out + input * c_skip
-    
+
     # inspired by https://github.com/openai/consistency_models/blob/main/cm/karras_diffusion.py#L106
     def consistency_loss(self, input, teacher_model, target_model, config, **kwargs):
 
@@ -258,10 +393,9 @@ class Denoiser(torch.nn.Module):
         dims = input.ndim
         num_scales = config.num_steps
 
-
-        def denoise_fn(x, t):   # t = sigma
+        def denoise_fn(x, t):  # t = sigma
             return self(x, t, **kwargs)
-        
+
         @torch.no_grad()
         def target_denoise_fn(x, t):
             return target_model(x, t, **kwargs)
@@ -269,7 +403,6 @@ class Denoiser(torch.nn.Module):
         @torch.no_grad()
         def teacher_denoise_fn(x, t):
             return teacher_model(x, t, **kwargs)
-
 
         @torch.no_grad()
         def heun_solver(samples, t, next_t, x0):
@@ -279,12 +412,14 @@ class Denoiser(torch.nn.Module):
             d = (x - denoiser) / k_diffusion.utils.append_dims(t, dims)
             samples = x + d * k_diffusion.utils.append_dims(next_t - t, dims)
             if teacher_model is None:
-                denoiser = x0     # but this would not be the correct Heun method any more? anyway, without teacher model it's using Euler
+                denoiser = x0  # but this would not be the correct Heun method any more? anyway, without teacher model it's using Euler
             else:
                 denoiser = teacher_denoise_fn(samples, next_t)
 
             next_d = (samples - denoiser) / k_diffusion.utils.append_dims(next_t, dims)
-            samples = x + (d + next_d) * k_diffusion.utils.append_dims((next_t - t) / 2, dims)
+            samples = x + (d + next_d) * k_diffusion.utils.append_dims(
+                (next_t - t) / 2, dims
+            )
 
             return samples
 
@@ -299,7 +434,6 @@ class Denoiser(torch.nn.Module):
             samples = x + d * k_diffusion.utils.append_dims(next_t - t, dims)
 
             return samples
-
 
         # Get random sigmas / EDM boundaries    same as k_diffusion.utils.get_sigmas_karras()   with t and t+1
         indices = torch.randint(
@@ -318,21 +452,33 @@ class Denoiser(torch.nn.Module):
         )
         t2 = t2**config.rho
 
-        x_t = input + noise * k_diffusion.utils.append_dims(t, dims)   # calculate x_t at time step t+1 from data
+        x_t = input + noise * k_diffusion.utils.append_dims(
+            t, dims
+        )  # calculate x_t at time step t+1 from data
 
-        dropout_state = torch.get_rng_state()   # get state of the random number generator
-        distiller = denoise_fn(x_t, t)     # denoise x_t completely x_t (t + 1) --> x_0 = input
+        dropout_state = (
+            torch.get_rng_state()
+        )  # get state of the random number generator
+        distiller = denoise_fn(
+            x_t, t
+        )  # denoise x_t completely x_t (t + 1) --> x_0 = input
 
         if teacher_model is None:
-            x_t2 = euler_solver(x_t, t, t2, input).detach()    # for consistency training, not used
+            x_t2 = euler_solver(
+                x_t, t, t2, input
+            ).detach()  # for consistency training, not used
         else:
-            x_t2 = heun_solver(x_t, t, t2, input).detach()     # for consistency distllation, one solver step to get from t+1 to t
+            x_t2 = heun_solver(
+                x_t, t, t2, input
+            ).detach()  # for consistency distllation, one solver step to get from t+1 to t
 
         torch.set_rng_state(dropout_state)
-        distiller_target = target_denoise_fn(x_t2, t2)   # target model (ema, not trained) denoises data completely from time t to t=0 / x_0 / input
+        distiller_target = target_denoise_fn(
+            x_t2, t2
+        )  # target model (ema, not trained) denoises data completely from time t to t=0 / x_0 / input
         distiller_target = distiller_target.detach()
 
-        weights = 1.    # paper: uniform weights work well in their experiments
+        weights = 1.0  # paper: uniform weights work well in their experiments
 
         # l2 loss / MSE loss
         diffs = (distiller - distiller_target) ** 2
@@ -341,32 +487,33 @@ class Denoiser(torch.nn.Module):
         return loss
 
 
-
-
-
-
-
 class PointwiseNet_kDiffusion(Module):
 
     def __init__(self, point_dim, context_dim, residual):
         super().__init__()
         time_dim = 64
-        fourier_scale = 16   # 1 in k-diffusion, 16 in EDM, 30 in Score-based generative modeling
+        fourier_scale = (
+            16  # 1 in k-diffusion, 16 in EDM, 30 in Score-based generative modeling
+        )
 
         self.act = functional.leaky_relu
         self.residual = residual
-        self.layers = ModuleList([
-            ConcatSquashLinear(point_dim, 128, context_dim+time_dim),
-            ConcatSquashLinear(128, 256, context_dim+time_dim),
-            ConcatSquashLinear(256, 512, context_dim+time_dim),
-            ConcatSquashLinear(512, 256, context_dim+time_dim),
-            ConcatSquashLinear(256, 128, context_dim+time_dim),
-            ConcatSquashLinear(128, point_dim, context_dim+time_dim)
-        ])
+        self.layers = ModuleList(
+            [
+                ConcatSquashLinear(point_dim, 128, context_dim + time_dim),
+                ConcatSquashLinear(128, 256, context_dim + time_dim),
+                ConcatSquashLinear(256, 512, context_dim + time_dim),
+                ConcatSquashLinear(512, 256, context_dim + time_dim),
+                ConcatSquashLinear(256, 128, context_dim + time_dim),
+                ConcatSquashLinear(128, point_dim, context_dim + time_dim),
+            ]
+        )
 
         self.timestep_embed = torch.nn.Sequential(
-            k_diffusion.layers.FourierFeatures(1, time_dim, std=fourier_scale),   # 1D Fourier features --> with register_buffer, so weights are not trained
-            torch.nn.Linear(time_dim, time_dim), # this is a trainable layer
+            k_diffusion.layers.FourierFeatures(
+                1, time_dim, std=fourier_scale
+            ),  # 1D Fourier features --> with register_buffer, so weights are not trained
+            torch.nn.Linear(time_dim, time_dim),  # this is a trainable layer
         )
 
     def forward(self, x, sigma, context=None):
@@ -374,18 +521,20 @@ class PointwiseNet_kDiffusion(Module):
         Args:
             x:  Point clouds at some timestep t, (B, N, d).
             sigma:     Time. (B, ).  --> becomes "sigma" in k-diffusion
-            context:  Shape latents. (B, functional). 
+            context:  Shape latents. (B, functional).
         """
         batch_size = x.size(0)
-        sigma = sigma.view(batch_size, 1, 1)          # (B, 1, 1)
-        context = context.view(batch_size, 1, -1)   # (B, 1, functional)
+        sigma = sigma.view(batch_size, 1, 1)  # (B, 1, 1)
+        context = context.view(batch_size, 1, -1)  # (B, 1, functional)
 
         # formulation from EDM paper / k-diffusion
         c_noise = sigma.log() / 4  # (B, 1, 1)
         time_emb = self.act(self.timestep_embed(c_noise))  # (B, 1, T)
-        
+
         # time_emb = torch.cat([beta, torch.sin(beta), torch.cos(beta)], dim=-1)  # (B, 1, 3)
-        ctx_emb = torch.cat([time_emb, context], dim=-1)    # (B, 1, functional+T)   # TODO: might want to add additional linear embedding net for context or only cond_feats
+        ctx_emb = torch.cat(
+            [time_emb, context], dim=-1
+        )  # (B, 1, functional+T)   # TODO: might want to add additional linear embedding net for context or only cond_feats
 
         out = x
         for i, layer in enumerate(self.layers):
@@ -399,29 +548,34 @@ class PointwiseNet_kDiffusion(Module):
             return out
 
 
-
 class PointwiseNet_kDiffusion_Dropout(Module):
 
     def __init__(self, point_dim, context_dim, residual, dropout_rate=0.0):
         super().__init__()
         time_dim = 64
-        fourier_scale = 16   # 1 in k-diffusion, 16 in EDM, 30 in Score-based generative modeling
+        fourier_scale = (
+            16  # 1 in k-diffusion, 16 in EDM, 30 in Score-based generative modeling
+        )
 
         self.act = functional.leaky_relu
         self.dropout = torch.nn.Dropout(dropout_rate)
         self.residual = residual
-        self.layers = ModuleList([
-            ConcatSquashLinear(point_dim, 128, context_dim+time_dim),
-            ConcatSquashLinear(128, 256, context_dim+time_dim),
-            ConcatSquashLinear(256, 512, context_dim+time_dim),
-            ConcatSquashLinear(512, 256, context_dim+time_dim),
-            ConcatSquashLinear(256, 128, context_dim+time_dim),
-            ConcatSquashLinear(128, point_dim, context_dim+time_dim)
-        ])
+        self.layers = ModuleList(
+            [
+                ConcatSquashLinear(point_dim, 128, context_dim + time_dim),
+                ConcatSquashLinear(128, 256, context_dim + time_dim),
+                ConcatSquashLinear(256, 512, context_dim + time_dim),
+                ConcatSquashLinear(512, 256, context_dim + time_dim),
+                ConcatSquashLinear(256, 128, context_dim + time_dim),
+                ConcatSquashLinear(128, point_dim, context_dim + time_dim),
+            ]
+        )
 
         self.timestep_embed = torch.nn.Sequential(
-            k_diffusion.layers.FourierFeatures(1, time_dim, std=fourier_scale),   # 1D Fourier features --> with register_buffer, so weights are not trained
-            torch.nn.Linear(time_dim, time_dim), # this is a trainable layer
+            k_diffusion.layers.FourierFeatures(
+                1, time_dim, std=fourier_scale
+            ),  # 1D Fourier features --> with register_buffer, so weights are not trained
+            torch.nn.Linear(time_dim, time_dim),  # this is a trainable layer
         )
 
     def forward(self, x, sigma, context=None):
@@ -429,23 +583,25 @@ class PointwiseNet_kDiffusion_Dropout(Module):
         Args:
             x:  Point clouds at some timestep t, (B, N, d).
             sigma:     Time. (B, ).  --> becomes "sigma" in k-diffusion
-            context:  Shape latents. (B, functional). 
+            context:  Shape latents. (B, functional).
         """
         batch_size = x.size(0)
-        sigma = sigma.view(batch_size, 1, 1)          # (B, 1, 1)
-        context = context.view(batch_size, 1, -1)   # (B, 1, functional)
+        sigma = sigma.view(batch_size, 1, 1)  # (B, 1, 1)
+        context = context.view(batch_size, 1, -1)  # (B, 1, functional)
 
         # formulation from EDM paper / k-diffusion
         c_noise = sigma.log() / 4  # (B, 1, 1)
         time_emb = self.act(self.timestep_embed(c_noise))  # (B, 1, T)
-        
+
         # time_emb = torch.cat([beta, torch.sin(beta), torch.cos(beta)], dim=-1)  # (B, 1, 3)
-        ctx_emb = torch.cat([time_emb, context], dim=-1)    # (B, 1, functional+T)   # TODO: might want to add additional linear embedding net for context or only cond_feats
+        ctx_emb = torch.cat(
+            [time_emb, context], dim=-1
+        )  # (B, 1, functional+T)   # TODO: might want to add additional linear embedding net for context or only cond_feats
 
         out = x
         for i, layer in enumerate(self.layers):
             out = layer(ctx=ctx_emb, x=out)
-            if i < len(self.layers) - 1:    # no activation and dropout after last layer
+            if i < len(self.layers) - 1:  # no activation and dropout after last layer
                 out = self.act(out)
                 out = self.dropout(out)
 
@@ -454,28 +610,35 @@ class PointwiseNet_kDiffusion_Dropout(Module):
         else:
             return out
 
+
 class PointwiseNet_kDiffusion_Dropout_mid(Module):
 
     def __init__(self, point_dim, context_dim, residual, dropout_rate=0.0):
         super().__init__()
         time_dim = 64
-        fourier_scale = 16   # 1 in k-diffusion, 16 in EDM, 30 in Score-based generative modeling
+        fourier_scale = (
+            16  # 1 in k-diffusion, 16 in EDM, 30 in Score-based generative modeling
+        )
 
         self.act = functional.leaky_relu
         self.dropout = torch.nn.Dropout(dropout_rate)
         self.residual = residual
-        self.layers = ModuleList([
-            ConcatSquashLinear(point_dim, 128, context_dim+time_dim),
-            ConcatSquashLinear(128, 256, context_dim+time_dim),
-            ConcatSquashLinear(256, 512, context_dim+time_dim),
-            ConcatSquashLinear(512, 256, context_dim+time_dim),
-            ConcatSquashLinear(256, 128, context_dim+time_dim),
-            ConcatSquashLinear(128, point_dim, context_dim+time_dim)
-        ])
+        self.layers = ModuleList(
+            [
+                ConcatSquashLinear(point_dim, 128, context_dim + time_dim),
+                ConcatSquashLinear(128, 256, context_dim + time_dim),
+                ConcatSquashLinear(256, 512, context_dim + time_dim),
+                ConcatSquashLinear(512, 256, context_dim + time_dim),
+                ConcatSquashLinear(256, 128, context_dim + time_dim),
+                ConcatSquashLinear(128, point_dim, context_dim + time_dim),
+            ]
+        )
 
         self.timestep_embed = torch.nn.Sequential(
-            k_diffusion.layers.FourierFeatures(1, time_dim, std=fourier_scale),   # 1D Fourier features --> with register_buffer, so weights are not trained
-            torch.nn.Linear(time_dim, time_dim), # this is a trainable layer
+            k_diffusion.layers.FourierFeatures(
+                1, time_dim, std=fourier_scale
+            ),  # 1D Fourier features --> with register_buffer, so weights are not trained
+            torch.nn.Linear(time_dim, time_dim),  # this is a trainable layer
         )
 
     def forward(self, x, sigma, context=None):
@@ -483,23 +646,25 @@ class PointwiseNet_kDiffusion_Dropout_mid(Module):
         Args:
             x:  Point clouds at some timestep t, (B, N, d).
             sigma:     Time. (B, ).  --> becomes "sigma" in k-diffusion
-            context:  Shape latents. (B, functional). 
+            context:  Shape latents. (B, functional).
         """
         batch_size = x.size(0)
-        sigma = sigma.view(batch_size, 1, 1)          # (B, 1, 1)
-        context = context.view(batch_size, 1, -1)   # (B, 1, functional)
+        sigma = sigma.view(batch_size, 1, 1)  # (B, 1, 1)
+        context = context.view(batch_size, 1, -1)  # (B, 1, functional)
 
         # formulation from EDM paper / k-diffusion
         c_noise = sigma.log() / 4  # (B, 1, 1)
         time_emb = self.act(self.timestep_embed(c_noise))  # (B, 1, T)
-        
+
         # time_emb = torch.cat([beta, torch.sin(beta), torch.cos(beta)], dim=-1)  # (B, 1, 3)
-        ctx_emb = torch.cat([time_emb, context], dim=-1)    # (B, 1, functional+T)   # TODO: might want to add additional linear embedding net for context or only cond_feats
+        ctx_emb = torch.cat(
+            [time_emb, context], dim=-1
+        )  # (B, 1, functional+T)   # TODO: might want to add additional linear embedding net for context or only cond_feats
 
         out = x
         for i, layer in enumerate(self.layers):
             out = layer(ctx=ctx_emb, x=out)
-            if i < len(self.layers) - 1:    # no activation and dropout after last layer
+            if i < len(self.layers) - 1:  # no activation and dropout after last layer
                 out = self.act(out)
                 if i == len(self.layers) - 3:
                     out = self.dropout(out)
