@@ -7,175 +7,213 @@ import pyro.distributions.transforms as T
 from .custom_pyro import ConditionalAffineCouplingTanH
 
 
+# a context manager to fix a seed
+class seed_torch:
+    def __init__(self, seed=42):
+        self.seed = seed
+
+    def __enter__(self):
+        self.previous_seed = torch.seed()
+        torch.manual_seed(self.seed)
+
+    def __exit__(self, type, value, traceback):
+        torch.manual_seed(self.previous_seed)
+
+
+def get_gauss_basis(num_inputs, device, **kwargs):
+    """
+    Create a multivariate Gaussian distribution.
+
+    Parameters
+    ----------
+    num_inputs : int
+        Dimension of the input and output space.
+    device : torch.device
+        The device on which the model will be run, either 'cpu' or 'cuda'.
+
+    Returns
+    -------
+    base_dist : dist.Normal
+        The distribution created by the transformations.
+
+    """
+    base_dist = dist.Normal(
+        torch.zeros(num_inputs).to(device), torch.ones(num_inputs).to(device)
+    )
+    return base_dist
+
+
+class HybridTanH_factory:
+    def __init__(self, num_inputs, num_cond_inputs, device):
+        self.num_inputs = num_inputs
+        self.num_cond_inputs = num_cond_inputs
+        self.device = device
+
+    def add_permutation(self, **kwargs):
+        perm = torch.randperm(self.num_inputs, dtype=torch.long).to(self.device)
+        ff = T.Permute(perm)
+        self.transforms.append(ff)
+
+    def add_affine_coupling(self, **kwargs):
+        split_dim = self.num_inputs // 2
+        param_dims = [self.num_inputs - split_dim, self.num_inputs - split_dim]
+        hypernet = ConditionalDenseNN(
+            split_dim,
+            self.num_cond_inputs,
+            [self.num_inputs * 10, self.num_inputs * 10],
+            param_dims,
+        )
+        ctf = ConditionalAffineCouplingTanH(split_dim, hypernet).to(self.device)
+        self.trainables.append(ctf)
+        self.transforms.append(ctf)
+
+    def add_spline_coupling(self, count_bins, **kwargs):
+        param_dims = [
+            self.num_inputs * count_bins,
+            self.num_inputs * count_bins,
+            self.num_inputs * (count_bins - 1),
+            self.num_inputs * count_bins,
+        ]
+        hypernet = DenseNN(
+            self.num_cond_inputs, [self.num_inputs * 4, self.num_inputs * 4], param_dims
+        )
+        ctf = T.ConditionalSpline(hypernet, self.num_inputs, count_bins).to(self.device)
+        self.trainables.append(ctf)
+        self.transforms.append(ctf)
+
+    def add_repeat(self, transform_pattern, transform_args):
+        for trans in transform_pattern:
+            if isinstance(trans, str):
+                trans = getattr(self, "add_" + trans)
+            trans(**transform_args)
+
+    def create(
+        self,
+        num_repeats,
+        transform_pattern,
+        base_dist_gen=get_gauss_basis,
+        **transform_args
+    ):
+
+        with seed_torch(42):
+            base_dist = base_dist_gen(self.num_inputs, self.device, **transform_args)
+            self.transforms = []
+            self.trainables = []
+            for _ in range(num_repeats):
+                self.add_repeat(transform_pattern, transform_args)
+            modules = nn.ModuleList(self.trainables)
+            flow_dist = dist.ConditionalTransformedDistribution(
+                base_dist, self.transforms
+            )
+
+        return modules, flow_dist
+
+
 def compile_HybridTanH_model(num_blocks, num_inputs, num_cond_inputs, device):
-    # the latent space distribution: choosing a 2-dim Gaussian
-    base_dist = dist.Normal(torch.zeros(num_inputs).to(device), torch.ones(num_inputs).to(device))
+    """
+    Simplified version of the default
 
-    input_dim = num_inputs
-    count_bins = 8
-    transforms = []
-    transforms2 = []
-      
-    input_dim = num_inputs
-    split_dim = num_inputs//2
-    param_dims1 = [input_dim-split_dim, input_dim-split_dim]
-    param_dims2 = [input_dim * count_bins, input_dim * count_bins, input_dim * (count_bins - 1), input_dim * count_bins]
+    Create a showerflow model to train, and also the distribution that it defines.
+    As this is a normalising flow model, the input and output space have the same dimensions.
 
-    torch.manual_seed(42)   # important to reproduce the permutations 
-
-    for i in range(num_blocks):
-        
-
-                    
-        hypernet = ConditionalDenseNN(split_dim, num_cond_inputs, [input_dim*10, input_dim*10], param_dims1)
-        #hypernet.apply(init_weights)
-        ctf = ConditionalAffineCouplingTanH(split_dim, hypernet)
-        transforms2.append(ctf)
-        transforms.append(ctf)
-        
-        perm = torch.randperm(input_dim, dtype=torch.long).to(device)
-        ff = T.Permute(perm)
-        transforms.append(ff)
-
-        
-        hypernet = ConditionalDenseNN(split_dim, num_cond_inputs, [input_dim*10, input_dim*10], param_dims1)
-        #hypernet.apply(init_weights)
-        ctf = ConditionalAffineCouplingTanH(split_dim, hypernet)
-        transforms2.append(ctf)
-        transforms.append(ctf)
-
-        perm = torch.randperm(input_dim, dtype=torch.long).to(device)
-        ff = T.Permute(perm)
-        transforms.append(ff)
-
-        
-        hypernet = ConditionalDenseNN(split_dim, num_cond_inputs, [input_dim*10, input_dim*10], param_dims1)
-        #hypernet.apply(init_weights)
-        ctf = ConditionalAffineCouplingTanH(split_dim, hypernet)
-        transforms2.append(ctf)
-        transforms.append(ctf)
-        
-        perm = torch.randperm(input_dim, dtype=torch.long).to(device)
-        ff = T.Permute(perm)
-        transforms.append(ff)
-        
-        
-        
-        
-        perm = torch.randperm(input_dim, dtype=torch.long).to(device)
-        ff = T.Permute(perm)
-        transforms.append(ff)
-        
-        hypernet = DenseNN(num_cond_inputs, [input_dim*4, input_dim*4], param_dims2)
-        #hypernet.apply(init_weights)
-        ctf = T.ConditionalSpline(hypernet, input_dim, count_bins)
-        transforms2.append(ctf)
-        transforms.append(ctf)
-        
-
-        
-
-        hypernet = ConditionalDenseNN(split_dim, num_cond_inputs, [input_dim*10, input_dim*10], param_dims1)
-        #hypernet.apply(init_weights)
-        ctf = ConditionalAffineCouplingTanH(split_dim, hypernet)
-        transforms2.append(ctf)
-        transforms.append(ctf)
-        
-        perm = torch.randperm(input_dim, dtype=torch.long).to(device)
-        ff = T.Permute(perm)
-        transforms.append(ff)
-
-        
-        hypernet = ConditionalDenseNN(split_dim, num_cond_inputs, [input_dim*10, input_dim*10], param_dims1)
-        #hypernet.apply(init_weights)
-        ctf = ConditionalAffineCouplingTanH(split_dim, hypernet)
-        transforms2.append(ctf)
-        transforms.append(ctf)
-
-        perm = torch.randperm(input_dim, dtype=torch.long).to(device)
-        ff = T.Permute(perm)
-        transforms.append(ff)
-
-        
-        hypernet = ConditionalDenseNN(split_dim, num_cond_inputs, [input_dim*10, input_dim*10], param_dims1)
-        #hypernet.apply(init_weights)
-        ctf = ConditionalAffineCouplingTanH(split_dim, hypernet)
-        transforms2.append(ctf)
-        transforms.append(ctf)
-        
-        perm = torch.randperm(input_dim, dtype=torch.long).to(device)
-        ff = T.Permute(perm)
-        transforms.append(ff)
-        
-        
-        
-        
-        
-    modules = nn.ModuleList(transforms2)
-
-    flow_dist = dist.ConditionalTransformedDistribution(base_dist, transforms)
-
-    return modules, flow_dist
+    It isn't hard coded, but usually there are 65 dimensions.
+    In order of appearance, the dimensions encode;
+    - the number of points total
+    - total visible energy
+    - center of gravity (energy) in x
+    - center of gravity (energy) in y
+    - center of gravity (energy) in z
+    - number of clusters on layer 1
+    ...
+    - number of clusters on layer 30
+    - total energy on layer 1
+    ...
+    - total energy on layer 30
 
 
+    Parameters
+    ----------
+    num_blocks : int
+        Number of transformaitons the model applies to the distribution.
+    num_inputs : int
+        Dimension of the input and output space.
+    num_cond_inputs : int
+        Dimension of the conditioning input. Same information is given to each transformation.
+    device : torch.device
+        The device on which the model will be run, either 'cpu' or 'cuda'.
 
-def compile_HybridTanH_model_s(num_blocks, num_inputs, num_cond_inputs, device, input_dim_multiplier=10):
-    # the latent space distribution: choosing a 2-dim Gaussian
-    base_dist = dist.Normal(torch.zeros(num_inputs).to(device), torch.ones(num_inputs).to(device))
+    Returns
+    -------
+    model : nn.ModuleList
+        The trainable model that will define the transformaitons.
+    flow_dist : dist.ConditionalTransformedDistribution
+        The distribution created by the transformations.
 
-    input_dim = num_inputs
-    count_bins = 8
-    transforms = []
-    transforms2 = []
-      
-    input_dim = num_inputs
-    split_dim = num_inputs//2
-    param_dims1 = [input_dim-split_dim, input_dim-split_dim]
-    param_dims2 = [input_dim * count_bins, input_dim * count_bins, input_dim * (count_bins - 1), input_dim * count_bins]
+    """
+    factory = HybridTanH_factory(num_inputs, num_cond_inputs, device)
 
-    torch.manual_seed(42)   # important to reproduce the permutations 
+    transform_pattern = [
+        "affine_coupling",
+        "permutation",
+        "affine_coupling",
+        "permutation",
+        "affine_coupling",
+        "permutation",
+        "permutation",
+        "spline_coupling",
+        "affine_coupling",
+        "permutation",
+        "affine_coupling",
+        "permutation",
+        "affine_coupling",
+        "permutation",
+    ]
 
-    for i in range(num_blocks):
-        
-                    
-        hypernet = ConditionalDenseNN(split_dim, num_cond_inputs, [input_dim*input_dim_multiplier, input_dim*input_dim_multiplier], param_dims1)
-        #hypernet.apply(init_weights)
-        ctf = ConditionalAffineCouplingTanH(split_dim, hypernet)
-        transforms2.append(ctf)
-        transforms.append(ctf)
-        
-        perm = torch.randperm(input_dim, dtype=torch.long).to(device)
-        ff = T.Permute(perm)
-        transforms.append(ff)
+    model, flow_dist = factory.create(num_blocks, transform_pattern, count_bins=8)
+    return model, flow_dist
 
 
-        
-        hypernet = ConditionalDenseNN(split_dim, num_cond_inputs, [input_dim*input_dim_multiplier, input_dim*input_dim_multiplier], param_dims1)
-        #hypernet.apply(init_weights)
-        ctf = ConditionalAffineCouplingTanH(split_dim, hypernet)
-        transforms2.append(ctf)
-        transforms.append(ctf)
-        
-        perm = torch.randperm(input_dim, dtype=torch.long).to(device)
-        ff = T.Permute(perm)
-        transforms.append(ff)
-        
-        
-        
-        perm = torch.randperm(input_dim, dtype=torch.long).to(device)
-        ff = T.Permute(perm)
-        transforms.append(ff)
-        
-        hypernet = DenseNN(num_cond_inputs, [input_dim*input_dim_multiplier, input_dim*input_dim_multiplier], param_dims2)
-        #hypernet.apply(init_weights)
-        ctf = T.ConditionalSpline(hypernet, input_dim, count_bins)
-        transforms2.append(ctf)
-        transforms.append(ctf)
-             
-        
-        
-    modules = nn.ModuleList(transforms2)
+def compile_HybridTanH_alt1(num_blocks, num_inputs, num_cond_inputs, device):
+    factory = HybridTanH_factory(num_inputs, num_cond_inputs, device)
 
-    flow_dist = dist.ConditionalTransformedDistribution(base_dist, transforms)
+    transform_pattern = [
+        "affine_coupling",
+        "permutation",
+        "affine_coupling",
+        "permutation",
+        "affine_coupling",
+        "permutation",
+        "spline_coupling",
+        "permutation",
+        "affine_coupling",
+        "permutation",
+        "affine_coupling",
+        "permutation",
+        "affine_coupling",
+        "permutation",
+    ]
 
-    return modules, flow_dist
+    model, flow_dist = factory.create(num_blocks, transform_pattern, count_bins=8)
+    return model, flow_dist
+
+
+def compile_HybridTanH_alt2(num_blocks, num_inputs, num_cond_inputs, device):
+    factory = HybridTanH_factory(num_inputs, num_cond_inputs, device)
+
+    transform_pattern = [
+        "affine_coupling",
+        "permutation",
+        "affine_coupling",
+        "permutation",
+        "affine_coupling",
+        "permutation",
+        "affine_coupling",
+        "permutation",
+        "affine_coupling",
+        "permutation",
+        "affine_coupling",
+        "permutation",
+    ]
+
+    model, flow_dist = factory.create(num_blocks, transform_pattern, count_bins=8)
+    return model, flow_dist
