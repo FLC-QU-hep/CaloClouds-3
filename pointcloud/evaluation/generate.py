@@ -379,6 +379,7 @@ def load_np_showers(file_path: str) -> np.array or tuple[np.array, np.array]:
 
 def main():
     config = Configs()
+    params_dict = make_params_dict()
     write_showers(config, params_dict)
 
 

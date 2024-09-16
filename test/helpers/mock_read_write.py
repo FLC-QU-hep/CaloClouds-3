@@ -10,18 +10,18 @@ def mock_get_n_events(path, n_files):
 
 def mock_read_raw_regaxes(config, idxs):
     meta = metadata.Metadata(config)
-    y_in_layers = meta.layer_bottom_pos_raw + meta.cell_thickness_raw / 2
+    z_in_layers = meta.layer_bottom_pos_hdf5 + meta.cell_thickness_hdf5 / 2
 
     incident_energies = np.array([1.0, 2.0, 3.0])
     coordinates = np.zeros((len(incident_energies), 10, 4))
 
-    coordinates[0, :3, 1] = y_in_layers[[0, 1, 1]]
-    coordinates[0, :3][:, [0, 2, 3]] = np.array(
+    coordinates[0, :3, 2] = z_in_layers[[0, 1, 1]]
+    coordinates[0, :3][:, [0, 1, 3]] = np.array(
         [[0.0, 0.0, 1.0], [0.0, 1.0, 2.0], [1.0, 0.0, 3.0]]
     )
 
-    coordinates[1, :4, 1] = y_in_layers[[0, 1, 1, 2]]
-    coordinates[1, :4][:, [0, 2, 3]] = np.array(
+    coordinates[1, :4, 2] = z_in_layers[[0, 1, 1, 2]]
+    coordinates[1, :4][:, [0, 1, 3]] = np.array(
         [[0.0, 0.0, 2.0], [0.0, 1.0, 2.0], [1.0, 0.0, 2.0], [0.0, 0.0, 2.0]]
     )
 

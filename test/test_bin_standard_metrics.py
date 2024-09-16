@@ -5,13 +5,12 @@ import os
 import numpy as np
 import numpy.testing as npt
 from unittest.mock import patch
-import pytest
 
 from helpers.mock_read_write import mock_read_raw_regaxes, mock_get_n_events
 from helpers.sample_models import write_fake_flow_model, make_fake_wish_model
+from helpers import config_creator
 
 
-from pointcloud.config_varients import default, wish
 from pointcloud.config_varients.wish import Configs as WishConfigs
 from pointcloud.models.wish import Wish
 from pointcloud.utils import stats_accumulator
@@ -25,21 +24,6 @@ from pointcloud.evaluation.bin_standard_metrics import (
     get_wish_models,
     get_caloclouds_models,
 )
-
-
-def make_config(use_wish=False):
-    if use_wish:
-        config = wish.Configs()
-    else:
-        config = default.Configs()
-    # no logging for tests, as we would need a comet key
-    config.log_comet = False
-    test_dir = os.path.dirname(os.path.abspath(__file__))
-    config.dataset_path = os.path.join(test_dir, "mini_data_sample.hdf5")
-    config.max_iters = 2
-    config.fit_attempts = 2
-    config.device = "cpu"
-    return config
 
 
 def make_default_binned(xyz_limits=None):
@@ -181,7 +165,9 @@ def test_BinnedData(tmpdir):
     # test load
     new_binned = BinnedData.load(save_path)
     npt.assert_allclose(new_binned.true_xyz_limits, binned.true_xyz_limits)
-    npt.assert_allclose(new_binned.layer_bottom_pos, binned.layer_bottom_pos)
+    npt.assert_allclose(
+        new_binned.layer_bottom_pos, binned.layer_bottom_pos
+    )
     for i in range(len(expected_hists)):
         npt.assert_allclose(new_binned.counts[i], binned.counts[i])
         npt.assert_allclose(new_binned.bins[i], binned.bins[i])
@@ -193,7 +179,7 @@ def test_BinnedData(tmpdir):
 @patch("pointcloud.data.trees.read_raw_regaxes", new=mock_read_raw_regaxes)
 def test_sample_g4():
     binned = make_default_binned([[-100, 100], [-100, 100], [-100, 100]])
-    config = make_config()
+    config = config_creator.make("default")
     # test with no events
     sample_g4(config, binned, 0)
     for counts in binned.counts[:-2]:
@@ -209,7 +195,7 @@ def test_sample_g4():
 
 def test_sample_model():
     # test with wish
-    configs = make_config(use_wish=True)
+    configs = config_creator.make("wish")
     wish_model = make_fake_wish_model(configs)
 
     binned = make_default_binned([[-100, 100], [-100, 100], [-100, 100]])
@@ -228,7 +214,7 @@ def test_sample_model():
 
 def test_sample_accumulator():
     # test with an empty accumulator
-    configs = make_config()
+    configs = config_creator.make()
     acc = stats_accumulator.StatsAccumulator()
     binned = make_default_binned()
     sample_accumulator(configs, binned, acc, 0)
@@ -245,7 +231,7 @@ def test_sample_accumulator():
 
 
 def test_get_path(tmpdir):
-    configs = make_config()
+    configs = config_creator.make()
     configs.logdir = str(tmpdir)
     name = "test me"
     path = get_path(configs, name)
@@ -256,7 +242,7 @@ def test_get_path(tmpdir):
 
 def test_get_wish_models(tmpdir):
     # make some fake models to read
-    configs = make_config(use_wish=True)
+    configs = config_creator.make("wish")
     wish_model = make_fake_wish_model(configs)
     save_path = os.path.join(str(tmpdir), "wish_model_{}.pt")
     n_poly_degrees = 3
@@ -274,7 +260,7 @@ def test_get_wish_models(tmpdir):
 
 def test_get_caloclouds_models(tmpdir):
     # Need to get the right paths
-    cfg = make_config()
+    cfg = config_creator.make("caloclouds_3")
     test_cm_model_path = "test/example_cm_model.pt"
     # fake the flow model
     test_model_path = str(tmpdir) + "/example_flow_model.pt"

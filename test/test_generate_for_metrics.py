@@ -1,20 +1,14 @@
 """
 Module to test the functions in evaluation.generate
 """
-import pytest
 from unittest.mock import patch
 import argparse
-import h5py
 import pickle
 import numpy as np
 from pointcloud.evaluation import generate_for_metrics
-from test_generate import make_config as make_config_generate
 from test_generate import write_fake_flow_model
 
-
-def make_config():
-    config = make_config_generate()
-    return config
+from helpers import config_creator
 
 
 @patch(
@@ -55,8 +49,10 @@ def test_make_params_dict():
 def test_get_g4_data():
     test_data_path = "test/mini_data_sample.hdf5"
     all_events, all_energy = generate_for_metrics.get_g4_data(test_data_path)
-    assert isinstance(all_events, generate_for_metrics.lazy_loading.DatasetView)
-    assert isinstance(all_energy, h5py.Dataset)
+    #assert isinstance(all_events, generate_for_metrics.lazy_loading.DatasetView)
+    assert isinstance(all_events, np.ndarray)
+    #assert isinstance(all_energy, h5py.Dataset)
+    assert isinstance(all_energy, np.ndarray)
     n_events_in_sample = 2
     max_hits_per_event = 6000
     assert all_events.shape == (n_events_in_sample, max_hits_per_event, 4)
@@ -64,7 +60,7 @@ def test_get_g4_data():
 
 
 def test_yield_g4_showers():
-    config = make_config()
+    config = config_creator.make()
     param_dict = generate_for_metrics.make_params_dict("cm")
     test_data_path = "test/mini_data_sample.hdf5"
     g4_data = generate_for_metrics.get_g4_data(test_data_path)
@@ -79,7 +75,7 @@ def test_yield_g4_showers():
 
 def test_shower_generator_factory(tmpdir):
     # Need to test the g4 version
-    config = make_config()
+    config = config_creator.make()
     param_dict = generate_for_metrics.make_params_dict("g4")
     param_dict["g4_data_path"] = "test/mini_data_sample.hdf5"
     shower_generator = generate_for_metrics.shower_generator_factory(config, param_dict)
@@ -110,7 +106,7 @@ def test_shower_generator_factory(tmpdir):
 
 # TODO test plotting.get_features.... it's fairly important
 def test_add_chunk():
-    config = make_config()
+    config = config_creator.make()
     param_dict = generate_for_metrics.make_params_dict("g4")
     param_dict["n_events"] = 50
     # make a fake shower generator

@@ -71,6 +71,8 @@ def get_p0_n_bounds(f, p0=None, bounds=(-np.inf, np.inf)):
         initial values will all be 1 (if the number of parameters for the
         function can be determined using introspection, otherwise a
         ValueError is raised).
+        In the case that finite bounds are provided, the initial guess will
+        be chosen to be within the bounds, centered if both bounds are finite.
     bounds : 2-tuple of array_like or `Bounds`, optional
         Lower and upper bounds on parameters. Defaults to no bounds.
         There are two ways to specify the bounds:
@@ -263,6 +265,8 @@ def curve_fit(
         convertible if it is an array like object.
     ydata : array_like
         The dependent data, a length M array - nominally ``f(xdata, ...)``.
+    n_attempts : int, optional
+        Number of attempts to make including the initial guess. Default is 10.
     p0 : array_like, optional
         Initial guess for the parameters (length N). If None, then the
         initial values will all be 1 (if the number of parameters for the
@@ -369,43 +373,6 @@ def curve_fit(
         the covariance matrix. Covariance matrices with large condition numbers
         (e.g. computed with `numpy.linalg.cond`) may indicate that results are
         unreliable.
-    infodict : dict (returned only if `full_output` is True)
-        a dictionary of optional outputs with the keys:
-
-        ``nfev``
-            The number of function calls. Methods 'trf' and 'dogbox' do not
-            count function calls for numerical Jacobian approximation,
-            as opposed to 'lm' method.
-        ``fvec``
-            The residual values evaluated at the solution, for a 1-D `sigma`
-            this is ``(f(x, *popt) - ydata)/sigma``.
-        ``fjac``
-            A permutation of the R matrix of a QR
-            factorization of the final approximate
-            Jacobian matrix, stored column wise.
-            Together with ipvt, the covariance of the
-            estimate can be approximated.
-            Method 'lm' only provides this information.
-        ``ipvt``
-            An integer array of length N which defines
-            a permutation matrix, p, such that
-            fjac*p = q*r, where r is upper triangular
-            with diagonal elements of nonincreasing
-            magnitude. Column j of p is column ipvt(j)
-            of the identity matrix.
-            Method 'lm' only provides this information.
-        ``qtf``
-            The vector (transpose(q) * fvec).
-            Method 'lm' only provides this information.
-
-    mesg : str (returned only if `full_output` is True)
-        A string message giving information about the solution.
-
-    ier : int (returned only if `full_output` is True)
-        An integer flag. If it is equal to 1, 2, 3 or 4, the solution was
-        found. Otherwise, the solution was not found. In either case, the
-        optional output variable `mesg` gives more information.
-
 
     Raises
     ------

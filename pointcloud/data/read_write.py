@@ -5,8 +5,9 @@ Read and write dat aon disk, creates a common interface.
 import h5py
 import numpy as np
 from functools import lru_cache
-import os
 import glob
+
+from ..utils.metadata import Metadata
 
 
 @lru_cache(maxsize=1)
@@ -117,10 +118,14 @@ def regularise_event_axes(events, is_transposed=None, known_regular=False):
             # don't want to straight up squeeze in case there is only one event
             events = events[0]
     if is_transposed == True:
-        assert events.shape[1] == 4, "The second last axes must be length 4 in transposed events"
+        assert (
+            events.shape[1] == 4
+        ), "The second last axes must be length 4 in transposed events"
         events = events.transpose(0, 2, 1)
     elif is_transposed == False:
-        assert events.shape[2] == 4, "The last axes must be length 4 in non-transposed events"
+        assert (
+            events.shape[2] == 4
+        ), "The last axes must be length 4 in non-transposed events"
     else:
         if events.shape[2] != 4:
             if not events.shape[1] == 4:
@@ -167,9 +172,140 @@ def get_n_events(dataset_path, n_files=0):
     return n_events
 
 
+def events_to_local(events, orientation):
+    """
+    Rotate axes order so that the shower progresses along the z-axis.
+    Modifes in place.
+    To get local coordinates from global coordinates,
+    the axis along which the shower is developing is swapped with the z-axis.
+    To revert it, the swap is performed again.
+
+    Parameters
+    ----------
+    events : array
+        The input showers tensor.
+    global_shower_orientation : char
+        "x", "y", or "z", the direction of the "z" axis of the local
+        shower coordinate system in the detector coordinate system.
+
+    """
+    local_orientation = _validate_orientations(orientation)
+    column_target = ["xyz".index(c) for c in local_orientation]
+    events[..., column_target] = events[..., [0, 1, 2]]
+
+
+def _validate_orientations(orientation, orientation_global=None):
+    """
+    Check the format of orientation strings, return the local and global orientations
+    relative to the disk.
+
+    Parameters
+    ----------
+    orientation : str
+        The relationship between orientation on disk and local coordinates.
+    orientation_global : str, optional
+        The relationship between orientation on disk and global coordinates.
+        If None, doesn't need checking
+
+    Returns
+    -------
+    short_orientation : str
+        The relationship between orientation on disk and local coordinates.
+    short_orientation_global : str (Optional)
+        The relationship between orientation on disk and global coordinates.
+
+    """
+    expected_start = "hdf5:xyz==local:"
+    if not orientation.startswith(expected_start):
+        raise NotImplementedError(
+            f"Do not know how to interpret orientation {orientation}"
+        )
+    short_orientation = orientation[len(expected_start) :]
+    if orientation_global is not None:
+        expected_start = "hdf5:xyz==global:"
+        if not orientation_global.startswith(expected_start):
+            raise NotImplementedError(
+                f"Do not know how to interpret orientation {orientation_global}"
+            )
+        short_orientation_global = orientation_global[len(expected_start) :]
+        return short_orientation, short_orientation_global
+    return short_orientation
+
+
+def local_to_global(events, orientation, orientation_global):
+    """
+    Rotate events given in a local coordinate system to the global coordinate system.
+    Two orientations strings are supplied becuase the metadata saves the relationship
+    bettween the disk coordinates and the local coordinates, and the disk
+    coordinates and the global coordinates.
+
+    Does not act in place.
+
+    Parameters
+    ----------
+    events : array [..., 4]
+        The input points, in local coordinates, with last axis in xyze format.
+    orientation : str
+        The relationship between orientation on disk and local coordinates.
+    orientation_global : str
+        The relationship between orientation on disk and global coordinates.
+
+    Returns
+    -------
+    events : array [..., 4]
+        The input points, in global coordinates, with last axis in xyze format.
+
+    """
+    if not len(events):
+        return events
+    local_to_disk, disk_to_global = _validate_orientations(
+        orientation, orientation_global
+    )
+    to_global = [local_to_disk.index(c) for c in disk_to_global]
+    new_events = events.copy()
+    new_events[..., to_global] = events[..., [0, 1, 2]]
+    return new_events
+
+
+def global_to_local(events, orientation, orientation_global):
+    """
+    Rotate events given in a global coordinate system to the local coordinate system.
+    Two orientations strings are supplied becuase the metadata saves the relationship
+    bettween the disk coordinates and the local coordinates, and the disk
+    coordinates and the global coordinates.
+
+    Does not act in place.
+
+    Parameters
+    ----------
+    events : array [..., 4]
+        The input points, in global coordinates, with last axis in xyze format.
+    orientation : str
+        The relationship between orientation on disk and local coordinates.
+    orientation_global : str
+        The relationship between orientation on disk and global coordinates.
+
+    Returns
+    -------
+    events : array [..., 4]
+        The input points, in local coordinates, with last axis in xyze format.
+
+    """
+    if not len(events):
+        return events
+    local_to_disk, disk_to_global = _validate_orientations(
+        orientation, orientation_global
+    )
+    to_local = [disk_to_global.index(c) for c in local_to_disk]
+    new_events = events.copy()
+    new_events[..., to_local] = events[..., [0, 1, 2]]
+    return new_events
+
+
 def read_raw_regaxes(config, pick_events=None, total_size=None):
     """
-    Draw raw events form the dataset, reshape, but don't alter values.
+    Draw raw events form the dataset, reshape, and move to local axis orientation,
+    but don't alter values.
 
     Parameters
     ----------
@@ -261,6 +397,9 @@ def read_raw_regaxes(config, pick_events=None, total_size=None):
     energy = np.concatenate(energy)
     events = np.vstack(events)
 
+    metadata = Metadata(config)
+    events_to_local(events, metadata.orientation)
+
     return energy, events
 
 
@@ -298,6 +437,8 @@ def check_regaxes(incedent_energy, events):
 def write_raw_regaxes(destination, incedent_energy, events):
     """
     Write data to the disk, require the data be in a regular shape.
+    Assumes the axis order is the correct one for the local_xyz_orientation
+    as specified in the metadata.
 
     Parameters
     ----------

@@ -5,7 +5,6 @@ Return data as a tree structure.
 import numpy as np
 from scipy.spatial import distance_matrix
 import matplotlib.pyplot as plt
-from mpl_toolkits.mplot3d import Axes3D
 from mpl_toolkits.mplot3d.art3d import Line3DCollection
 from .read_write import read_raw_regaxes, get_n_events
 from ..utils.metadata import Metadata
@@ -30,8 +29,8 @@ class Tree:
     total_points : int
         The total number of points the tree is connecting,
         including the root node.
-    xz : np.ndarray of float32 (n_points, 2)
-        The xz positions of the points including the root node.
+    xy : np.ndarray of float32 (n_points, 2)
+        The xy positions of the points including the root node.
     energy : np.ndarray of float32 (n_points)
         The energy of the points including the root node.
     edges : np.ndarray of int32 (n_points, 2)
@@ -42,7 +41,7 @@ class Tree:
 
     """
 
-    def __init__(self, event_as_layers, root_xz, max_skips=5):
+    def __init__(self, event_as_layers, root_xy, max_skips=5):
         """
         Construct the tree from the event data.
         Put a root node bofore the first layer.
@@ -51,15 +50,15 @@ class Tree:
         ----------
         event_as_layers : list of np.ndarray (n_points, 4)
             The event data split into layers. Format is x, y, z, energy.
-        root_xz : np.ndarray of float32 (2)
-            The xz position of the root node, presumably the particle gun.
+        root_xy : np.ndarray of float32 (2)
+            The xy position of the root node, presumably the particle gun.
         max_skips : int
             The maximum number of occupied layers a parent child relation can skip.
 
         """
         self.max_skips = max_skips
         self._setup_layers(event_as_layers)
-        self._setup_root(root_xz)
+        self._setup_root(root_xy)
         for _ in self.occupied_layers[2:]:
             self._assign_next_layer()
 
@@ -81,8 +80,8 @@ class Tree:
         self.total_points = sum(n_points_in_layer)
         self.occupied_layers = np.where(n_points_in_layer)[0]
         cumulative_points_in_layer = np.cumsum(n_points_in_layer)
-        # store the xz positions of the points
-        self.xz = np.zeros((self.total_points, 2), dtype=np.float32)
+        # store the xy positions of the points
+        self.xy = np.zeros((self.total_points, 2), dtype=np.float32)
         self.energy = np.zeros(self.total_points, dtype=np.float32)
         for layer_n, layer in enumerate(self._event_as_layers[1:], 1):
             layer_slice = slice(
@@ -93,7 +92,7 @@ class Tree:
             layer_mask = layer_e > 0
             if np.any(layer_mask):
                 self.energy[layer_slice] = layer_e[layer_mask]
-                self.xz[layer_slice] = layer[layer_mask][:, [0, 2]]
+                self.xy[layer_slice] = layer[layer_mask][:, [0, 1]]
 
         self.layer = np.repeat(np.arange(self.n_layers), n_points_in_layer)
         # allocate storage for the edges,
@@ -102,19 +101,19 @@ class Tree:
         # points in the first layer all have the root parent
         self.edges = -np.ones((self.total_points - 1, 2), dtype=np.int32)
 
-    def _setup_root(self, root_xz):
+    def _setup_root(self, root_xy):
         """
         Set up the root node, and assign its parents.
 
         Parameters
         ----------
-        root_xz : np.ndarray of float32 (2)
-            The xz position of the root node, presumably the particle gun.
+        root_xy : np.ndarray of float32 (2)
+            The xy position of the root node, presumably the particle gun.
         """
         self.energy[0] = 1.
-        self.xz[0] = root_xz
+        self.xy[0] = root_xy
         self._event_as_layers[0][0] = np.array(
-            [[root_xz[0], 0, root_xz[1], 1]], dtype=np.float32
+            [[root_xy[0], root_xy[1], 0, 1]], dtype=np.float32
         )
         # every point in layer one has the root as parent
         if len(self.occupied_layers) == 1:
@@ -135,7 +134,7 @@ class Tree:
             The layer we want to find the positions on.
         """
         current_idxs = []
-        current_xz = []
+        current_xy = []
         to_layer = self.occupied_layers[to_occ_layer_idx]
         for back in range(1, min(self.max_skips + 1, to_occ_layer_idx)):
             previous_layer = self.occupied_layers[to_occ_layer_idx - back - 1]
@@ -143,15 +142,15 @@ class Tree:
             from_idxs = np.where(self.layer == from_layer)[0]
             current_idxs.append(from_idxs)
             previous = self.edges[from_idxs - 1, 0]
-            xz_previous = self.xz[previous]
-            xz_from = self.xz[from_idxs]
+            xy_previous = self.xy[previous]
+            xy_from = self.xy[from_idxs]
             gap1 = from_layer - previous_layer
             gap2 = to_layer - from_layer
-            projected_xz = xz_from + (gap2 / gap1) * (xz_from - xz_previous)
-            current_xz.append(projected_xz)
+            projected_xy = xy_from + (gap2 / gap1) * (xy_from - xy_previous)
+            current_xy.append(projected_xy)
         current_idxs = np.concatenate(current_idxs)
-        projected_xz = np.concatenate(current_xz)
-        return current_idxs, projected_xz
+        projected_xy = np.concatenate(current_xy)
+        return current_idxs, projected_xy
 
     def _assign_next_layer(self):
         """
@@ -160,13 +159,13 @@ class Tree:
         """
         self._occ_idx += 1
         next_occupied_layer = self.occupied_layers[self._occ_idx]
-        parent_idxs, parent_xz = self.project_positions(self._occ_idx)
+        parent_idxs, parent_xy = self.project_positions(self._occ_idx)
         parent_energies = self.energy[parent_idxs]
         child_idxs = np.where(self.layer == next_occupied_layer)[0]
-        child_xz = self.xz[child_idxs]
+        child_xy = self.xy[child_idxs]
         child_energies = self.energy[child_idxs]
         parent_child_distances = akt_distance(
-            parent_xz, parent_energies, child_xz, child_energies
+            parent_xy, parent_energies, child_xy, child_energies
         )
         closest_parents = np.argmin(parent_child_distances, axis=1)
         self.edges[child_idxs - 1, 0] = parent_idxs[closest_parents]
@@ -202,19 +201,19 @@ def check_connected(tree):
     return is_connected, in_graph
 
 
-def akt_distance(parent_xzs, parent_energies, child_xzs, child_energies):
+def akt_distance(parent_xys, parent_energies, child_xys, child_energies):
     """
     Calculate an anti-kT style distance between the first and
     the second set of points.
 
     Parameters
     ----------
-    parent_xzs : np.ndarray of float32 (n_parents, 2)
-        The xz positions of the first set of points.
+    parent_xys : np.ndarray of float32 (n_parents, 2)
+        The xy positions of the first set of points.
     parent_energies : np.ndarray of float32 (n_parents)
         The energies of the first set of points.
-    child_xzs : np.ndarray of float32 (n_children, 2)
-        The xz positions of the second set of points.
+    child_xys : np.ndarray of float32 (n_children, 2)
+        The xy positions of the second set of points.
     child_energies : np.ndarray of float32 (n_children)
         The energies of the second set of points.
 
@@ -224,9 +223,9 @@ def akt_distance(parent_xzs, parent_energies, child_xzs, child_energies):
         The distances between the points.
 
     """
-    if len(parent_xzs) == 0 or len(child_xzs) == 0:
-        return np.array([]).reshape(len(parent_xzs), len(child_xzs))
-    eucideans = distance_matrix(child_xzs, parent_xzs)
+    if len(parent_xys) == 0 or len(child_xys) == 0:
+        return np.array([]).reshape(len(parent_xys), len(child_xys))
+    eucideans = distance_matrix(child_xys, parent_xys)
     akt_factors = np.maximum(parent_energies, child_energies[:, np.newaxis])
     akt_factors = np.clip(akt_factors, 1e-6, None)
     return eucideans / akt_factors
@@ -260,11 +259,11 @@ class DataAsTrees:
         self._held_trees = []
 
         metadata = Metadata(configs)
-        self._layer_bottom_pos = metadata.layer_bottom_pos_raw
-        self._cell_thickness = (
+        self._layer_bottom_pos = metadata.layer_bottom_pos_hdf5
+        self._cell_thickness_global = (
             self._layer_bottom_pos[1] - self._layer_bottom_pos[0]
         ) / 2
-        self.root_xz = metadata.gun_xz_pos_raw
+        self.root_xy = metadata.gun_xyz_pos_hdf5[:2]
 
     def __len__(self):
         return self.__len
@@ -308,9 +307,9 @@ class DataAsTrees:
 
     def _generate_tree(self, event):
         event_as_layers = list(
-            split_to_layers(event, self._layer_bottom_pos, self._cell_thickness)
+            split_to_layers(event, self._layer_bottom_pos, self._cell_thickness_global)
         )
-        return Tree(event_as_layers, self.root_xz)
+        return Tree(event_as_layers, self.root_xy)
 
     def _hold_tree(self, idx, tree):
         if len(self._held_idxs) >= self._max_trees_in_memory:
@@ -325,15 +324,15 @@ def plot_tree(
     idx,
     ax=None,
     xlims=(-150, 150),
-    ylims=(-2, 31),
-    zlims=(-150, 150),
+    ylims=(-150, 150),
+    zlims=(-2, 31),
     line_alpha=0.5,
     show=True,
 ):
     if isinstance(config_or_trees, DataAsTrees):
         tree_data = config_or_trees
     else:
-        tree_data = DataAsTrees(config)
+        tree_data = DataAsTrees(config_or_trees)
     tree = tree_data.get([idx])[0]
 
     if ax is None:
@@ -353,9 +352,9 @@ def plot_tree(
         colours = []
         for edge in tree.edges:
             line = np.empty((3, 2))
-            line[0] = tree.xz[edge][:, 0]
-            line[2] = tree.xz[edge][:, 1]
-            line[1] = tree.layer[edge]
+            line[0] = tree.xy[edge][:, 0]
+            line[1] = tree.xy[edge][:, 1]
+            line[2] = tree.layer[edge]
             line_segments.append(line.T)
             colour = cmap(1 - n_children[edge[0]], alpha=line_alpha)
             colours.append(colour)
@@ -365,16 +364,16 @@ def plot_tree(
         ax.add_collection3d(lc)
     reg_energy = tree.energy / np.max(tree.energy)
     ax.scatter(
-        tree.xz[:, 0],
+        tree.xy[:, 0],
         tree.layer,
-        tree.xz[:, 1],
+        tree.xy[:, 1],
         s=20 * reg_energy,
         c=[(0, 0, 0, 0.5)],
     )
 
     ax.set_xlabel("X")
-    ax.set_ylabel("layers")
-    ax.set_zlabel("Z")
+    ax.set_ylabel("Y")
+    ax.set_zlabel("layers")
     ax.set_xlim(*xlims)
     ax.set_ylim(*ylims)
     ax.set_zlim(*zlims)

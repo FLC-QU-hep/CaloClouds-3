@@ -25,7 +25,7 @@ for ib in view.lazy_iter(axis=1):
 """
 
 import numpy as np
-from abc import ABCMeta, abstractmethod
+from abc import ABCMeta
 from typing import Union
 import h5py
 

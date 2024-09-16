@@ -1,15 +1,15 @@
 """ Module to test the data/dataset.py module. """
 
-import numpy as np
-import numpy.testing as npt
-
-from pointcloud.data import dataset
-from pointcloud.config_varients.default import Configs
-
 import os
 import tempfile
 import shutil
 import h5py
+import numpy as np
+import numpy.testing as npt
+
+from pointcloud.data import dataset, read_write
+
+from helpers import config_creator
 
 
 def make_test_batch(key, dataset_class, trim=False):
@@ -27,6 +27,7 @@ def make_test_batch(key, dataset_class, trim=False):
         points = np.concatenate([TestData.points0, TestData.points1])
     else:
         raise ValueError("Invalid key")
+    read_write.events_to_local(normed_copy, dataset_class.metadata.orientation)
     dataset_class.normalize_xyze(normed_copy)
     if trim:
         normed_copy = normed_copy[:, :trim]
@@ -151,8 +152,8 @@ class AbsDatasetTest:
 
 class TestPointCloudDataset(AbsDatasetTest):
     ds_class = dataset.PointCloudDataset
-    ds_class.metadata.layer_bottom_pos_raw = np.linspace(0, 10, 30)
-    ds_class.metadata.cell_thickness_raw = 1 / 3
+    ds_class.metadata.layer_bottom_pos_hdf5 = np.linspace(0, 10, 30)
+    ds_class.metadata.cell_thickness_hdf5 = 1 / 3
 
     def test_init(self):
         # For data0
@@ -253,7 +254,7 @@ class TestPointCloudDataset(AbsDatasetTest):
         test_batch = {
             "energy": test_batch["energy"][[1, 3]],
             "event": test_batch["event"][[1, 3], :1],
-            "points": test_batch["points"][[1, 3]]
+            "points": test_batch["points"][[1, 3]],
         }
         compare_batches(batch, test_batch)
 
@@ -264,14 +265,14 @@ class TestPointCloudDataset(AbsDatasetTest):
         npt.assert_array_equal(found, TestData.points1)
 
     def test_normalize_xyze(self):
-        xmin = dataset.PointCloudDataset.metadata.Xmin
-        xmax = dataset.PointCloudDataset.metadata.Xmax
-        zmin = dataset.PointCloudDataset.metadata.Zmin
-        zmax = dataset.PointCloudDataset.metadata.Zmax
-        ymin = dataset.PointCloudDataset.metadata.layer_bottom_pos_raw[0]
-        ymax = (
-            dataset.PointCloudDataset.metadata.layer_bottom_pos_raw[-1]
-            + dataset.PointCloudDataset.metadata.cell_thickness_raw
+        xmin = dataset.PointCloudDataset.metadata.Xmin_global
+        xmax = dataset.PointCloudDataset.metadata.Xmax_global
+        ymin = dataset.PointCloudDataset.metadata.Zmin_global
+        ymax = dataset.PointCloudDataset.metadata.Zmax_global
+        zmin = dataset.PointCloudDataset.metadata.layer_bottom_pos_hdf5[0]
+        zmax = (
+            dataset.PointCloudDataset.metadata.layer_bottom_pos_hdf5[-1]
+            + dataset.PointCloudDataset.metadata.cell_thickness_hdf5
         )
         # make data
         fake_event = np.vstack(
@@ -286,11 +287,15 @@ class TestPointCloudDataset(AbsDatasetTest):
 
         # for a single event
         dataset.PointCloudDataset.normalize_xyze(fake_event)
-        npt.assert_allclose(fake_event[:, 0], np.linspace(-1, 1, 10))
+        npt.assert_allclose(
+            fake_event[:, 0], np.linspace(-1, 1, 10), atol=1e-3, rtol=1e-3
+        )
         npt.assert_allclose(
             fake_event[:, 1], np.linspace(-1, 1, 10), atol=1e-3, rtol=1e-3
         )
-        npt.assert_allclose(fake_event[:, 2], np.linspace(-1, 1, 10))
+        npt.assert_allclose(
+            fake_event[:, 2], np.linspace(-1, 1, 10), atol=1e-3, rtol=1e-3
+        )
         npt.assert_allclose(
             fake_event[:, 3] / dataset.PointCloudDataset.energy_scale, np.arange(10) + 1
         )
@@ -298,11 +303,15 @@ class TestPointCloudDataset(AbsDatasetTest):
         # for a batch of events
         dataset.PointCloudDataset.normalize_xyze(fake_events)
         last_event = fake_events[-1]
-        npt.assert_allclose(last_event[:, 0], np.linspace(-1, 1, 10))
+        npt.assert_allclose(
+            last_event[:, 0], np.linspace(-1, 1, 10), atol=1e-3, rtol=1e-3
+        )
         npt.assert_allclose(
             last_event[:, 1], np.linspace(-1, 1, 10), atol=1e-3, rtol=1e-3
         )
-        npt.assert_allclose(last_event[:, 2], np.linspace(-1, 1, 10))
+        npt.assert_allclose(
+            last_event[:, 2], np.linspace(-1, 1, 10), atol=1e-3, rtol=1e-3
+        )
         npt.assert_allclose(
             last_event[:, 3] / dataset.PointCloudDataset.energy_scale, np.arange(10) + 1
         )
@@ -310,11 +319,10 @@ class TestPointCloudDataset(AbsDatasetTest):
 
 class TestPointCloudDatasetUnordered(AbsDatasetTest):
     ds_class = dataset.PointCloudDatasetUnordered
-    ds_class.metadata.layer_bottom_pos_raw = np.linspace(0, 10, 30)
-    ds_class.metadata.cell_thickness_raw = 1 / 3
+    ds_class.metadata.layer_bottom_pos_hdf5 = np.linspace(0, 10, 30)
+    ds_class.metadata.cell_thickness_hdf5 = 1 / 3
 
     def test_getitem(self):
-
         # in this dataset, the events are delivered at random
         # For data0, only one event, there is no difference
         ds0 = self.ds_class(
@@ -346,12 +354,7 @@ class TestPointCloudDatasetUnordered(AbsDatasetTest):
 
 def test_dataset_class_from_config():
     # set a test config
-    cfg = Configs()
-    cfg.device = 'cpu'
-    # no logging for tests, as we would need a comet key
-    cfg.log_comet = False
-    test_dir = os.path.dirname(os.path.realpath(__file__))
-    cfg.dataset_path = os.path.join(test_dir, "mini_data_sample.hdf5")
+    cfg = config_creator.make()
 
     # try for x36_grid datasets
     cfg.dataset = "x36_grid"

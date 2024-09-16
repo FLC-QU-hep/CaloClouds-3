@@ -12,24 +12,24 @@ from helpers import sample_trees
 
 
 def test_Tree():
-    root_xz = np.array([0.0, 0.0])
-    empty_tree = sample_trees.empty(root_xz)
+    root_xy = np.array([0.0, 0.0])
+    empty_tree = sample_trees.empty(root_xy)
     assert empty_tree.n_layers == 3
     assert empty_tree.max_skips == 6
     npt.assert_array_equal(empty_tree.occupied_layers, [0])
     assert empty_tree.total_points == 1
-    npt.assert_allclose(empty_tree.xz, [root_xz])
+    npt.assert_allclose(empty_tree.xy, [root_xy])
     npt.assert_allclose(empty_tree.energy, [1.0])
     assert len(empty_tree.edges) == 0
     npt.assert_array_equal(empty_tree.layer, [0])
 
-    tree = sample_trees.simple(root_xz)
+    tree = sample_trees.simple(root_xy)
     assert tree.n_layers == 5
     assert tree.max_skips == 2
     npt.assert_array_equal(tree.occupied_layers, [0, 1, 2, 4])
     assert tree.total_points == 7
     npt.assert_allclose(
-        tree.xz,
+        tree.xy,
         [
             [0.0, 0.0],
             [0.0, 0.0],

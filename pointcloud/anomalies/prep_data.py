@@ -29,7 +29,7 @@ def format_data(data_as_trees, sample_idxs):
     -------
     features : list of np.ndarray (n_events, n_pnts, n_features)
         The features of the nodes in the trees.
-        Features are [x, y (layer num), z, energy, incident, children1, children2, ...]
+        Features are [x, y, z (layer num), energy, incident, children1, children2, ...]
         where children1, children2, ... are the number of children the corrisponding 
         number of layers ahead of the node.
         The total number of children features is the max number of skips in the
@@ -61,9 +61,9 @@ def format_data(data_as_trees, sample_idxs):
         feats = (
             np.vstack(
                 [
-                    tree.xz[:, 0],
+                    tree.xy[:, 0],
+                    tree.xy[:, 1],
                     tree.layer,
-                    tree.xz[:, 1],
                     energy,
                     incident,
                     *child_projection.T,

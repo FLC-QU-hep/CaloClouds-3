@@ -2,8 +2,8 @@ from pointcloud.config_varients import default
 import os
 
 class Configs(default.Configs):
-    def __init__(self):
-        super().__init__()
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
         
     # Experiment Name
         self.name = 'wish_'  # options: [TEST_, kCaloClouds_, CaloClouds_, CD_]
@@ -56,4 +56,6 @@ class Configs(default.Configs):
         self.formatted_tree_base = os.path.join(self.storage_base, "formatted_trees")
         self.anomaly_checkpoint = os.path.join(self.storage_base, "autoencoder_checkpoints")
         self.anomaly_hidden_dim = 8
+
+        self.process_kwargs(kwargs)
 

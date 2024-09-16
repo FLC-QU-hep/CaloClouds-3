@@ -9,21 +9,21 @@ from pointcloud.utils.plotting import heatmap
 
 plt.ioff()
 
-#acc = StatsAccumulator.load(
+# acc = StatsAccumulator.load(
 #    "../point-cloud-diffusion-logs/wish/dataset_accumulators"
 #    "/10-90GeV_x36_grid_regular_524k_float32/from_10.h5"
-#)
+# )
 # acc = StatsAccumulator.load("../point-cloud-diffusion-logs/"
 #                             "wish/dataset_accumulators/wish_v4.h5")
-#acc = StatsAccumulator.load(
+# acc = StatsAccumulator.load(
 #    "../point-cloud-diffusion-logs/wish/dataset_accumulators"
 #    "/sim-photon-showers_10-90GeV_Zpos4_validation_merge.h5"
-#)
+# )
 acc = StatsAccumulator.load(
     "../point-cloud-diffusion-logs/wish/dataset_accumulators"
-    #"../local_data"
+    # "../local_data"
     "/p22_th90_ph90_en10-100_accumulator.h5"
-#    #"/sim-photon-showers_10-90GeV_Zpos4_validation_102_all_steps.h5"
+    #    #"/sim-photon-showers_10-90GeV_Zpos4_validation_102_all_steps.h5"
 )
 hists_2D = "evt_mean_E", "evt_mean_E_sq", "pnt_mean_E_sq"
 
@@ -40,7 +40,7 @@ last_bin = -next(
 last_bin = len(acc.incident_bin_boundaries) + 1 + last_bin
 
 xs = acc.incident_bin_boundaries[first_bin], acc.incident_bin_boundaries[last_bin]
-ys = acc.layer_bottom[0], acc.layer_bottom[-1] + acc.cell_thickness
+zs = acc.layer_bottom[0], acc.layer_bottom[-1] + acc.cell_thickness_global
 
 
 def save_ensure_dir_exists(file_name):
@@ -67,7 +67,7 @@ for name in hists_2D:
     arr = getattr(acc, name + "_hist")[first_bin:last_bin] / n_events
 
     heatmap(
-        arr, xs, ys, "Incident Energy", "Y (layers)", expand_name(name), cmap="viridis"
+        arr, xs, zs, "Incident Energy", "Z (layers)", expand_name(name), cmap="viridis"
     )
     plt.tight_layout()
     save_ensure_dir_exists(
@@ -79,7 +79,7 @@ plt.close()
 hists_4D = "counts", "energy", "evt_mean_counts"
 
 xs = acc.Xmin - acc.lateral_bin_size * 0.5, acc.Xmax + acc.lateral_bin_size * 0.5
-ys = acc.Zmin - acc.lateral_bin_size * 0.5, acc.Zmax + acc.lateral_bin_size * 0.5
+ys = acc.Ymin - acc.lateral_bin_size * 0.5, acc.Ymax + acc.lateral_bin_size * 0.5
 
 n_events = acc.total_events[:, np.newaxis, np.newaxis, np.newaxis]
 mask = n_events <= 0
@@ -109,7 +109,7 @@ for name in hists_4D:
                 xs,
                 ys,
                 "X",
-                "Z",
+                "Y",
                 expand_name(name),
                 cmap="viridis",
                 vmin=0.0,
@@ -117,8 +117,8 @@ for name in hists_4D:
             )
             plt.tight_layout()
             save_ensure_dir_exists(
-                f"../point-cloud-diffusion-images/stats_heatmap_wishv5/{name}_layers" +
-                f"/global/E{incident_energy_range[0]:02}_layer{layer:02}_global."
+                f"../point-cloud-diffusion-images/stats_heatmap_wishv5/{name}_layers"
+                + f"/global/E{incident_energy_range[0]:02}_layer{layer:02}_global."
             )
 
             plt.close()
@@ -127,7 +127,7 @@ for name in hists_4D:
                 xs,
                 ys,
                 "X",
-                "Z",
+                "Y",
                 expand_name(name),
                 cmap="viridis",
                 vmin=0.0,
@@ -135,16 +135,16 @@ for name in hists_4D:
             )
             plt.tight_layout()
             save_ensure_dir_exists(
-                f"../point-cloud-diffusion-images/stats_heatmap_wishv5/{name}_layers/" +
-                f"perInci/E{incident_energy_range[0]:02}_layer{layer:02}_perInci."
+                f"../point-cloud-diffusion-images/stats_heatmap_wishv5/{name}_layers/"
+                + f"perInci/E{incident_energy_range[0]:02}_layer{layer:02}_perInci."
             )
 
             plt.close()
-            heatmap(arr, xs, ys, "X", "Z", expand_name(name), cmap="viridis")
+            heatmap(arr, xs, ys, "X", "Y", expand_name(name), cmap="viridis")
             plt.tight_layout()
             save_ensure_dir_exists(
-                f"../point-cloud-diffusion-images/stats_heatmap_wishv5/{name}_layers/" +
-                f"local/E{incident_energy_range[0]:02}_layer{layer:02}_local."
+                f"../point-cloud-diffusion-images/stats_heatmap_wishv5/{name}_layers/"
+                + f"local/E{incident_energy_range[0]:02}_layer{layer:02}_local."
             )
 
 
@@ -174,7 +174,7 @@ for incident_bin in range(first_bin, last_bin):
             xs,
             ys,
             "X",
-            "Z",
+            "Y",
             expand_name(name),
             cmap="viridis",
             vmin=0.0,
@@ -182,8 +182,8 @@ for incident_bin in range(first_bin, last_bin):
         )
         plt.tight_layout()
         save_ensure_dir_exists(
-            f"../point-cloud-diffusion-images/stats_heatmap_wishv5/{name}_layers/" +
-            f"global/E{incident_energy_range[0]:02}_layer{layer:02}_global."
+            f"../point-cloud-diffusion-images/stats_heatmap_wishv5/{name}_layers/"
+            + f"global/E{incident_energy_range[0]:02}_layer{layer:02}_global."
         )
 
         plt.close()
@@ -192,7 +192,7 @@ for incident_bin in range(first_bin, last_bin):
             xs,
             ys,
             "X",
-            "Z",
+            "Y",
             expand_name(name),
             cmap="viridis",
             vmin=0.0,
@@ -200,14 +200,14 @@ for incident_bin in range(first_bin, last_bin):
         )
         plt.tight_layout()
         save_ensure_dir_exists(
-            f"../point-cloud-diffusion-images/stats_heatmap_wishv5/{name}_layers/" +
-            f"perInci/E{incident_energy_range[0]:02}_layer{layer:02}_perInci."
+            f"../point-cloud-diffusion-images/stats_heatmap_wishv5/{name}_layers/"
+            + f"perInci/E{incident_energy_range[0]:02}_layer{layer:02}_perInci."
         )
 
         plt.close()
-        heatmap(arr, xs, ys, "X", "Z", expand_name(name), cmap="viridis")
+        heatmap(arr, xs, ys, "X", "Y", expand_name(name), cmap="viridis")
         plt.tight_layout()
         save_ensure_dir_exists(
-            f"../point-cloud-diffusion-images/stats_heatmap_wishv5/{name}_layers/" +
-            f"local/E{incident_energy_range[0]:02}_layer{layer:02}_local."
+            f"../point-cloud-diffusion-images/stats_heatmap_wishv5/{name}_layers/"
+            + f"local/E{incident_energy_range[0]:02}_layer{layer:02}_local."
         )

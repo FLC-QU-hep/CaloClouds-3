@@ -3,12 +3,12 @@ import os
 
 
 class Configs(wish.Configs):
-    def __init__(self):
-        super().__init__()
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
 
         self.log_comet = False
         self.comet_workspace = "none"
-        self.storage_base = "/beegfs/desy/user/"
+        self.storage_base = "/gpfs/dust/maxwell/user/"
         self.dataset_path_in_storage = True
         #self._dataset_path = 'akorol/data/calo-clouds/hdf5/high_granular_grid/train/10-90GeV_x36_grid_regular_524k_float32.hdf5'
         self._dataset_path = 'dayhallh/data/ILCsoftEvents/p22_th90_ph90_en10-100_joined/p22_th90_ph90_en10-100_seed{}_all_steps.hdf5'
@@ -26,3 +26,5 @@ class Configs(wish.Configs):
         data_path = "dayhallh/point-cloud-diffusion-data/"
         self.formatted_tree_base = os.path.join(self.storage_base, data_path, "formatted_trees")
         self.anomaly_checkpoint = os.path.join(self.storage_base, data_path, "autoencoder_checkpoints")
+
+        self.process_kwargs(kwargs)

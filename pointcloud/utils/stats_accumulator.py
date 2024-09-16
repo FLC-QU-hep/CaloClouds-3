@@ -24,8 +24,8 @@ class StatsAccumulator:
         self,
         Xmin=-1,
         Xmax=1,
-        Zmin=-1,
-        Zmax=1,
+        Ymin=-1,
+        Ymax=1,
         layer_bottom=np.linspace(-1, 1, 31)[:-1],
         cell_thickness=None,
         incident_energy_bin_size=5.0,
@@ -43,16 +43,16 @@ class StatsAccumulator:
         Xmax: float (optional)
             Maximum x coordinate of the detector
             Optional, default is 1.0
-        Zmin: float (optional)
-            Minimum z coordinate of the detector
+        Ymin: float (optional)
+            Minimum y coordinate of the detector
             Optional, default is -1.0
-        Zmax: float (optional)
-            Maximum z coordinate of the detector
+        Ymax: float (optional)
+            Maximum y coordinate of the detector
             Optional, default is 1.0
         layer_bottom: array of floats (n_layers,) (optional)
             The y coordinates of the bottom of each detector layer
             Optional, default is 30 evenly spaced layers between -1 and 1
-        cell_thickness: float (optional)
+        cell_thickness : float (optional)
             The thickness of each layer
             Optional, default is distance between the first two layer bottoms
         incident_energy_bin_size: float
@@ -161,8 +161,8 @@ class StatsAccumulator:
 
         self.Xmin = Xmin
         self.Xmax = Xmax
-        self.Zmin = Zmin
-        self.Zmax = Zmax
+        self.Ymin = Ymin
+        self.Ymax = Ymax
         self.incident_energy_bin_size = incident_energy_bin_size
         if lateral_bin_size is None:
             lateral_bin_size = (Xmax - Xmin) / 50
@@ -174,7 +174,6 @@ class StatsAccumulator:
             cell_thickness = layer_bottom[1] - layer_bottom[0]
         self.cell_thickness = cell_thickness
 
-        self.cell_thickness = 0.5 * (self.layer_bottom[1] - self.layer_bottom[0])
         self.incident_bin_boundaries = np.arange(
             self.min_incident_energy,
             self.max_incident_energy,
@@ -185,50 +184,50 @@ class StatsAccumulator:
             Xmin, Xmax + lateral_bin_size, lateral_bin_size
         )
         n_x_bins = len(self.lateral_x_bin_boundaries) - 1
-        self.lateral_z_bin_boundaries = np.arange(
-            Zmin, Zmax + lateral_bin_size, lateral_bin_size
+        self.lateral_y_bin_boundaries = np.arange(
+            Ymin, Ymax + lateral_bin_size, lateral_bin_size
         )
-        n_z_bins = len(self.lateral_z_bin_boundaries) - 1
+        n_y_bins = len(self.lateral_y_bin_boundaries) - 1
 
         # the things we are accumulating
         self.total_events = np.zeros(n_incident_bins + 2)
         # incident bins get under and overflow
         self.counts_hist = np.zeros(
-            (n_incident_bins + 2, self.n_layers, n_x_bins, n_z_bins)
+            (n_incident_bins + 2, self.n_layers, n_x_bins, n_y_bins)
         )
         self.counts_sq_hist = np.zeros(
-            (n_incident_bins + 2, self.n_layers, n_x_bins, n_z_bins)
+            (n_incident_bins + 2, self.n_layers, n_x_bins, n_y_bins)
         )
         self.evt_counts_sq_hist = np.zeros((n_incident_bins + 2, self.n_layers))
         self.energy_hist = np.zeros(
-            (n_incident_bins + 2, self.n_layers, n_x_bins, n_z_bins)
+            (n_incident_bins + 2, self.n_layers, n_x_bins, n_y_bins)
         )
         self.energy_sq_hist = np.zeros(
-            (n_incident_bins + 2, self.n_layers, n_x_bins, n_z_bins)
+            (n_incident_bins + 2, self.n_layers, n_x_bins, n_y_bins)
         )
         self.evt_mean_E_hist = np.zeros((n_incident_bins + 2, self.n_layers))
         self.evt_mean_E_sq_hist = np.zeros((n_incident_bins + 2, self.n_layers))
         self.pnt_mean_E_sq_hist = np.zeros((n_incident_bins + 2, self.n_layers))
         self.evt_mean_counts_hist = np.zeros(
-            (n_incident_bins + 2, self.n_layers, n_x_bins, n_z_bins)
+            (n_incident_bins + 2, self.n_layers, n_x_bins, n_y_bins)
         )
 
     def layer_hists(self, points_in_layer):
         n_pts_hist, _, _ = np.histogram2d(
             points_in_layer[:, 0],
-            points_in_layer[:, 2],
-            bins=(self.lateral_x_bin_boundaries, self.lateral_z_bin_boundaries),
+            points_in_layer[:, 1],
+            bins=(self.lateral_x_bin_boundaries, self.lateral_y_bin_boundaries),
         )
         energies_hist, _, _ = np.histogram2d(
             points_in_layer[:, 0],
-            points_in_layer[:, 2],
-            bins=(self.lateral_x_bin_boundaries, self.lateral_z_bin_boundaries),
+            points_in_layer[:, 1],
+            bins=(self.lateral_x_bin_boundaries, self.lateral_y_bin_boundaries),
             weights=points_in_layer[:, 3],
         )
         energies_hist_sq, _, _ = np.histogram2d(
             points_in_layer[:, 0],
-            points_in_layer[:, 2],
-            bins=(self.lateral_x_bin_boundaries, self.lateral_z_bin_boundaries),
+            points_in_layer[:, 1],
+            bins=(self.lateral_x_bin_boundaries, self.lateral_y_bin_boundaries),
             weights=points_in_layer[:, 3] ** 2,
         )
         return n_pts_hist, energies_hist, energies_hist_sq
@@ -314,7 +313,7 @@ class StatsAccumulator:
             "lateral_bin_size",
         ]
         for limit in ["min", "max"]:
-            for coord in ["X", "Z"]:
+            for coord in ["X", "Y"]:
                 attrs.append(coord + limit)
         return attrs
 
@@ -429,10 +428,10 @@ class StatsAccumulator:
         x_bin_centers = 0.5 * (
             self.lateral_x_bin_boundaries[:-1] + self.lateral_x_bin_boundaries[1:]
         )
-        z_bin_centers = 0.5 * (
-            self.lateral_z_bin_boundaries[:-1] + self.lateral_z_bin_boundaries[1:]
+        y_bin_centers = 0.5 * (
+            self.lateral_y_bin_boundaries[:-1] + self.lateral_y_bin_boundaries[1:]
         )
-        return x_bin_centers, self.layer_bottom, z_bin_centers
+        return x_bin_centers, y_bin_centers, self.layer_bottom
 
     def heatmap_normalised(self, incident_energy, choice, ax=None):
         """
@@ -467,8 +466,8 @@ class StatsAccumulator:
             self.layer_bottom,
             self.Xmin,
             self.Xmax,
-            self.Zmin,
-            self.Zmax,
+            self.Ymin,
+            self.Ymax,
             ax=ax,
             alpha=alpha,
         )
@@ -477,8 +476,8 @@ class StatsAccumulator:
         ax.set_title(
             f"{choice.capitalize()} for incident energy {energy_min}-{energy_max} MeV"
         )
-        ax.set_xlabel("x (detector coordinates)")
-        ax.set_ylabel("z (detector coordinates)")
+        ax.set_xlabel("x (shower coordinates)")
+        ax.set_ylabel("y (shower coordinates)")
 
     def scatter_normalised(self, incident_energy, choice, ax=None):
         """
@@ -858,14 +857,14 @@ class HighLevelStats:
         self.eigenvalue_values = np.zeros((len(self.incident_energy_bin_centers), 2))
         self.eigenvector_angles = np.zeros(len(self.incident_energy_bin_centers))
         # need the location of eahc bin in x and z
-        x_bin_centers, _, z_bin_centers = self.accumulator._get_bin_centers()
+        x_bin_centers, y_bin_centers, _ = self.accumulator._get_bin_centers()
         # then make a meshgrid of the locations
-        x_mesh, z_mesh = np.meshgrid(x_bin_centers, z_bin_centers)
+        x_mesh, y_mesh = np.meshgrid(x_bin_centers, y_bin_centers)
         # and zip it together so that when the bin heights are
         # flattened they can be treated as weights
-        xz_mesh = np.vstack((x_mesh.flatten(), z_mesh.flatten()))
+        xy_mesh = np.vstack((x_mesh.flatten(), y_mesh.flatten()))
         for i, evt_mean_counts in enumerate(evt_mean_counts_all_i):
-            cov_matrix = np.cov(xz_mesh, aweights=evt_mean_counts.flatten())
+            cov_matrix = np.cov(xy_mesh, aweights=evt_mean_counts.flatten())
             eigenvalues, eigenvectors = np.linalg.eigh(cov_matrix)
             self.eigenvalue_values[i] = eigenvalues
             self.eigenvector_angles[i] = np.arctan2(*eigenvectors[0])
@@ -893,7 +892,7 @@ class RadialView:
     for fitting the radial profile of the shower.
     """
 
-    def __init__(self, accumulator, x_offset=None, z_offset=None):
+    def __init__(self, accumulator, x_offset=None, y_offset=None):
         """
         Constructor, calculates the transform imeadiately.
 
@@ -909,29 +908,29 @@ class RadialView:
             + self.accumulator.incident_bin_boundaries[1:]
         )
         self.raw_energy = self.accumulator.energy_hist[1:-1]
-        x_bin_centers, _, z_bin_centers = self.accumulator._get_bin_centers()
+        x_bin_centers, y_bin_centers, _ = self.accumulator._get_bin_centers()
         # the data may not be centered,
         # but the distribution can only fit centered data
         # so calculate the offset, such that the mean value is (0, 0)
         # sum over energies and layers
         all_energy = np.sum(self.raw_energy, axis=(0, 1))
         x_marginal = np.sum(all_energy, axis=1)
-        z_marginal = np.sum(all_energy, axis=0)
+        y_marginal = np.sum(all_energy, axis=0)
         if x_offset is None:
             self.x_offset = np.sum(x_marginal * x_bin_centers) / np.sum(x_marginal)
         else:
             self.x_offset = x_offset
-        if z_offset is None:
-            self.z_offset = np.sum(z_marginal * z_bin_centers) / np.sum(z_marginal)
+        if y_offset is None:
+            self.y_offset = np.sum(y_marginal * y_bin_centers) / np.sum(y_marginal)
         else:
-            self.z_offset = z_offset
+            self.y_offset = y_offset
         # now move the bin centers so that the mean value is (0, 0)
         self.x_bin_centers = x_bin_centers - self.x_offset
-        self.z_bin_centers = z_bin_centers - self.z_offset
+        self.y_bin_centers = y_bin_centers - self.y_offset
         # calculate the radial positions of the bins from this center
         r_bin_centers = np.sqrt(
             self.x_bin_centers[:, np.newaxis] ** 2
-            + self.z_bin_centers[np.newaxis, :] ** 2
+            + self.y_bin_centers[np.newaxis, :] ** 2
         )
         self.r_bin_centers = r_bin_centers.flatten()
         radial_order = np.argsort(self.r_bin_centers)

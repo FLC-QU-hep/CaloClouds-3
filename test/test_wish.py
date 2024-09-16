@@ -4,10 +4,9 @@ import numpy.testing as npt
 import torch
 
 from pointcloud.models import wish
-from pointcloud.config_varients.wish import Configs
 from pointcloud.utils.stats_accumulator import HighLevelStats
 
-from helpers import sample_accumulator
+from helpers import sample_accumulator, config_creator
 
 
 def test_construct_symmetric_2by2():
@@ -441,9 +440,7 @@ def test_WishLayer():
 def test_Wish(tmpdir):
     # test each of the functions is callable in princple.
     # all of the internal working are tested in the other tests
-    configs = Configs()
-    configs.device = "cpu"
-    configs.fit_attempts = 2
+    configs = config_creator.make("wish", my_tmpdir=tmpdir)
 
     wish_model = wish.Wish(configs)
 

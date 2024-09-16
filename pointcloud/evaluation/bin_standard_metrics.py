@@ -11,7 +11,7 @@ from pointcloud.data.read_write import read_raw_regaxes
 from pointcloud.models.wish import Wish
 from pointcloud.models.shower_flow import compile_HybridTanH_model
 from pointcloud.models.load import get_model_class
-from pointcloud.utils.gen_utils import gen_condE_showers_batch
+from pointcloud.utils.gen_utils import gen_cond_showers_batch
 
 
 from pointcloud.config_varients.wish import Configs as WishConfigs
@@ -36,7 +36,7 @@ def try_mkdir(dir_name):
 configs = Configs()
 meta = Metadata(configs)
 floors, ceilings = floors_ceilings(
-    meta.layer_bottom_pos_raw, meta.cell_thickness_raw, 0
+    meta.layer_bottom_pos_hdf5, meta.cell_thickness_hdf5, 0
 )
 
 
@@ -46,9 +46,9 @@ class BinnedData:
     into bins for easy plotting and comparison.
     """
     true_xyz_limits = [
-        [meta.Xmin, meta.Xmax],
+        [meta.Xmin_global, meta.Xmax_global],
+        [meta.Zmin_global, meta.Zmax_global],
         [floors[0], ceilings[-1]],
-        [meta.Zmin, meta.Zmax],
     ]
     arg_names = [
         "name",
@@ -56,7 +56,7 @@ class BinnedData:
         "energy_scale",
         "layer_bottom_pos",
         "cell_thickness",
-        "gun_xz_pos",
+        "gun_xyz_pos",
     ]
 
     def __init__(
@@ -66,7 +66,7 @@ class BinnedData:
         energy_scale,
         layer_bottom_pos,
         cell_thickness,
-        gun_xz_pos,
+        gun_xyz_pos,
     ):
         """Construct a BinnedData object.
 
@@ -82,11 +82,11 @@ class BinnedData:
         layer_bottom_pos : np.array
             The y positions of the bottom of each layer, in the coordinates
             the data is given in.
-        cell_thickness : float
+        cell_thickness: float
             The thickness in the y direction of each cell, in the coordinates
             the data is given in.
-        gun_xz_pos : np.array
-            The x and z positions of the gun, in the coordinates the data is
+        gun_xyz_pos : np.array
+            The x, y and z positions of the gun, in the coordinates the data is
             given in. The data is shifted so that the gun is at the origin.
         """
         self.name = name
@@ -94,7 +94,7 @@ class BinnedData:
         self.energy_scale = energy_scale
         self.layer_bottom_pos = layer_bottom_pos
         self.cell_thickness = cell_thickness
-        self.gun_xz_pos = gun_xz_pos
+        self.gun_xyz_pos = gun_xyz_pos
         buffed_floors, buffed_ceilings = floors_ceilings(
             layer_bottom_pos, cell_thickness, 1.0
         )
@@ -123,15 +123,15 @@ class BinnedData:
         )
         self.add_hist(
             "number of showers",
-            "center of gravity Z [mm]",
+            "center of gravity Y [mm]",
             *self.true_xyz_limits[1],
-            60,
+            2000,
         )
         self.add_hist(
             "number of showers",
-            "center of gravity Y [mm]",
+            "center of gravity Z [mm]",
             *self.true_xyz_limits[2],
-            2000,
+            60,
         )
         self.add_hist("mean energy [MeV]", "radius [mm]", 0, 500, 32)
         self.add_hist("mean energy [MeV]", "layers", 1, 30, 30)
@@ -149,8 +149,8 @@ class BinnedData:
             The fake event with the gun at the origin.
         """
         fake_events = np.zeros((1, 1, 4))
-        fake_events[0, 0, 0] = self.gun_xz_pos[0]
-        fake_events[0, 0, 2] = self.gun_xz_pos[1]
+        fake_events[0, 0, 0] = self.gun_xyz_pos[0]
+        fake_events[0, 0, 1] = self.gun_xyz_pos[1]
         fake_events[:, :, 3] = 0  # no energy
         return fake_events
 
@@ -301,7 +301,9 @@ class BinnedData:
             unit = (raw - self.xyz_limits[dim][0]) / (
                 self.xyz_limits[dim][1] - self.xyz_limits[dim][0]
             )
-            # assert np.all(unit <= 1.), f"Dim {dim}, limits {self.xyz_limits[dim]}, Raw min {np.min(raw)}, max {np.max(raw)}, unit {unit}"
+            # assert np.all(unit <= 1.), \
+            # f"Dim {dim}, limits {self.xyz_limits[dim]}, "\
+            # f"Raw min {np.min(raw)}, max {np.max(raw)}, unit {unit}"
             # Models can generate data outside of the range
             rescaled[:, :, dim] = (
                 unit * (self.true_xyz_limits[dim][1] - self.true_xyz_limits[dim][0])
@@ -319,18 +321,18 @@ class BinnedData:
             The events to add to the histograms.
         """
         mask = events[:, :, 3] > 0
-        raw_ys = events[:, :, 1][mask]
+        raw_zs = events[:, :, 2][mask]
 
         rescaled = self.rescaled_events(events)
 
         energy = rescaled[:, :, 3][mask]
         gun_shifted = rescaled - self.gun_shift
-        radius = np.sqrt(gun_shifted[:, :, 0] ** 2 + gun_shifted[:, :, 2] ** 2)[mask]
+        radius = np.sqrt(gun_shifted[:, :, 0] ** 2 + gun_shifted[:, :, 1] ** 2)[mask]
 
         self.counts[0] += np.histogram(radius, self.bins[0])[0]
         self.counts[1] += np.histogram(radius, self.bins[1], weights=energy)[0]
-        self.counts[2] += np.histogram(raw_ys, self.layer_bins)[0]
-        self.counts[3] += np.histogram(raw_ys, self.layer_bins, weights=energy)[0]
+        self.counts[2] += np.histogram(raw_zs, self.layer_bins)[0]
+        self.counts[3] += np.histogram(raw_zs, self.layer_bins, weights=energy)[0]
         self.counts[4] += np.histogram(energy, self.bins[4])[0]
 
         hits_per_shower = np.sum(mask, axis=1)
@@ -462,10 +464,10 @@ def sample_model(configs, binned, n_events, model, shower_flow=None):
         The number of events to sample.
     model : torch.nn.Module
         The model to sample from, will be sampled by
-        pointcloud.utils.gen_utils.gen_condE_showers_batch.
+        pointcloud.utils.gen_utils.gen_cond_showers_batch.
     shower_flow : distribution, optional
         The flow to sample from, if the model needs it, by default None
-        also used by gen_condE_showers_batch.
+        also used by gen_cond_showers_batch.
 
     Returns
     -------
@@ -489,7 +491,7 @@ def sample_model(configs, binned, n_events, model, shower_flow=None):
         )
         energy = torch.Tensor(energy.reshape(-1, 1))
         # events = model.sample(energy, configs.max_points)
-        events = gen_condE_showers_batch(
+        events = gen_cond_showers_batch(
             model, shower_flow, energy, bs=batch_len, config=configs
         )
         binned.add_events(events)
@@ -533,9 +535,9 @@ def sample_accumulator(configs, binned, acc, n_events):
 
     gun_shift = binned.get_gunshift()
     x_bin_centers -= gun_shift[0, 0, 0]
-    z_bin_centers -= gun_shift[0, 0, 2]
+    y_bin_centers -= gun_shift[0, 0, 1]
     bin_radii = np.sqrt(
-        x_bin_centers[:, np.newaxis] ** 2 + z_bin_centers[np.newaxis, :] ** 2
+        x_bin_centers[:, np.newaxis] ** 2 + y_bin_centers[np.newaxis, :] ** 2
     )
     flat_radii = bin_radii.flatten()
     flat_hits = np.sum(acc.counts_hist, axis=(0, 1)).flatten()
