@@ -6,6 +6,7 @@ import numpy as np
 from pointcloud.utils import metadata
 from pointcloud.config_varients.default import Configs
 
+
 def test_get_metadata_folder():
     data_dir = metadata.get_metadata_folder()
     assert isinstance(data_dir, str)
@@ -22,7 +23,15 @@ def test_Metadata(tmpdir):
     array_path = os.path.join(str(tmpdir), "dog.npy")
     np.save(array_path, np.array([1, 2, 3]))
     dict_path = os.path.join(str(tmpdir), "cat.npy")
-    np.save(dict_path, {"meow": 1, "purr": 2})
+    np.save(
+        dict_path,
+        {
+            "meow": 1,
+            "purr": 2,
+            "orientation_global": "hdf5:xyz==global:xyz",
+            "orientation": "hdf5:xyz==local:yzx",
+        },
+    )
 
     # also mock the muon map subfolder
     os.mkdir(os.path.join(str(tmpdir), "muon_map"))
@@ -34,8 +43,10 @@ def test_Metadata(tmpdir):
     np.save(muon_map_path_Z, np.array([1, 4, 3]))
     muon_map_path_E = os.path.join(str(tmpdir), "muon_map/E.npy")
     np.save(muon_map_path_E, np.array([1, 6, 3]))
-    
-    with patch('pointcloud.utils.metadata.get_metadata_folder', return_value=str(tmpdir)):
+
+    with patch(
+        "pointcloud.utils.metadata.get_metadata_folder", return_value=str(tmpdir)
+    ):
         m = metadata.Metadata()
         assert hasattr(m, "dog")
         assert np.array_equal(m.dog, np.array([1, 2, 3]))
@@ -57,4 +68,4 @@ def test_Metadata(tmpdir):
         assert np.array_equal(m.muon_map_Z, np.array([1, 4, 3]))
         assert np.array_equal(m.muon_map_E, np.array([1, 6, 3]))
 
-
+        assert m.global_shower_axis_char == "y"

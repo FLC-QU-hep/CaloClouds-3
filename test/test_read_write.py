@@ -8,9 +8,12 @@ import shutil
 import h5py
 
 from pointcloud.data import read_write
-from pointcloud.config_varients.default import Configs
+
+from helpers import config_creator
+from helpers.mock_metadata import TemporaryMetadata
 
 
+@TemporaryMetadata("WdatasetW")
 class TestReaders:
     """Test the readers in the read_write module."""
 
@@ -48,10 +51,10 @@ class TestReaders:
         [
             [
                 [
-                    [2.0, 0.],
-                    [2.1, 0.],
-                    [2.2, 0.],
-                    [2.3, 0.],
+                    [2.0, 0.0],
+                    [2.1, 0.0],
+                    [2.2, 0.0],
+                    [2.3, 0.0],
                 ],
                 [
                     [3.0, 3.01],
@@ -60,19 +63,19 @@ class TestReaders:
                     [3.30, 3.31],
                 ],
                 [
-                    [4.0, 0.],
-                    [4.1, 0.],
-                    [4.2, 0.],
-                    [4.3, 0.],
+                    [4.0, 0.0],
+                    [4.1, 0.0],
+                    [4.2, 0.0],
+                    [4.3, 0.0],
                 ],
             ]
         ]
     )
     reg_events1 = np.array(
         [
-            [[2.0, 2.1, 2.2, 2.3], [0., 0., 0., 0.]],
+            [[2.0, 2.1, 2.2, 2.3], [0.0, 0.0, 0.0, 0.0]],
             [[3.0, 3.1, 3.2, 3.3], [3.01, 3.11, 3.21, 3.31]],
-            [[4.0, 4.1, 4.2, 4.3], [0., 0., 0., 0.]],
+            [[4.0, 4.1, 4.2, 4.3], [0.0, 0.0, 0.0, 0.0]],
         ]
     )
 
@@ -104,7 +107,9 @@ class TestReaders:
         # the second will contain one dataset with one event
         # in event, point, xyze format
         cls.folders["one_event"] = cls.mkdir("one_event_folder")
-        cls.paths["one_event"] = os.path.join(cls.folders["one_event"], "one_event_dataset.h5")
+        cls.paths["one_event"] = os.path.join(
+            cls.folders["one_event"], "one_event_dataset.h5"
+        )
         energy = np.array([1.0])
         events = np.array([[[1.0, 2.0, 3.0, 4.0], [5.0, 6.0, 7.0, 8.0]]])
         with h5py.File(cls.paths["one_event"], "w") as f:
@@ -202,8 +207,7 @@ class TestReaders:
         npt.assert_allclose(found, [3, 3, 3])
 
     def test_read_raw_regaxes(self):
-        configs = Configs()
-        configs.device = 'cpu'
+        configs = config_creator.make()
         configs.dataset_path = self.paths["empty"]
         configs.n_dataset_files = 0
         found_energy, found_events = read_write.read_raw_regaxes(configs)
@@ -259,16 +263,18 @@ def test_regularise_event_axes():
 def test_check_regaxes():
     read_write.check_regaxes(TestReaders.reg_energy0, TestReaders.reg_events0)
     read_write.check_regaxes(TestReaders.reg_energy1, TestReaders.reg_events1)
-    npt.assert_raises(ValueError, read_write.check_regaxes, TestReaders.energy1, TestReaders.events1)
+    npt.assert_raises(
+        ValueError, read_write.check_regaxes, TestReaders.energy1, TestReaders.events1
+    )
 
 
+@TemporaryMetadata("test_W", target_folder="sim-E1261AT600AP180-180_file_W")
 def test_write_raw_regaxes(tmpdir):
     path_0 = os.path.join(tmpdir, "test_0.h5")
     read_write.write_raw_regaxes(
         path_0, TestReaders.reg_energy0, TestReaders.reg_events0
     )
-    configs = Configs()
-    configs.device = 'cpu'
+    configs = config_creator.make()
     configs.dataset_path = path_0
     # when the number of points is also 4 it is ambigus to read
     npt.assert_raises(RuntimeError, read_write.read_raw_regaxes, configs)
@@ -288,3 +294,70 @@ def test_write_raw_regaxes(tmpdir):
         TestReaders.energy1,
         TestReaders.events1,
     )
+
+
+def test_events_to_local():
+    events = np.array(
+        [
+            [
+                [1.0, 1.01, 1.02, 1.03],
+                [1.10, 1.11, 1.12, 1.13],
+                [1.20, 1.21, 1.22, 1.23],
+                [1.30, 1.31, 1.32, 1.33],
+            ],
+            [
+                [2.0, 2.01, 2.02, 2.03],
+                [2.10, 2.11, 2.12, 2.13],
+                [2.20, 2.21, 2.22, 2.23],
+                [2.30, 2.31, 2.32, 2.33],
+            ],
+        ]
+    )
+    before = events.copy()
+    no_change = "hdf5:xyz==local:xyz"
+    read_write.events_to_local(events, no_change)
+    npt.assert_allclose(before, events)
+    to_rotate = "hdf5:xyz==local:yzx"
+    read_write.events_to_local(events, to_rotate)
+    expected = before[:, :, [2, 0, 1, 3]]
+    npt.assert_allclose(events, expected)
+    invalid = "variable"
+    npt.assert_raises(NotImplementedError, read_write.events_to_local, events, invalid)
+
+
+def test_local_global_exchanges():
+    events = np.array(
+        [
+            [
+                [1.0, 1.01, 1.02, 1.03],
+                [1.10, 1.11, 1.12, 1.13],
+                [1.20, 1.21, 1.22, 1.23],
+                [1.30, 1.31, 1.32, 1.33],
+            ],
+            [
+                [2.0, 2.01, 2.02, 2.03],
+                [2.10, 2.11, 2.12, 2.13],
+                [2.20, 2.21, 2.22, 2.23],
+                [2.30, 2.31, 2.32, 2.33],
+            ],
+        ]
+    )
+    # start with local_to_global
+    no_change = "hdf5:xyz==local:xyz"
+    no_change_global = "hdf5:xyz==global:xyz"
+    found = read_write.local_to_global(events, no_change, no_change_global)
+    npt.assert_allclose(events, found)
+    to_rotate = "hdf5:xyz==local:yzx"
+    found = read_write.local_to_global(events, to_rotate, no_change_global)
+    expected = events[:, :, [1, 2, 0, 3]]
+    npt.assert_allclose(found, expected)
+    npt.assert_raises(
+        NotImplementedError, read_write.local_to_global, events, no_change, no_change
+    )
+    # now global_to_local
+    found = read_write.global_to_local(events, no_change, no_change_global)
+    npt.assert_allclose(events, found)
+    found = read_write.global_to_local(events, to_rotate, no_change_global)
+    expected = events[:, :, [2, 0, 1, 3]]
+    npt.assert_allclose(found, expected)
+

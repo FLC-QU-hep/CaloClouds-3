@@ -1,20 +1,15 @@
 from tqdm import tqdm
 import numpy as np
-import matplotlib as mpl
 import matplotlib.pyplot as plt
 import matplotlib.font_manager as font_manager
-from matplotlib.patches import Rectangle
 from mpl_toolkits.mplot3d import Axes3D
-from mpl_toolkits.mplot3d.art3d import Poly3DCollection
 from scipy.stats import binned_statistic
 
 from ..utils import metrics
-from ..utils.detector_map import create_map
-from ..configs import Configs
 
 # mpl.rcParams["xtick.labelsize"] = 25
 # mpl.rcParams["ytick.labelsize"] = 25
-## mpl.rcParams['font.size'] = 28
+# mpl.rcParams['font.size'] = 28
 # mpl.rcParams["font.size"] = 35
 # mpl.rcParams["legend.frameon"] = False
 # mpl.rcParams["text.usetex"] = True
@@ -24,11 +19,13 @@ from ..configs import Configs
 # mpl.rcParams['font.weight'] = 1  # Or you can use a numerical value, e.g., 700
 
 
-nice_hex = [["#00E5E3", "#8DD7BF", "#FF96C5", "#FF5768", "#FFBF65"],
-            ["#FC6238", "#FFD872", "#F2D4CC", "#E77577", "#6C88C4"],
-            ["#C05780", "#FF828B", "#E7C582", "#00B0BA", "#0065A2"],
-            ["#00CDAC", "#FF6F68", "#FFDACC", "#FF60A8", "#CFF800"],
-            ["#FF5C77", "#4DD091", "#FFEC59", "#FFA23A", "#74737A"]]
+nice_hex = [
+    ["#00E5E3", "#8DD7BF", "#FF96C5", "#FF5768", "#FFBF65"],
+    ["#FC6238", "#FFD872", "#F2D4CC", "#E77577", "#6C88C4"],
+    ["#C05780", "#FF828B", "#E7C582", "#00B0BA", "#0065A2"],
+    ["#00CDAC", "#FF6F68", "#FFDACC", "#FF60A8", "#CFF800"],
+    ["#FF5C77", "#4DD091", "#FFEC59", "#FFA23A", "#74737A"],
+]
 
 
 class PltConfigs:
@@ -138,7 +135,9 @@ def get_cog(cloud, thr=plt_config.threshold):  # expects shape [events, points, 
     return x_cog, y_cog, z_cog
 
 
-def get_features(plt_config, map_layers, half_cell_size, events):
+def get_features(
+    plt_config, map_layers, half_cell_size_global, events, global_shower_axis_char
+):
     """
     High level features used to evaluate events.
 
@@ -148,13 +147,17 @@ def get_features(plt_config, map_layers, half_cell_size, events):
         plotting configurations
     map_layers : list
         list of dictionaries, each containing the grid of cells for a layer
-    half_cell_size : float
+    half_cell_size_global : float
         Half the size of the cells in the detector,
         perpendicular to the radial direction
     events : list
         list of 2D arrays, each containing the energy deposited
         in each cell of the layer with the arangement specified by map_layers
         in the style of a histogram
+    global_shower_axis_char : char
+        "x", "y" or "z" specifying the direction of the local z axis
+        that runs through the layers, in the global coordinate system
+        of the detector
 
     Returns
     -------
@@ -203,7 +206,7 @@ def get_features(plt_config, map_layers, half_cell_size, events):
         e_layers = []
         occ_layers = []
         e_radial_layers = []
-        for l, layer in enumerate(layers):
+        for i, layer in enumerate(layers):
             # layer = layer*1000 # energy rescale to MeV
             layer = layer.copy()  # for following inplace operations
             layer_noThreshold = layer.copy()
@@ -222,13 +225,30 @@ def get_features(plt_config, map_layers, half_cell_size, events):
             occ_layers.append(hit_mask.sum())
 
             # get radial profile #######################
-            x_hit_idx, z_hit_idx = np.where(hit_mask)
-            x_cell_coord = map_layers[l]["xedges"][:-1][x_hit_idx] + half_cell_size
-            z_cell_coord = map_layers[l]["zedges"][:-1][z_hit_idx] + half_cell_size
-            e_cell = layer[x_hit_idx, z_hit_idx]
+
+            x_hit_idx, y_hit_idx = np.where(hit_mask)
+            
+            if not global_shower_axis_char == "y":
+                raise NotImplementedError(
+                        "We don't have a muon map system for different"
+                        " global shower directions than y"
+                        )
+            # due to rotations, the x and z have been swapped.
+            local_x = "z"
+            local_y = "x"
+
+            x_cell_coord = (
+                map_layers[i][f"{local_x}edges"][:-1][x_hit_idx]
+                + half_cell_size_global
+            )
+            y_cell_coord = (
+                map_layers[i][f"{local_y}edges"][:-1][y_hit_idx]
+                + half_cell_size_global
+            )
+            e_cell = layer[x_hit_idx, y_hit_idx]
             dist_to_origin = np.sqrt(
                 (x_cell_coord - incident_point[0]) ** 2
-                + (z_cell_coord - incident_point[1]) ** 2
+                + (y_cell_coord - incident_point[1]) ** 2
             )
             e_radial.append([dist_to_origin, e_cell])
             e_radial_layers.append([dist_to_origin, e_cell])
@@ -407,7 +427,7 @@ def plt_radial(
     # ax2 = ax1.twiny()
     # ax2.set_xticks( ax1.get_xticks() )
     # ax2.set_xbound(ax1.get_xbound())
-    # ax2.set_xticklabels([int(x / (half_cell_size*2)) for x in ax1.get_xticks()])
+    # ax2.set_xticklabels([int(x / (half_cell_size_global*2)) for x in ax1.get_xticks()])
     # ax2.set_xlabel("radius [cells]")
 
     plt.xlabel("radius [mm]")
@@ -436,7 +456,7 @@ def plt_spinal(
 ):
     fig, axs = plt.subplots(2, 1, figsize=(7, 9), height_ratios=[3, 1], sharex=True)
 
-    ## for legend ##########################################
+    # for legend ##########################################
     axs[0].hist(
         np.zeros(1) - 10, label=labels[0], color="lightgrey", edgecolor="dimgrey", lw=2
     )
@@ -451,12 +471,16 @@ def plt_spinal(
         )
     ########################################################
 
-    pos = np.arange(1, len(e_layers) + 1)
+    # pos = np.arange(1, len(e_layers) + 1)
     bins = np.arange(0.5, len(e_layers) + 1.5)
 
-    # h_data = axs[0].hist(pos, bins=bins, weights=e_layers, color='lightgrey', rasterized=True)
+    # h_data = axs[0].hist(
+    #     pos, bins=bins, weights=e_layers, color="lightgrey", rasterized=True
+    # )
     axs[0].stairs(e_layers, edges=bins, color="lightgrey", fill=True)
-    # axs[0].hist(pos, bins=bins, weights=e_layers, color='dimgrey', histtype='step', lw=2)
+    # axs[0].hist(
+    #     pos, bins=bins, weights=e_layers, color="dimgrey", histtype="step", lw=2
+    # )
 
     # uncertainty band
     err_data = e_layers_std_real / np.sqrt(
@@ -474,7 +498,15 @@ def plt_spinal(
     for i, (e_layers_, e_layers_std_) in enumerate(
         zip(e_layers_list, e_layers_std_list)
     ):
-        # axs[0].hist(pos, bins=bins, weights=e_layers_, histtype='step', linestyle='-', lw=3, color=plt_config.color_lines[i])
+        # axs[0].hist(
+        #     pos,
+        #     bins=bins,
+        #     weights=e_layers_,
+        #     histtype="step",
+        #     linestyle="-",
+        #     lw=3,
+        #     color=plt_config.color_lines[i],
+        # )
         axs[0].stairs(
             e_layers_, edges=bins, linestyle="-", lw=3, color=plt_config.color_lines[i]
         )
@@ -777,7 +809,7 @@ def plt_esum(e_sum, e_sum_list, labels, plt_config=plt_config):
 def plt_cog(
     cog, cog_list, labels, plt_config=plt_config, title=r"\textbf{full spectrum}"
 ):
-    lables = ["X", "Z", "Y"]  # local coordinate system
+    lables = ["X", "Y", "Z"]
     # plt.figure(figsize=(21, 9))
     fig, axs = plt.subplots(2, 3, figsize=(25, 9), height_ratios=[3, 1], sharex="col")
 
@@ -935,7 +967,7 @@ def plt_feats(
     density : bool, optional
         If True, the y-axis is the density. Default is False.
     """
-    lables = ["X", "Z", "Y"]  # local coordinate system
+    lables = ["X", "Y", "Z"]
     plt.figure(figsize=(21, 7))
 
     for k, j in enumerate([0, 2, 1]):
@@ -1199,7 +1231,13 @@ def plt_esum_singleE(e_sum_list, e_sum_list_list, labels, plt_config=plt_config)
             color="lightgrey",
             rasterized=True,
         )
-        # h = axs.hist(np.array(e_sum), bins=plt_config.e_sum_bins,  histtype='step', color='dimgrey', lw=2)
+        # h = axs.hist(
+        #     np.array(e_sum),
+        #     bins=plt_config.e_sum_bins,
+        #     histtype="step",
+        #     color="dimgrey",
+        #     lw=2,
+        # )
 
         # uncertainty
         h_err = np.sqrt(h[0])
@@ -1237,27 +1275,59 @@ def plt_esum_singleE(e_sum_list, e_sum_list_list, labels, plt_config=plt_config)
             # lims_min = 0.5
             # lims_max = 2.0
             # eps = 1e-5
-            # x_nhits_range = [plt_config.e_sum_bins.min() - plt_config.e_indent, 500, 1300, plt_config.e_sum_bins.max() + plt_config.e_indent]
+            # x_nhits_range = [
+            #     plt_config.e_sum_bins.min() - plt_config.e_indent,
+            #     500,
+            #     1300,
+            #     plt_config.e_sum_bins.max() + plt_config.e_indent,
+            # ]
 
-            # centers = np.array((h[1][:-1] + h[1][1:])/2)
-            # x_mask = (centers >= x_nhits_range[j]) & (centers < x_nhits_range[j+1])
+            # centers = np.array((h[1][:-1] + h[1][1:]) / 2)
+            # x_mask = (centers >= x_nhits_range[j]) & (centers < x_nhits_range[j + 1])
 
             # centers = centers[x_mask]
-            # ratios = np.clip(np.array((h1[0]+eps)/(h[0]+eps)), lims_min, lims_max)[x_mask]
-            # mask = (ratios > lims_min) & (ratios < lims_max)  # mask ratios within plotting y range
+            # ratios = np.clip(
+            #     np.array((h1[0] + eps) / (h[0] + eps)), lims_min, lims_max
+            # )[x_mask]
+            # mask = (ratios > lims_min) & (
+            #     ratios < lims_max
+            # )  # mask ratios within plotting y range
             # # only connect dots with adjecent points
-            # starts = np.argwhere(np.insert(mask[:-1],0,False)<mask)[:,0]
-            # ends = np.argwhere(np.append(mask[1:],False)<mask)[:,0]+1
-            # indexes = np.stack((starts,ends)).T
+            # starts = np.argwhere(np.insert(mask[:-1], 0, False) < mask)[:, 0]
+            # ends = np.argwhere(np.append(mask[1:], False) < mask)[:, 0] + 1
+            # indexes = np.stack((starts, ends)).T
             # for idxs in indexes:
             #     sub_mask = np.zeros(len(mask), dtype=bool)
-            #     sub_mask[idxs[0]:idxs[1]] = True
-            #     axs[1].plot(centers[sub_mask], ratios[sub_mask], linestyle=':', lw=2, marker='o', color=plt_config.color_lines[i])
+            #     sub_mask[idxs[0] : idxs[1]] = True
+            #     axs[1].plot(
+            #         centers[sub_mask],
+            #         ratios[sub_mask],
+            #         linestyle=":",
+            #         lw=2,
+            #         marker="o",
+            #         color=plt_config.color_lines[i],
+            #     )
             # # remaining points either above or below plotting y range
-            # mask = (ratios == lims_min)
-            # axs[1].plot(centers[mask], ratios[mask], linestyle='', lw=2, marker='v', color=plt_config.color_lines[i], clip_on=False)
-            # mask = (ratios == lims_max)
-            # axs[1].plot(centers[mask], ratios[mask], linestyle='', lw=2, marker='^', color=plt_config.color_lines[i], clip_on=False)
+            # mask = ratios == lims_min
+            # axs[1].plot(
+            #     centers[mask],
+            #     ratios[mask],
+            #     linestyle="",
+            #     lw=2,
+            #     marker="v",
+            #     color=plt_config.color_lines[i],
+            #     clip_on=False,
+            # )
+            # mask = ratios == lims_max
+            # axs[1].plot(
+            #     centers[mask],
+            #     ratios[mask],
+            #     linestyle="",
+            #     lw=2,
+            #     marker="^",
+            #     color=plt_config.color_lines[i],
+            #     clip_on=False,
+            # )
 
     # horizontal line at 1
     # axs[1].axhline(1, linestyle='-', lw=1, color='k')
@@ -1299,14 +1369,16 @@ def plt_esum_singleE(e_sum_list, e_sum_list_list, labels, plt_config=plt_config)
 def get_plots(
     plt_config,
     map_layers,
-    half_cell_size,
+    half_cell_size_global,
     events,
     events_list: list,
+    global_shower_axis_char: str,
     labels: list = ["1", "2", "3"],
     title=r"\textbf{full spectrum}",
 ):
-    # e_radial_real, occ_real, e_sum_real, hits_real, e_layers_real, occ_layer_real, e_layers_distibution_real, e_radial_lists_real, hits_noThreshold_list_real = get_features(events)
-    dict_real = get_features(plt_config, map_layers, half_cell_size, events)
+    dict_real = get_features(
+        plt_config, map_layers, half_cell_size_global, events, global_shower_axis_char
+    )
     e_radial_real = dict_real["e_radial"]
     occ_real = dict_real["occ"]
     e_sum_real = dict_real["e_sum"]
@@ -1316,7 +1388,13 @@ def get_plots(
     e_radial_list, occ_list, e_sum_list, hits_list, e_layers_list = [], [], [], [], []
 
     for i in range(len(events_list)):
-        dict_fake = get_features(plt_config, map_layers, half_cell_size, events_list[i])
+        dict_fake = get_features(
+            plt_config,
+            map_layers,
+            half_cell_size_global,
+            events_list[i],
+            global_shower_axis_char,
+        )
 
         e_radial_list.append(dict_fake["e_radial"])
         occ_list.append(dict_fake["occ"])
@@ -1332,9 +1410,16 @@ def get_plots(
 
 
 def get_observables_for_plotting(
-    plt_config, map_layers, half_cell_size, events, events_list: list
+    plt_config,
+    map_layers,
+    half_cell_size_global,
+    events,
+    events_list: list,
+    global_shower_axis_char: str,
 ):
-    dict_real = get_features(plt_config, map_layers, half_cell_size, events)
+    dict_real = get_features(
+        plt_config, map_layers, half_cell_size_global, events, global_shower_axis_char
+    )
     e_radial_real = dict_real["e_radial"]
     occ_real = dict_real["occ"]
     e_sum_real = dict_real["e_sum"]
@@ -1352,7 +1437,13 @@ def get_observables_for_plotting(
     )
 
     for i in range(len(events_list)):
-        dict_fake = get_features(plt_config, map_layers, half_cell_size, events_list[i])
+        dict_fake = get_features(
+            plt_config,
+            map_layers,
+            half_cell_size_global,
+            events_list[i],
+            global_shower_axis_char,
+        )
 
         e_radial_list.append(dict_fake["e_radial"])
         occ_list.append(dict_fake["occ"])
@@ -1470,7 +1561,8 @@ def plot_line_with_devation(
     **line_kwargs,
 ):
     """
-    Plot a line with a shaded region around it. The shaded region usually represents the standard deviation of the data.
+    Plot a line with a shaded region around it.
+    The shaded region usually represents the standard deviation of the data.
 
     Parameters
     ----------
@@ -1697,7 +1789,8 @@ def plot_event(
     # write a title
     observed_energy = energy.sum()
     ax.set_title(
-        f"Evt: {event_n}, $n_{{pts}}$: {n_points}, $E_{{in}}$: {incident_energy:.2f}, $E_{{vis}}$: {observed_energy:.2f}"
+        f"Evt: {event_n}, $n_{{pts}}$: {n_points}, $E_{{in}}$: "
+        f"{incident_energy:.2f}, $E_{{vis}}$: {observed_energy:.2f}"
     )
     return ax
 

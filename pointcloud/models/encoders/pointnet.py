@@ -46,6 +46,6 @@ class PointNetEncoder(nn.Module):
         v = F.relu(self.fc_bn2_v(self.fc2_v(v)))
         v = self.fc3_v(v)
 
-        # Returns both mean and logvariance, just ignore the latter in deteministic cases.
+        # Returns both mean and logvariance,
+        # just ignore the latter in deteministic cases.
         return m, v
-

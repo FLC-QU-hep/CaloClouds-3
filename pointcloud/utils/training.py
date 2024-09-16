@@ -69,128 +69,80 @@ def get_sample_density(config):
 
 
 def get_optimiser_schedular(config, model):
+    # Consistency Model was trained with Rectified Adam,
+    # in k-diffusion AdamW is used, in EDM normal Adam
+    optimiser_class = {"Adam": torch.optim.Adam, "RAdam": torch.optim.RAdam}.get(
+            config.optimizer, None)
+    if optimiser_class is None:
+        raise NotImplementedError(f"Optimizer {config.optimizer} not implemented")
+
     if config.model_name == "flow":
-        optimizer_flow = None
-        scheduler_flow = None
-        optimizer = torch.optim.Adam(
-            model.parameters(), lr=config.lr, weight_decay=config.weight_decay
-        )
-        scheduler = get_linear_scheduler(
-            optimizer,
-            start_epoch=config.sched_start_epoch,
-            end_epoch=config.sched_end_epoch,
-            start_lr=config.lr,
-            end_lr=config.end_lr,
-        )
-
-    elif config.model_name in [
-        "AllCond_epicVAE_nFlow_PointDiff",
-        "epicVAE_nFlow_kDiffusion",
-        "wish",
-    ]:
-        if config.optimizer == "Adam":
-            if config.latent_dim > 0:
-                optimizer = torch.optim.Adam(  # Consistency Model was trained with Rectified Adam, in k-diffusion AdamW is used, in EDM normal Adam
-                    [
-                        {"params": model.encoder.parameters()},
-                        {"params": model.diffusion.parameters()},
-                    ],
-                    lr=config.lr,
-                    weight_decay=config.weight_decay,
-                )
-                optimizer_flow = torch.optim.Adam(
-                    [
-                        {"params": model.flow.parameters()},
-                    ],
-                    lr=config.lr,
-                    weight_decay=config.weight_decay,
-                )
-            else:
-                optimizer = torch.optim.Adam(  # Consistency Model was trained with Rectified Adam, in k-diffusion AdamW is used, in EDM normal Adam
-                    [
-                        {"params": model.diffusion.parameters()},
-                    ],
-                    lr=config.lr,
-                    weight_decay=config.weight_decay,
-                )
-                optimizer_flow = None
-        elif config.optimizer == "RAdam":
-            if config.latent_dim > 0:
-                optimizer = torch.optim.RAdam(  # Consistency Model was trained with Rectified Adam, in k-diffusion AdamW is used, in EDM normal Adam
-                    [
-                        {"params": model.encoder.parameters()},
-                        {"params": model.diffusion.parameters()},
-                    ],
-                    lr=config.lr,
-                    weight_decay=config.weight_decay,
-                )
-                optimizer_flow = torch.optim.RAdam(
-                    [
-                        {"params": model.flow.parameters()},
-                    ],
-                    lr=config.lr,
-                    weight_decay=config.weight_decay,
-                )
-            elif config.model_name == "wish":
-                optimizer = torch.optim.RAdam(  # Consistency Model was trained with Rectified Adam, in k-diffusion AdamW is used, in EDM normal Adam
-                    [{"params": model.parameters()}],
-                    lr=config.lr,
-                    weight_decay=config.weight_decay,
-                )
-                optimizer_flow = None
-            else:
-                optimizer = torch.optim.RAdam(  # Consistency Model was trained with Rectified Adam, in k-diffusion AdamW is used, in EDM normal Adam
-                    [
-                        {"params": model.diffusion.parameters()},
-                    ],
-                    lr=config.lr,
-                    weight_decay=config.weight_decay,
-                )
-                optimizer_flow = None
+        needs_flow = False
+        model_parameters = model.parameters()
+    if config.model_name == "wish":
+        needs_flow = False
+        model_parameters = [{"params": model.parameters()}]
+    elif config.model_name in ["epicVAE_nFlow", "epicVAE_nFlow_kDiffusion"]:
+        needs_flow = config.latent_dim > 0
+        if needs_flow:
+            model_parameters = [
+                {"params": model.encoder.parameters()},
+                {"params": model.diffusion.parameters()},
+            ]
+            flow_parameters = [{"params": model.flow.parameters()}]
         else:
-            raise NotImplementedError("Optimizer not implemented")
+            model_parameters = [{"params": model.diffusion.parameters()}]
+    else:
+        raise NotImplementedError(f"Model {config.model_name} not implemented")
 
-        scheduler = get_linear_scheduler(
-            optimizer,
-            start_epoch=config.sched_start_epoch,
-            end_epoch=config.sched_end_epoch,
-            start_lr=config.lr,
-            end_lr=config.end_lr,
+    optimizer = optimiser_class(
+        model_parameters, lr=config.lr, weight_decay=config.weight_decay
         )
-        if config.latent_dim > 0:
-            scheduler_flow = get_linear_scheduler(
-                optimizer_flow,
-                start_epoch=config.sched_start_epoch,
-                end_epoch=config.sched_end_epoch,
-                start_lr=config.lr,
-                end_lr=config.end_lr,
+    scheduler = get_linear_scheduler(
+        optimizer,
+        start_epoch=config.sched_start_epoch,
+        end_epoch=config.sched_end_epoch,
+        start_lr=config.lr,
+        end_lr=config.end_lr,
+    )
+
+    if needs_flow:
+        optimizer_flow = optimiser_class(
+            flow_parameters, lr=config.lr, weight_decay=config.weight_decay
             )
-        else:
-            scheduler_flow = None
+
+        scheduler_flow = get_linear_scheduler(
+            optimizer_flow,
+            start_epoch=config.sched_start_epoch,
+            end_epoch=config.sched_end_epoch,
+            start_lr=config.lr,
+            end_lr=config.end_lr,
+        )
+    else:
+        scheduler_flow = None
+        optimizer_flow = None
     return optimizer, scheduler, optimizer_flow, scheduler_flow
 
 
 def get_pretrained(config, model):
-    if hasattr(config, 'uda_model_path') and os.path.isfile(config.uda_model_path):
+    if hasattr(config, "uda_model_path") and os.path.isfile(config.uda_model_path):
+        print(f"\n Loading model from {config.uda_model_path} \n")
 
-        print(f'\n Loading model from {config.uda_model_path} \n')
-        
-        #for the pretraining we lower the learning rate
-        config.lr = 5e-5        ## calochallenge -  [5-1]e-4     # Caloclouds default: 2e-3, consistency model paper: approx. 1e-5
-        config.end_lr = 1e-5  
+        # for the pretraining we lower the learning rate
+        config.lr = 5e-5
+        # calochallenge -  [5-1]e-4
+        # Caloclouds default: 2e-3, consistency model paper: approx. 1e-5
+        config.end_lr = 1e-5
 
-        try:
-            from pointcloud.configs import Configs
-            print("Module configs found")
-        except ModuleNotFoundError as e:
-            print("Module configs not found")
-            raise e
-
-        checkpoint = torch.load(config.uda_model_path, map_location=torch.device(config.device))    # caloclouds for uda
-        model.load_state_dict(checkpoint['others']['model_ema'], strict=False) #strict allows for partial loading
+        checkpoint = torch.load(
+            config.uda_model_path, map_location=torch.device(config.device)
+        )  # caloclouds for uda
+        model.load_state_dict(
+            checkpoint["others"]["model_ema"], strict=False
+        )  # strict allows for partial loading
 
         for i, layer in enumerate(model.diffusion.inner_model.layers):
-            if i in config.uda_layers: # the layer with adaptive training
+            if i in config.uda_layers:  # the layer with adaptive training
                 print(f"Training layer {i}")
                 for param in layer.parameters():
                     param.requires_grad = True
@@ -198,13 +150,12 @@ def get_pretrained(config, model):
                 print(f"Setting layer {i} to requires_grad=False")
                 for param in layer.parameters():
                     param.requires_grad = False
-        print(f'\n Model loaded from checkpoint {config.uda_model_path} \n')
+        print(f"\n Model loaded from checkpoint {config.uda_model_path} \n")
     else:
-        print('\n Creating a new model from scratch\n')
-    
-    # Verify the 'requires_grad' status 
-        
-    for name, param in model.named_parameters():
-        print(f'\n {name}: requires_grad={param.requires_grad} \n')
-    
+        print("\n Creating a new model from scratch\n")
+
+    # # Verify the 'requires_grad' status
+    # for name, param in model.named_parameters():
+    #     print(f"\n {name}: requires_grad={param.requires_grad} \n")
+
     return model

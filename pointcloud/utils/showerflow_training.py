@@ -10,20 +10,46 @@ import os
 from pointcloud.utils.metadata import Metadata
 from pointcloud.data.read_write import get_n_events, read_raw_regaxes
 from pointcloud.utils.detector_map import floors_ceilings
+from pointcloud.utils.gen_utils import get_cog as cog_from_kinematics
 
 
 def get_incident_npts_visible(
     configs, showerflow_dir, redo=False, local_batch_size=10_000
 ):
+    """
+    Save and return the incident energy and the number of
+    visible points in the shower for all showers in the dataset.
+    If found on disk, will just return.
+
+    Parameters
+    ----------
+    configs : pointcloud.configs.Configs
+        Description of setup, including location of dataset.
+    showerflow_dir : str
+        Location to store the data, should exist.
+    redo : bool, optional
+        If `True`, will recalculate the data even if it is already
+        found in `showerflow_dir`. The default is False.
+    local_batch_size : int, optional
+        Number of events to process at once. Should fit in memory.
+        The default is 10_000.
+
+    Returns
+    -------
+    pointsE_path : str
+        Path to the file containing the incident energy and number of
+        visible points in the shower for all showers in the dataset.
+    """
+    assert os.path.exists(showerflow_dir)
     meta = Metadata(configs)
     pointsE_path = os.path.join(showerflow_dir, "pointsE.npz")
     if os.path.exists(pointsE_path) and not redo:
         print("Using precaluclated energies and counts", flush=True)
     else:
         print("Recalculating energies and counts", flush=True)
-        n_events = sum(get_n_events(configs.dataset_path, configs.n_dataset_files))
+        n_events = np.sum(get_n_events(configs.dataset_path, configs.n_dataset_files))
         floors, ceilings = floors_ceilings(
-            meta.layer_bottom_pos_raw, meta.cell_thickness_raw
+            meta.layer_bottom_pos_hdf5, meta.cell_thickness_hdf5
         )
         energy = np.zeros(n_events)
         num_points = np.zeros(n_events)
@@ -51,13 +77,39 @@ def get_incident_npts_visible(
 def get_clusters_per_layer(
     configs, showerflow_dir, redo=False, local_batch_size=10_000
 ):
+    """
+    Save and return the number of clusters in each layer for all showers
+    in the dataset. If found on disk, will just return.
+
+    Parameters
+    ----------
+    configs : pointcloud.configs.Configs
+        Description of setup, including location of dataset.
+    showerflow_dir : str
+        Location to store the data.
+    redo : bool, optional
+        If `True`, will recalculate the data even if it is already
+        found in `showerflow_dir`. The default is False.
+    local_batch_size : int, optional
+        Number of events to process at once. Should fit in memory.
+        The default is 10_000.
+
+    Returns
+    -------
+    clusters_per_layer_path : str
+        Path to the file containing the number of clusters in each layer
+        for all showers in the dataset.
+    """
+    assert os.path.exists(showerflow_dir)
+    meta = Metadata(configs)
+    n_events = np.sum(get_n_events(configs.dataset_path, configs.n_dataset_files))
     clusters_per_layer_path = os.path.join(showerflow_dir, "clusters_per_layer.npz")
     if os.path.exists(clusters_per_layer_path) and not redo:
         print("Using precaluclated clusters per layer", flush=True)
     else:
-        print("Recalculating clusters per layer", flush=True)  
+        print("Recalculating clusters per layer", flush=True)
         floors, ceilings = floors_ceilings(
-            meta.layer_bottom_pos_raw, meta.cell_thickness_raw
+            meta.layer_bottom_pos_hdf5, meta.cell_thickness_hdf5
         )
         clusters_per_layer = np.zeros((n_events, len(floors)))
         for start_idx in range(0, n_events, local_batch_size):
@@ -66,7 +118,7 @@ def get_clusters_per_layer(
             _, events_batch = read_raw_regaxes(configs, pick_events=my_slice)
             mask = events_batch[:, :, 3] > 0
             clusters_here = [
-                ((events_batch[:, :, 1] < c) & (events_batch[:, :, 1] > f) & mask).sum(
+                ((events_batch[:, :, 2] < c) & (events_batch[:, :, 2] > f) & mask).sum(
                     axis=1
                 )
                 for f, c in zip(floors, ceilings)
@@ -83,13 +135,40 @@ def get_clusters_per_layer(
 
 
 def get_energy_per_layer(configs, showerflow_dir, redo=False, local_batch_size=10_000):
+    """
+    Save and return the observed total energy in each layer
+    for all showers in the dataset.
+
+    Parameters
+    ----------
+    configs : pointcloud.configs.Configs
+        Description of setup, including location of dataset.
+    showerflow_dir : str
+        Location to store the data.
+    redo : bool, optional
+        If `True`, will recalculate the data even if it is already
+        found in `showerflow_dir`. The default is False.
+    local_batch_size : int, optional
+        Number of events to process at once. Should fit in memory.
+        The default is 10_000.
+
+    Returns
+    -------
+    energy_per_layer_path : str
+        Path to the file containing the observed total energy in each layer
+        for all showers in the dataset.
+
+    """
+    assert os.path.exists(showerflow_dir)
+    meta = Metadata(configs)
+    n_events = np.sum(get_n_events(configs.dataset_path, configs.n_dataset_files))
     energy_per_layer_path = os.path.join(showerflow_dir, "energy_per_layer.npz")
     if os.path.exists(energy_per_layer_path) and not redo:
         print("Using precaluclated energy per layer", flush=True)
     else:
         print("Recalculating energy per layer", flush=True)
         floors, ceilings = floors_ceilings(
-            meta.layer_bottom_pos_raw, meta.cell_thickness_raw
+            meta.layer_bottom_pos_hdf5, meta.cell_thickness_hdf5
         )
         energy_per_layer = np.zeros((n_events, len(floors)))
         for start_idx in range(0, n_events, local_batch_size):
@@ -99,8 +178,8 @@ def get_energy_per_layer(configs, showerflow_dir, redo=False, local_batch_size=1
             energy_here = [
                 (
                     events_batch[..., 3]
-                    * (events_batch[:, :, 1] < c)
-                    * (events_batch[:, :, 1] > f)
+                    * (events_batch[:, :, 2] < c)
+                    * (events_batch[:, :, 2] > f)
                 ).sum(axis=1)
                 for f, c in zip(floors, ceilings)
             ]
@@ -115,16 +194,36 @@ def get_energy_per_layer(configs, showerflow_dir, redo=False, local_batch_size=1
     return energy_per_layer_path
 
 
-def cog_from_kinematics(x, y, z, e):
-    sum_e = e.sum(axis=1)
-    return (
-        np.sum((x * e), axis=1) / sum_e,
-        np.sum((y * e), axis=1) / sum_e,
-        np.sum((z * e), axis=1) / sum_e,
-    )
-
-
 def get_cog(configs, showerflow_dir, redo=False, local_batch_size=10_000):
+    """
+    Save and return the number of center of gravity of each shower
+    in the dataset. If found on disk, will just return.
+    Also returns a sample equal to the local_batch_size.
+
+    Parameters
+    ----------
+    configs : pointcloud.configs.Configs
+        Description of setup, including location of dataset.
+    showerflow_dir : str
+        Location to store the data.
+    redo : bool, optional
+        If `True`, will recalculate the data even if it is already
+        found in `showerflow_dir`. The default is False.
+    local_batch_size : int, optional
+        Number of events to process at once. Should fit in memory.
+        The default is 10_000.
+
+    Returns
+    -------
+    cog_path : str
+        Path to the file containing the center of gravity of each shower
+        for all showers in the dataset.
+    cog_batch : np.ndarray
+        A sample of the center of gravity of each shower for the first
+        `local_batch_size` showers in the dataset.
+    """
+    assert os.path.exists(showerflow_dir)
+    n_events = np.sum(get_n_events(configs.dataset_path, configs.n_dataset_files))
     cog_path = os.path.join(showerflow_dir, "cog.npy")
     if os.path.exists(cog_path) and not redo:
         print("Using precaluclated cog", flush=True)
@@ -149,7 +248,7 @@ def get_cog(configs, showerflow_dir, redo=False, local_batch_size=10_000):
                 events_batch[..., 2],
                 events_batch[..., 3],
             )
-            cog[my_slice] = np.vstack(cog_here).T
+            cog[my_slice] = np.vstack(cog_batch).T
         np.save(cog_path, cog)
         assert np.all(~np.isnan(cog))
     return cog_path, cog_batch
@@ -158,6 +257,33 @@ def get_cog(configs, showerflow_dir, redo=False, local_batch_size=10_000):
 def train_ds_function_factory(
     pointsE_path, cog_path, clusters_per_layer_path, energy_per_layer_path, configs
 ):
+    """
+    Function factory that returns a function to create training datasets
+    for selected index ranges of the dataset.
+
+    Parameters
+    ----------
+    pointsE_path : str
+        Path to the file containing the incident energy and number of
+        visible points in the shower for all showers in the dataset.
+    cog_path : str
+        Path to the file containing the center of gravity of each shower
+        for all showers in the dataset.
+    clusters_per_layer_path : str
+        Path to the file containing the number of clusters in each layer
+        for all showers in the dataset.
+    energy_per_layer_path : str
+        Path to the file containing the observed total energy in each layer
+        for all showers in the dataset.
+    configs : pointcloud.configs.Configs
+        Description of setup, including location of dataset.
+
+    Returns
+    -------
+    make_train_ds : function
+        Function that returns a training dataset for a given index range.
+        Arguments are `start_idx` and `end_idx`.
+    """
     meta = Metadata(configs)
     device = configs.device
 

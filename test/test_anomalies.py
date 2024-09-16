@@ -9,12 +9,11 @@ import tempfile
 import shutil
 
 from pointcloud.anomalies import prep_data, autoencoder, train, detect
-from pointcloud.config_varients import default
 from pointcloud.utils import metadata
 from pointcloud.data import trees
 
 from helpers.mock_read_write import mock_read_raw_regaxes, mock_get_n_events
-from helpers import sample_trees
+from helpers import sample_trees, config_creator
 
 # ## prep_data.py ###
 
@@ -22,7 +21,7 @@ from helpers import sample_trees
 @patch("pointcloud.data.trees.get_n_events", new=mock_get_n_events)
 @patch("pointcloud.data.trees.read_raw_regaxes", new=mock_read_raw_regaxes)
 def test_format_data():
-    configs = default.Configs()
+    configs = config_creator.make()
     data_as_trees = trees.DataAsTrees(configs, max_trees_in_memory=2)
 
     features, edges = prep_data.format_data(data_as_trees, [0, 1])
@@ -37,17 +36,17 @@ def test_format_data():
     assert features[0].shape == (n_points, number_of_features)
     assert edges[0].shape == (2, n_points - 1)
 
-    root_xz = metadata.Metadata(data_as_trees.configs).gun_xz_pos_raw
+    root_xy = metadata.Metadata(data_as_trees.configs).gun_xyz_pos_hdf5[[0, 1]]
 
     energies = features[0][:, 3]
     energy_order = np.argsort(energies)
     npt.assert_allclose(energies[energy_order], [1.0, 1.0, 2.0, 3.0])
 
     xs = features[0][energy_order, 0]
-    npt.assert_allclose(xs, np.array([root_xz[0], 0.0, 0.0, 1.0]))
+    npt.assert_allclose(xs, np.array([root_xy[0], 0.0, 0.0, 1.0]))
 
-    zs = features[0][energy_order, 2]
-    npt.assert_allclose(zs, np.array([root_xz[1], 0.0, 1.0, 0.0]))
+    ys = features[0][energy_order, 1]
+    npt.assert_allclose(ys, np.array([root_xy[1], 0.0, 1.0, 0.0]))
 
     incident_energy = features[0][energy_order, 4]
     npt.assert_allclose(incident_energy, np.array([1.0, 1.0, 1.0, 1.0]))
@@ -70,8 +69,7 @@ def test_format_data():
 @patch("pointcloud.data.trees.get_n_events", new=mock_get_n_events)
 @patch("pointcloud.data.trees.read_raw_regaxes", new=mock_read_raw_regaxes)
 def test_direct_data():
-    configs = default.Configs()
-    configs.device = "cpu"
+    configs = config_creator.make()
     data = prep_data.direct_data(configs, "dummy")
     for item in data:
         # check it's a torch_geometric.data.Data object
@@ -81,8 +79,7 @@ def test_direct_data():
 @patch("pointcloud.data.trees.get_n_events", new=mock_get_n_events)
 @patch("pointcloud.data.trees.read_raw_regaxes", new=mock_read_raw_regaxes)
 def test_format_save(tmpdir):
-    configs = default.Configs()
-    configs.device = "cpu"
+    configs = config_creator.make(my_tmpdir=tmpdir)
     save_dir = tmpdir.mkdir("test_format_save")
     configs.formatted_tree_base = os.path.join(save_dir, "formatted_trees")
 
@@ -92,7 +89,7 @@ def test_format_save(tmpdir):
     assert os.path.exists(features_path)
     assert os.path.exists(edges_path)
 
-    root_xz = metadata.Metadata(configs).gun_xz_pos_raw
+    root_xy = metadata.Metadata(configs).gun_xyz_pos_hdf5[[0, 1]]
 
     features = np.load(features_path)["arr_0"]
     edges = np.load(edges_path)["arr_0"]
@@ -102,10 +99,10 @@ def test_format_save(tmpdir):
     npt.assert_allclose(energies[energy_order], [1.0, 1.0, 2.0, 3.0])
 
     xs = features[energy_order, 0]
-    npt.assert_allclose(xs, np.array([root_xz[0], 0.0, 0.0, 1.0]))
+    npt.assert_allclose(xs, np.array([root_xy[0], 0.0, 0.0, 1.0]))
 
-    zs = features[energy_order, 2]
-    npt.assert_allclose(zs, np.array([root_xz[1], 0.0, 1.0, 0.0]))
+    ys = features[energy_order, 1]
+    npt.assert_allclose(ys, np.array([root_xy[1], 0.0, 1.0, 0.0]))
 
     incident_energy = features[energy_order, 4]
     npt.assert_allclose(incident_energy, np.array([1.0, 1.0, 1.0, 1.0]))
@@ -168,8 +165,8 @@ def test_get_critrion():
 # Make an enviroment that creates a sample dataset
 class SampleDataset:
     tmpdir = tempfile.mkdtemp()
-    configs = default.Configs()
-    configs_empty = default.Configs()
+    configs = config_creator.make(my_tmpdir=tmpdir)
+    configs_empty = config_creator.make(my_tmpdir=tmpdir)
     n_features = 8
     sample_model = os.path.join(tmpdir, "sample_model.pth")
 
@@ -187,7 +184,6 @@ class SampleDataset:
         The dataset requires data on disk to read, so we need to create
         some test data.
         """
-        cls.configs.device = "cpu"
         cls.configs.anomaly_checkpoint = cls.mkdir("checkpoints")
         cls.configs.anomaly_hidden_dim = 8
         # create some fake data
@@ -232,14 +228,12 @@ class SampleDataset:
         shutil.rmtree(cls.tmpdir)
 
 
-
 class TestTrain(SampleDataset):
     tmpdir = tempfile.mkdtemp()
-    configs = default.Configs()
-    configs_empty = default.Configs()
+    configs = config_creator.make(my_tmpdir=tmpdir)
+    configs_empty = config_creator.make(my_tmpdir=tmpdir)
     n_features = 8
     sample_model = os.path.join(tmpdir, "sample_model.pth")
-
 
     def test_TreeDataset(self):
         dataset = train.TreeDataset(self.configs)
@@ -313,12 +307,12 @@ def test_get_rating():
 
 class TestDetect(SampleDataset):
     tmpdir = tempfile.mkdtemp()
-    configs = default.Configs()
+    configs = config_creator.make(my_tmpdir=tmpdir)
     n_features = 8
     sample_model = os.path.join(tmpdir, "sample_model.pth")
-    
+
     def test_score_data(self):
-        dataset = train.TreeDataset(self.configs) 
+        dataset = train.TreeDataset(self.configs)
         scores = detect.score_data(self.sample_model, dataset, 0, 3)
         assert scores.shape == (3, 2)
         npt.assert_allclose(scores[:, 0], [0, 1, 2])

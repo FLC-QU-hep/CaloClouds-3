@@ -5,7 +5,7 @@ import h5py
 from ..configs import Configs
 from ..utils.metadata import Metadata
 from ..utils.detector_map import floors_ceilings
-from ..data.read_write import get_files
+from ..data.read_write import get_files, events_to_local
 
 
 class PointCloudDataset(Dataset):
@@ -178,9 +178,9 @@ class PointCloudDataset(Dataset):
 
     def _fuzz(self, event):
         pos_offset_x = np.random.uniform(0, self.offset, 1)
-        pos_offset_z = np.random.uniform(0, self.offset, 1)
+        pos_offset_y = np.random.uniform(0, self.offset, 1)
         event[:, :, 0] = event[:, :, 0] + pos_offset_x
-        event[:, :, 2] = event[:, :, 2] + pos_offset_z
+        event[:, :, 1] = event[:, :, 1] + pos_offset_y
 
     @classmethod
     def normalize_xyze(cls, event):
@@ -204,8 +204,8 @@ class PointCloudDataset(Dataset):
     def normalize_parallal(cls, event):
         """
         Normalise in the directions parallel to the layers.
-        In this case that's the x and z directions.
-        Ensure that the x and z go from -1 to 1.
+        In this case that's the x and y directions.
+        Ensure that the x and y go from -1 to 1.
         Acts in place.
 
         Parameters
@@ -215,20 +215,26 @@ class PointCloudDataset(Dataset):
             with coordinates x, y, z, and energy.
 
         """
-        Xmin = cls.metadata.Xmin
-        Xmax = cls.metadata.Xmax
+        if not cls.metadata.global_shower_axis_char == "y":
+            raise NotImplementedError(
+                "We haven't implemented any other " " global shower directions than y"
+            )
+        # works on the assumption that the data has been saved with
+        # the physical x and z scale unaltered
+        Xmin = cls.metadata.Xmin_global
+        Xmax = cls.metadata.Xmax_global
         event[..., 0] = (
             ((event[..., 0] - Xmin) * 2) / (Xmax - Xmin)
         ) - 1  # x coordinate normalization
-        Zmin = cls.metadata.Zmin
-        Zmax = cls.metadata.Zmax
-        event[..., 2] = (
-            ((event[..., 2] - Zmin) * 2) / (Zmax - Zmin)
+        Ymin = cls.metadata.Zmin_global
+        Ymax = cls.metadata.Zmax_global
+        event[..., 1] = (
+            ((event[..., 1] - Ymin) * 2) / (Ymax - Ymin)
         ) - 1  # z coordinate normalization
         # ensure padding xyz is 0
         event[event[..., 3] == 0] = 0
 
-    normalised_bounds = np.linspace(-1, 1, len(metadata.layer_bottom_pos_raw) + 1)
+    normalised_bounds = np.linspace(-1, 1, len(metadata.layer_bottom_pos_hdf5) + 1)
 
     @classmethod
     def normalize_perpendicular(cls, event):
@@ -251,10 +257,10 @@ class PointCloudDataset(Dataset):
             If some points are outside the layers.
 
         """
-        return cls._normalize_perpendicular(event, perpendicular_axis=1)
+        return cls._normalize_perpendicular(event, perpendicular_axis=2)
 
     @classmethod
-    def _normalize_perpendicular(cls, event, perpendicular_axis=1):
+    def _normalize_perpendicular(cls, event, perpendicular_axis=2):
         """
         Normalise in the direction perpendicular to the layers.
         Map the relevant coordinate to a linspace from -1 to 1.
@@ -275,8 +281,8 @@ class PointCloudDataset(Dataset):
 
         """
         layer_floors, layer_ceilings = floors_ceilings(
-            cls.metadata.layer_bottom_pos_raw,
-            cls.metadata.cell_thickness_raw,
+            cls.metadata.layer_bottom_pos_hdf5,
+            cls.metadata.cell_thickness_hdf5,
             percent_buffer=0,
         )
         rescales = (cls.normalised_bounds[1:] - cls.normalised_bounds[:-1]) / (
@@ -284,8 +290,8 @@ class PointCloudDataset(Dataset):
         )
 
         select_from, select_to = floors_ceilings(
-            cls.metadata.layer_bottom_pos_raw,
-            cls.metadata.cell_thickness_raw,
+            cls.metadata.layer_bottom_pos_hdf5,
+            cls.metadata.cell_thickness_hdf5,
             percent_buffer=0.5,
         )
 
@@ -307,11 +313,25 @@ class PointCloudDataset(Dataset):
             )
             done[mask] = True
         if not np.all(done):
-            raise ValueError("Some points appear to be outside all layers")
+            msg = "Some points appear to be outside all layers"
+            percent_outside = (~done).sum() / done.size
+            msg += f" ({percent_outside:.2%} of points)\n"
+            lowest_point = event[..., perpendicular_axis][~done].min()
+            highest_point = event[..., perpendicular_axis][~done].max()
+            msg += f"Lowest point outside layers: {lowest_point}\n"
+            msg += f"Highest point outside layers: {highest_point}\n"
+            lowest_layer = layer_floors[0]
+            highest_layer = layer_ceilings[-1]
+            msg += f"Layers range from {lowest_layer} to {highest_layer}\n"
+            msg += f"Metadata from {cls.metadata.metadata_folder}\n"
+            raise ValueError(msg)
 
     def _event_processing(self, event):
         if self._roll_axis:
             event = np.moveaxis(event, -1, -2)
+
+        # Ensure the shower runs along the z axis
+        events_to_local(event, self.metadata.orientation)
 
         # Trim padding
         max_len = (event[:, :, 3] > 0).sum(axis=1).max()
@@ -404,77 +424,25 @@ class PointCloudAngular(PointCloudDataset):
         "p_norm_local": "p_norm_local",
     }
 
-    @classmethod
-    def normalize_parallal(cls, event):
-        """
-        Normalise in the directions parallel to the layers.
-        In this case that's the x and y directions.
-        Ensure that the x and y go from -1 to 1.
-        Acts in place.
-
-        Parameters
-        ----------
-        event : np.ndarray, (..., 4)
-            One or more events. The last dimension should be 4
-            with coordinates x, y, z, and energy.
-
-        """
-        Xmin = cls.metadata.Xmin
-        Xmax = cls.metadata.Xmax
-        event[..., 0] = (
-            ((event[..., 0] - Xmin) * 2) / (Xmax - Xmin)
-        ) - 1  # x coordinate n[:1],ormalization
-        Ymin = cls.metadata.Ymin
-        Ymax = cls.metadata.Ymax
-        event[..., 1] = (
-            ((event[..., 1] - Ymin) * 2) / (Ymax - Ymin)
-        ) - 1  # z coordinate normalization
-        # ensure padding xyz is 0
-        event[event[..., 3] == 0] = 0
-
-    @classmethod
-    def normalize_perpendicular(cls, event):
-        """
-        Normalise in the direction perpendicular to the layers.
-        Map the relevant coordinate to a linspace from -1 to 1.
-        Gaps between layers are rescaled to have the same size,
-        but points do not lose their variation in the perpendicular.
-        Acts in place.
-
-        Parameters
-        ----------
-        event : np.ndarray, (..., 4)
-            One or more events. The last dimension should be 4
-            with coordinates x, y, z, and energy.
-
-        Raises
-        ------
-        ValueError
-            If some points are outside the layers.
-
-        """
-        return cls._normalize_perpendicular(event, perpendicular_axis=2)
-
 
 class CaloChallangeDataset(Dataset):
     def __init__(self, file_path, cfg, bs=32, max_ds_seq_len=22000):
-        dataset = h5py.File(file_path, 'r')
+        dataset = h5py.File(file_path, "r")
 
         # Get the indices and shuffle them
         if cfg.percentage < 1.0:
-    
-            tot_len = len(dataset['events'])
-            size = int ( tot_len * cfg.percentage)
-            idx = np.random.choice(np.arange( 0, tot_len ), size=size, replace=False)
+            tot_len = len(dataset["events"])
+            size = int(tot_len * cfg.percentage)
+            idx = np.random.choice(np.arange(0, tot_len), size=size, replace=False)
             idx = np.sort(idx).astype(int)
         else:
             cfg.percentage = 1.0
-            idx = np.arange(0, len(dataset['events'])).astype(int)
+            idx = np.arange(0, len(dataset["events"])).astype(int)
             # idx = np.sort(idx).astype(int)
-            
+
         self.dataset = {
-            'events' : dataset['events'][idx],
-            'energy' : dataset['energy'][idx]
+            "events": dataset["events"][idx],
+            "energy": dataset["energy"][idx],
         }
         self.Ymin, self.Ymax = -17, 17
         self.Xmin, self.Xmax = -17, 17
@@ -482,58 +450,64 @@ class CaloChallangeDataset(Dataset):
         self.bs = bs
         self.max_ds_seq_len = max_ds_seq_len
         self.cfg = cfg
-        
+
     def get_n_points(self, data, axis=-1):
-        n_points_arr = (data[...,axis] != 0.0).sum(1)
+        n_points_arr = (data[..., axis] != 0.0).sum(1)
         return n_points_arr
 
     def __getitem__(self, idx):
-        
         if idx > self.bs and idx < self.__len__() - self.bs:
-            event = self.dataset['events'][idx-int(self.bs/2) : idx+int(self.bs/2)].copy()
-            energy = self.dataset['energy'][idx-int(self.bs/2) : idx+int(self.bs/2)].copy()
+            event = self.dataset["events"][
+                idx - int(self.bs / 2) : idx + int(self.bs / 2)
+            ].copy()
+            energy = self.dataset["energy"][
+                idx - int(self.bs / 2) : idx + int(self.bs / 2)
+            ].copy()
         elif idx < self.bs:
-            event = self.dataset['events'][idx : idx+self.bs].copy()
-            energy = self.dataset['energy'][idx : idx+self.bs].copy()
+            event = self.dataset["events"][idx : idx + self.bs].copy()
+            energy = self.dataset["energy"][idx : idx + self.bs].copy()
         else:
-            event = self.dataset['events'][idx-self.bs : idx].copy()
-            energy = self.dataset['energy'][idx-self.bs : idx].copy()
-            
-        # event[:, 3, :] = event[:, 3, :] # energy scale
-        event[:, 3, :] = event[:, 3, :] / 1000 # energy scale
-        # event[:, 3, :] = event[:, 3, :] / energy # energy scale E_depos/E_insident
+            event = self.dataset["events"][idx - self.bs : idx].copy()
+            energy = self.dataset["energy"][idx - self.bs : idx].copy()
 
+        # event[:, 3, :] = event[:, 3, :] # energy scale
+        event[:, 3, :] = event[:, 3, :] / 1000  # energy scale
+        # event[:, 3, :] = event[:, 3, :] / energy # energy scale E_depos/E_insident
 
         max_len = (event[:, -1, :] > 0).sum(axis=1).max()
         event = event[:, :, :max_len]
-        
-        
-        event[:, 0, :] = (event[:, 0, :] - self.Xmin) * 2 / (self.Xmax - self.Xmin) - 1 # x coordinate normalization
-        event[:, 1, :] = (event[:, 1, :] - self.Ymin) * 2 / (self.Ymax - self.Ymin) - 1 # y coordinate normalization
-        event[:, 2, :] = (event[:, 2, :] - self.Zmin) * 2 / (self.Zmax - self.Zmin) - 1 # z coordinate normalization
-        
+
+        event[:, 0, :] = (event[:, 0, :] - self.Xmin) * 2 / (
+            self.Xmax - self.Xmin
+        ) - 1  # x coordinate normalization
+        event[:, 1, :] = (event[:, 1, :] - self.Ymin) * 2 / (
+            self.Ymax - self.Ymin
+        ) - 1  # y coordinate normalization
+        event[:, 2, :] = (event[:, 2, :] - self.Zmin) * 2 / (
+            self.Zmax - self.Zmin
+        ) - 1  # z coordinate normalization
 
         event = event[:, [0, 1, 2, 3]]
-        
+
         event = np.moveaxis(event, -1, -2)
-        
+
         event[event[:, :, -1] == 0] = 0
 
         # nPoints
-        points = self.get_n_points(event, axis=-1).reshape(-1,1)
-
+        points = self.get_n_points(event, axis=-1).reshape(-1, 1)
 
         if self.cfg.norm_cond:
-            energy = np.log((energy + 1e-5)/self.cfg.min_energy) / np.log(self.cfg.max_energy/self.cfg.min_energy)
-            points = np.log((points + 1)/self.cfg.min_points) / np.log(self.cfg.max_points/self.cfg.min_points)
-        
+            energy = np.log((energy + 1e-5) / self.cfg.min_energy) / np.log(
+                self.cfg.max_energy / self.cfg.min_energy
+            )
+            points = np.log((points + 1) / self.cfg.min_points) / np.log(
+                self.cfg.max_points / self.cfg.min_points
+            )
 
-        return {'event' : event,
-                'energy' : energy,
-                'points' : points}
+        return {"event": event, "energy": energy, "points": points}
 
     def __len__(self):
-        return len(self.dataset['events'])
+        return len(self.dataset["events"])
 
 
 def dataset_class_from_config(config):

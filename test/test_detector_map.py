@@ -38,12 +38,12 @@ def test_create_map():
     Y = np.array(Y)
     Z = np.array(Z)
 
-    half_cell_size = 0.5
-    cell_thickness = 0.1
-    layer_bottom_pos = np.linspace(0, 4, n_layers) - cell_thickness / 2
+    half_cell_size_global = 0.5
+    cell_thickness_global = 0.1
+    layer_bottom_pos = np.linspace(0, 4, n_layers) - cell_thickness_global / 2
 
     layers, offset = detector_map.create_map(
-        X, Y, Z, layer_bottom_pos, half_cell_size, cell_thickness
+        X, Y, Z, layer_bottom_pos, half_cell_size_global, cell_thickness_global
     )
     npt.assert_allclose(offset, 1.0)
     # all layers should be identical
@@ -88,9 +88,11 @@ def test_normalise_map():
 def test_split_to_layers():
     manual_points = np.array([[0, 0, 0], [1, 1, 1], [2, 2, 2], [3, 3, 3]])
     layer_bottom_pos = np.array([-1, 2])
-    cell_thickness = 1
+    cell_thickness_global = 1
     layered_data = list(
-        detector_map.split_to_layers(manual_points, layer_bottom_pos, cell_thickness)
+        detector_map.split_to_layers(
+            manual_points, layer_bottom_pos, cell_thickness_global
+        )
     )
     assert len(layered_data) == 2
     assert np.all(layered_data[0] == manual_points[:1])
@@ -141,11 +143,13 @@ def test_points_to_cells():
         },
     ]
     layer_bottom_pos = np.array([0, 1])
-    cell_thickness = 0.5
+    cell_thickness_global = 0.5
 
     # shouldn't choke on empty input
     empty = np.empty((0, 4))
-    cells = detector_map.points_to_cells(empty, MAP, layer_bottom_pos, cell_thickness)
+    cells = detector_map.points_to_cells(
+        empty, MAP, layer_bottom_pos, cell_thickness_global
+    )
     expected_cells = np.zeros((2, 5, 5))
     npt.assert_allclose(cells, expected_cells)
 
@@ -156,7 +160,9 @@ def test_points_to_cells():
     e_points = [1, 1, 3, 1, 5]
     points = np.vstack((x_points, y_points, z_points, e_points)).T
 
-    cells = detector_map.points_to_cells(points, MAP, layer_bottom_pos, cell_thickness)
+    cells = detector_map.points_to_cells(
+        points, MAP, layer_bottom_pos, cell_thickness_global
+    )
 
     expected_cells = np.zeros((2, 5, 5))
     expected_cells[0, 0, 2] = 2.0
@@ -166,8 +172,8 @@ def test_points_to_cells():
 
 
 def test_cells_to_points():
-    half_cell_size = 0.5
-    cell_thickness = 0.1
+    half_cell_size_global = 0.5
+    cell_thickness_global = 0.1
     n_across = 5
     x_edges_before = np.linspace(0, 5, n_across + 1)
     z_edges_before = np.linspace(-5, 5, n_across + 1)
@@ -188,13 +194,18 @@ def test_cells_to_points():
 
     # shouldn't choke on empty input
     points = detector_map.cells_to_points(
-        layers, MAP, layer_bottom_pos, half_cell_size, cell_thickness
+        layers, MAP, layer_bottom_pos, half_cell_size_global, cell_thickness_global
     )
     assert points.shape == (0, 4)
 
     # if told to pad, the output from empty input should eb all 0
     points = detector_map.cells_to_points(
-        layers, MAP, layer_bottom_pos, half_cell_size, cell_thickness, length_to_pad=4
+        layers,
+        MAP,
+        layer_bottom_pos,
+        half_cell_size_global,
+        cell_thickness_global,
+        length_to_pad=4,
     )
     assert len(points) == 4
     npt.assert_allclose(points, np.zeros((4, 4)))
@@ -205,7 +216,7 @@ def test_cells_to_points():
     layers[1][2, 0] = 5.0
 
     points = detector_map.cells_to_points(
-        layers, MAP, layer_bottom_pos, half_cell_size, cell_thickness
+        layers, MAP, layer_bottom_pos, half_cell_size_global, cell_thickness_global
     )
     assert points.shape == (3, 4)
     # we don't know which order the points will be in
@@ -217,8 +228,8 @@ def test_cells_to_points():
 
 
 def test_get_projections():
-    half_cell_size = 0.5
-    cell_thickness = 0.1
+    half_cell_size_global = 0.5
+    cell_thickness_global = 0.1
     # Mostly composed of other functions, so just a smoke test
     x_edges_before = np.linspace(0, 5, 5)
     z_edges_before = np.linspace(-5, 5, 5)
@@ -230,11 +241,22 @@ def test_get_projections():
 
     # shouldn't choke on empty input
     events = detector_map.get_projections(
-        [], MAP, layer_bottom_pos, half_cell_size, cell_thickness, False
+        np.empty(0),
+        MAP,
+        layer_bottom_pos,
+        half_cell_size_global,
+        cell_thickness_global,
+        False,
     )
     assert len(events) == 0
     events, cell_point_clouds = detector_map.get_projections(
-        [], MAP, layer_bottom_pos, half_cell_size, cell_thickness, True, 10
+        np.empty(0),
+        MAP,
+        layer_bottom_pos,
+        half_cell_size_global,
+        cell_thickness_global,
+        True,
+        10,
     )
     assert len(events) == 0
     assert cell_point_clouds.shape == (0, 0, 4)
@@ -244,12 +266,22 @@ def test_get_projections():
         [[0, 0.05, 0.5, 2.0], [3.75, 0.05, 4.5, 3.0], [0, 1.05, 0.5, 5.0]]
     )
     events = detector_map.get_projections(
-        [shower1], MAP, layer_bottom_pos, half_cell_size, cell_thickness, False
+        shower1[None, ...],
+        MAP,
+        layer_bottom_pos,
+        half_cell_size_global,
+        cell_thickness_global,
+        False,
     )
     assert len(events) == 1
     events, cell_point_clouds = detector_map.get_projections(
-        [shower1], MAP, layer_bottom_pos, half_cell_size, cell_thickness, True,
-        max_num_hits=10
+        shower1[None, ...],
+        MAP,
+        layer_bottom_pos,
+        half_cell_size_global,
+        cell_thickness_global,
+        True,
+        max_num_hits=10,
     )
     assert len(events) == 1
     assert cell_point_clouds.shape == (1, 10, 4)
@@ -258,11 +290,11 @@ def test_get_projections():
 def test_confine_to_box():
     class FakeMetadata:
         def __init__(self):
-            self.Ymin = 1
-            self.Xmin = 0
-            self.Xmax = 5
-            self.Zmin = -5
-            self.Zmax = 5
+            self.Ymin_global = 1
+            self.Xmin_global = 0
+            self.Xmax_global = 5
+            self.Zmin_global = -5
+            self.Zmax_global = 5
 
     fake_metadata = FakeMetadata()
 

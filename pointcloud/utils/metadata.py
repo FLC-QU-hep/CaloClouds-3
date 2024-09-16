@@ -52,6 +52,7 @@ class Metadata:
     Things labeled 'raw' refer to the data saved in the h5 files,
     which may be normalised.
     """
+
     def __init__(self, config=Configs()):
         """
         Object that contains metadata for a dataset.
@@ -88,6 +89,8 @@ class Metadata:
                 basename = os.path.basename(file)[: -len(".npy")]
                 assert not hasattr(self, basename)
                 self.found_attrs.append(basename)
+                if str(content.dtype).startswith("<U"):
+                    content = content.item()
                 setattr(self, basename, content)
 
     def __str__(self):
@@ -115,3 +118,35 @@ class Metadata:
         self.muon_map_E = np.load(data_dir + "/E.npy")
 
         return self.muon_map_X, self.muon_map_Y, self.muon_map_Z, self.muon_map_E
+
+    @property
+    def global_shower_axis_char(self):
+        """
+        The character representing the orientation of the shower axis,
+        in the detector coordinate system.
+        """
+        expected_start = "hdf5:xyz==global:"
+        if not self.orientation_global[: len(expected_start)] == expected_start:
+            raise NotImplementedError(
+                f"Don't know how to interpret global "
+                f"orientation {self.orientation_global}"
+            )
+        global_order = self.orientation_global[len(expected_start) :]
+        expected_start = "hdf5:xyz==local:"
+        if not self.orientation[: len(expected_start)] == expected_start:
+            raise NotImplementedError(
+                f"Don't know how to interpret local orientation {self.orientation}"
+            )
+        local_order = self.orientation[len(expected_start) :]
+        char = global_order[local_order.index("z")]
+        return char
+
+    @property
+    def global_shower_axis(self):
+        """
+        Orientation of the shower axis, in the detector coordinate system.
+        """
+        char = self.global_shower_axis_char
+        vector = np.zeros(3)
+        vector["xyz".index(char)] = 1
+        return vector

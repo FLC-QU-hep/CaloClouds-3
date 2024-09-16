@@ -16,7 +16,7 @@ from ..utils.detector_map import get_projections, create_map
 from ..utils import metrics, plotting
 from ..data.dataset import dataset_class_from_config
 from ..utils.metadata import Metadata
-from ..data.read_write import regularise_event_axes
+from ..data.read_write import get_n_events, read_raw_regaxes
 
 from .generate import load_flow_model, load_diffusion_model, generate_showers
 
@@ -122,12 +122,13 @@ def make_params_dict(model_name: str = "cm") -> dict:
 def get_g4_data(path_or_config: str | Configs) -> tuple:
     """
     Get the validation G4 data for comparison to the simulated data.
+    No longer lazy
 
     Parameters
     ----------
     path_or_config : str or Configs
         If str, the path to the G4 data. If Configs, the Configs object
-        from which the storage base can be extracted.
+        pointing to the G4 data.
 
     Returns
     -------
@@ -137,35 +138,39 @@ def get_g4_data(path_or_config: str | Configs) -> tuple:
         The incident particle energy for the G4 events.
     """
     if isinstance(path_or_config, str):
-        path = path_or_config
+        config = Configs()
+        config.dataset_path = path_or_config
+        config.n_dataset_files = 0
     else:
-        storage_base = path_or_config.storage_base
-        path = os.path.join(
-            storage_base,
-            "akorol/data/calo-clouds/hdf5/all_steps/validation",
-            "10-90GeV_x36_grid_regular_712k.hdf5",
-        )
-    try:
-        all_events = h5py.File(path, "r")["events"]
-    except KeyError:
-        all_events = h5py.File(path, "r")["event"]
-    all_events = lazy_loading.DatasetView(all_events)
+        config = path_or_config
+    # # We used to do this in a lazy loading way, which is great,
+    # # but now there are two conversion steps between disk data and read data
+    # # which makes lazy loading complex.
+    # try:
+    #     all_events = h5py.File(path, "r")["events"]
+    # except KeyError:
+    #     all_events = h5py.File(path, "r")["event"]
+    # all_events = lazy_loading.DatasetView(all_events)
 
-    def transpose(*ax_order):
-        return all_events.lazy_transpose(ax_order)
-    all_events.transpose = transpose
+    # def transpose(*ax_order):
+    #     return all_events.lazy_transpose(ax_order)
 
-    all_events = regularise_event_axes(all_events)
-    all_energy = h5py.File(path, "r")["energy"]
-    if len(all_energy.shape) == 3:
-        if all_energy.shape[0] == 1:
-            all_energy = all_energy[0]
-        else:
-            raise ValueError(
-                f"The G4 data at {path} has an unexpected shape. "
-                "Please ensure that the energy data is in the format "
-                "(n_events, 1)."
-            )
+    # all_events.transpose = transpose
+
+    # all_events = regularise_event_axes(all_events)
+    # all_energy = h5py.File(path, "r")["energy"]
+    # if len(all_energy.shape) == 3:
+    #     if all_energy.shape[0] == 1:
+    #         all_energy = all_energy[0]
+    #     else:
+    #         raise ValueError(
+    #             f"The G4 data at {path} has an unexpected shape. "
+    #             "Please ensure that the energy data is in the format "
+    #             "(n_events, 1)."
+    #         )
+    n_events = get_n_events(config.dataset_path)
+    all_energy, all_events = read_raw_regaxes(config, total_size=n_events)
+    all_energy = all_energy[..., None]
     return all_events, all_energy
 
 
@@ -222,10 +227,8 @@ def shower_generator_factory(config, param_dict):
     """
     if param_dict["caloclouds"] == "g4":
         if "g4_data_path" in param_dict:
-            args = (param_dict["g4_data_path"],)
-        else:
-            args = (config,)
-        g4_data = get_g4_data(*args)
+            config.dataset_path = param_dict["g4_data_path"]
+        g4_data = get_g4_data(config)
 
         def shower_generator(param_dict=param_dict, g4_data=g4_data):
             for showers, cond_E in yield_g4_showers(config, param_dict, g4_data):
@@ -296,16 +299,16 @@ def add_chunk(config, params_dict, shower_generator, merge_dict):
         X,
         Y,
         Z,
-        metadata.layer_bottom_pos,
-        metadata.half_cell_size,
-        metadata.cell_thickness,
+        metadata.layer_bottom_pos_global,
+        metadata.half_cell_size_global,
+        metadata.cell_thickness_global,
     )
     events, clouds = get_projections(
         showers,
         map_layers,
-        metadata.layer_bottom_pos,
-        metadata.half_cell_size,
-        metadata.cell_thickness,
+        metadata.layer_bottom_pos_global,
+        metadata.half_cell_size_global,
+        metadata.cell_thickness_global,
         max_num_hits=6000,
         return_cell_point_cloud=True,
     )
@@ -313,7 +316,11 @@ def add_chunk(config, params_dict, shower_generator, merge_dict):
     print("get features and center of gravities")
     plt_config = plotting.PltConfigs()
     features_dict = plotting.get_features(
-        plt_config, map_layers, metadata.half_cell_size, events
+        plt_config,
+        map_layers,
+        metadata.half_cell_size_global,
+        events,
+        metadata.global_shower_axis_char,
     )
 
     features_dict["incident_energy"] = cond_E.reshape(-1)  # GeV  shape: (n_events,)

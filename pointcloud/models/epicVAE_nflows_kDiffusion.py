@@ -179,6 +179,8 @@ class epicVAE_nFlow_kDiffusion(Module):
 
     def sample(self, cond_feats, num_points, config):
         batch_size, _ = cond_feats.size()
+        if batch_size == 0:
+            return torch.zeros(0, num_points, config.features, device=cond_feats.device)
 
         # contect / latent space
         if self.args.latent_dim > 0:

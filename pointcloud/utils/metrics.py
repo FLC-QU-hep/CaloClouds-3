@@ -100,7 +100,8 @@ def binned_radial_occupancy_sum(occ_radial, bin_edges=[0, 300]):  # just for deb
         radial_sub = occ_radial[mask]
         binned_occ_radial.append(radial_sub.sum())
     binned_radial_occ_sum = np.array(binned_occ_radial)
-    return binned_radial_occ_sum  # shape (bin centeres,)  --> should each be about 10% of total occupancy
+    # shape (bin centeres,)  --> should each be about 10% of total occupancy
+    return binned_radial_occ_sum
 
 
 def binned_radial_occupancy(occ_radial, bin_edges=[0, 300]):  # just for debugging
@@ -162,19 +163,21 @@ def merge_dicts(dict_list, key_exceptions=[]):
     return merged_dict
 
 
-def get_event_observables_from_dict(dict):
-    cog_x = dict["cog_x"].reshape(-1, 1)  # 0
-    cog_y = dict["cog_y"].reshape(-1, 1)  # 1
-    cog_z = dict["cog_z"].reshape(-1, 1)  # 2
-    occ = dict["occ"].reshape(-1, 1)  # 3
-    sampling_fraction = (dict["e_sum"] / (dict["incident_energy"] * 1000)).reshape(
+def get_event_observables_from_dict(obs_dict):
+    cog_x = obs_dict["cog_x"].reshape(-1, 1)  # 0
+    cog_y = obs_dict["cog_y"].reshape(-1, 1)  # 1
+    cog_z = obs_dict["cog_z"].reshape(-1, 1)  # 2
+    occ = obs_dict["occ"].reshape(-1, 1)  # 3
+    sampling_fraction = (
+        obs_dict["e_sum"] / (obs_dict["incident_energy"] * 1000)
+    ).reshape(
         -1, 1
     )  # 4
-    hits = dict["hits"][0 : len(cog_x)].reshape(
+    hits = obs_dict["hits"][0 : len(cog_x)].reshape(
         -1, 1
     )  # only use the first X hits       # 5
-    binned_layer_e = dict["binned_layer_e"].T  # 6-15
-    binned_radial_e = dict["binned_radial_e"].T  # 16-25
+    binned_layer_e = obs_dict["binned_layer_e"].T  # 6-15
+    binned_radial_e = obs_dict["binned_radial_e"].T  # 16-25
     return np.hstack(
         [
             cog_x,

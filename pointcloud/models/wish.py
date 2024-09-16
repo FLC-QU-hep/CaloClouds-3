@@ -7,8 +7,6 @@ from torch.distributions import (
     LogNormal,
     Weibull,
     MultivariateNormal,
-    transformed_distribution,
-    transforms,
 )
 import numpy as np
 
@@ -18,7 +16,6 @@ from ..utils.detector_map import split_to_layers
 from ..utils import stats_accumulator
 from ..utils.maths import (
     _TORCH_TINY,
-    _TORCH_MAX,
     torch_polyval,
     weibull_params,
     logNorm_params,
@@ -809,9 +806,11 @@ class LayersBackBone:
         assert (
             not energy_mean_coeffs
         ), f"energy_mean_coeffs contains unused items: {energy_mean_coeffs}"
-        assert (
-            not energy_standarddev_coeffs
-        ), f"energy_standarddev_coeffs contains unused items: {energy_standarddev_coeffs}"
+        assert not energy_standarddev_coeffs, (
+            "energy_standarddev_coeffs contains unused items:"
+            f"{energy_standarddev_coeffs}",
+        )
+
         # self.all_params = self._collect_all_params()
 
     def __str__(self):
@@ -842,7 +841,8 @@ class LayersBackBone:
 
     def log_likelihood(self, incident_energy, samples):
         """
-        Given an observed event backbone, calculate the log likelihood of the model parameters.
+        Given an observed event backbone,
+        calculate the log likelihood of the model parameters.
 
         Parameters
         ----------
@@ -1120,7 +1120,7 @@ class Wish(Module):
             The backbone of the model, containing the fits for the inputs to each layer.
         normed_layer_bottom : 1-D array_like, of length n_layers
             The normalised position of the bottom of each layer.
-        cell_thickness : float
+        cell_thickness_global : float
             Normalised thickness of a cell in the detector.
         layer_params : list of torch.Tensor
             The parameters of the fits for each layer.
@@ -1133,7 +1133,7 @@ class Wish(Module):
         """
         super().__init__()
         metadata = Metadata(config)
-        self.n_layers = len(metadata.layer_bottom_pos)
+        self.n_layers = len(metadata.layer_bottom_pos_global)
         self.poly_degree = config.poly_degree
         self.max_n_pts_per_layer = config.max_points / 2.0
         self.backbone = LayersBackBone(self.n_layers, self.poly_degree)
@@ -1142,7 +1142,7 @@ class Wish(Module):
         self.normed_layer_bottom = np.linspace(-1, 1, self.n_layers + 1)[
             : self.n_layers
         ]
-        self.cell_thickness = 0.5 * (
+        self.cell_thickness_global = 0.5 * (
             self.normed_layer_bottom[1] - self.normed_layer_bottom[0]
         )
         self.layer_params = []
@@ -1276,9 +1276,9 @@ class Wish(Module):
         log_likelihood = 0.0
         backbone_observed = []
         for layer_n, points_in_layer in enumerate(
-            split_to_layers(event, self.normed_layer_bottom, self.cell_thickness)
+            split_to_layers(event, self.normed_layer_bottom, self.cell_thickness_global)
         ):
-            displacement = points_in_layer[:, [0, 2]]
+            displacement = points_in_layer[:, [0, 1]]
             energies = points_in_layer[:, 3]
             n_points = torch.tensor((energies.shape[0]))
             backbone_observed.append((n_points, energies))
@@ -1346,12 +1346,12 @@ class Wish(Module):
         """
         with torch.no_grad():
             all_x, all_y, all_z, all_e = [], [], [], []
-            for y, (displacement, energy) in enumerate(
+            for z, (displacement, energy) in enumerate(
                 self.draw_all_layers(incident_energy)
             ):
                 all_x += displacement[:, 0].tolist()
-                all_y += np.full(len(displacement), y).tolist()
-                all_z += displacement[:, 1].tolist()
+                all_y += displacement[:, 1].tolist()
+                all_z += np.full(len(displacement), z).tolist()
                 all_e += energy.tolist()
         return all_x, all_y, all_z, all_e
 

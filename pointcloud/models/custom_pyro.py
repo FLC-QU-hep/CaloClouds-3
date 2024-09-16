@@ -1,26 +1,16 @@
 # Copyright Contributors to the Pyro project.
 # SPDX-License-Identifier: Apache-2.0
 
-from functools import partial, reduce
-import operator
+from functools import partial
 
 import torch
 from torch.distributions.utils import _sum_rightmost
 
-
-from pyro.nn import AutoRegressiveNN, ConditionalAutoRegressiveNN, ConditionalDenseNN, DenseNN
-
 from pyro.distributions import constraints
 from pyro.distributions.conditional import ConditionalTransformModule
 from pyro.distributions.torch_transform import TransformModule
-from pyro.distributions.util import copy_docs_from
 from pyro.distributions.transforms.spline import ConditionalSpline
-from pyro.distributions.transforms.utils import clamp_preserve_gradients
 from pyro.distributions.transforms import SplineCoupling
-
-
-    
-
 
 
 class SplineAutoregressive(TransformModule):
@@ -138,11 +128,6 @@ class SplineAutoregressive(TransformModule):
         return self._cache_log_detJ.sum(-1)
 
 
-
-
-
-
-
 class ConditionalSplineAutoregressive(ConditionalTransformModule):
     r"""
     An implementation of the autoregressive layer with rational spline bijections of
@@ -222,19 +207,15 @@ class ConditionalSplineAutoregressive(ConditionalTransformModule):
         of type :class:`~pyro.distributions.transforms.SplineAutoregressive`.
         """
 
-        # Note that nn.condition doesn't copy the weights of the ConditionalAutoregressiveNN
+        # Note that nn.condition doesn't copy the weights of the
+        # ConditionalAutoregressiveNN
         cond_nn = partial(self.nn, context=context)
         cond_nn.permutation = cond_nn.func.permutation
         cond_nn.get_permutation = cond_nn.func.get_permutation
         return SplineAutoregressive(self.input_dim, cond_nn, **self.kwargs)
-    
-    
-    
-    
-    
+
+
 class ConditionalSplineCoupling(ConditionalTransformModule):
-
-
     domain = constraints.real_vector
     codomain = constraints.real_vector
     bijective = True
@@ -245,8 +226,6 @@ class ConditionalSplineCoupling(ConditionalTransformModule):
         self.split_dim = split_dim
         self.nn = hypernet
         self.kwargs = kwargs
-        
-
 
     def condition(self, context):
         """
@@ -254,23 +233,12 @@ class ConditionalSplineCoupling(ConditionalTransformModule):
         of type :class:`~pyro.distributions.transforms.SplineAutoregressive`.
         """
 
-        # Note that nn.condition doesn't copy the weights of the ConditionalAutoregressiveNN
+        # Note that nn.condition doesn't copy the weights of the
+        # ConditionalAutoregressiveNN
         cond_nn = partial(self.nn, context=context)
-        #cond_nn.permutation = cond_nn.func.permutation
-        #cond_nn.get_permutation = cond_nn.func.get_permutation
+        # cond_nn.permutation = cond_nn.func.permutation
+        # cond_nn.get_permutation = cond_nn.func.get_permutation
         return SplineCoupling(self.input_dim, self.split_dim, cond_nn, **self.kwargs)
-
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-
 
 
 class AffineCouplingTanH(TransformModule):
@@ -385,17 +353,17 @@ class AffineCouplingTanH(TransformModule):
             [self.split_dim, x.size(self.dim) - self.split_dim], dim=self.dim
         )
 
-        # Now that we can split on an arbitrary dimension, we have do a bit of reshaping...
+        # Now that we can split on an arbitrary dimension,
+        # we have do a bit of reshaping...
         mean, log_scale = self.nn(x1.reshape(x1.shape[: self.dim] + (-1,)))
         mean = mean.reshape(mean.shape[:-1] + x2.shape[self.dim :])
         log_scale = log_scale.reshape(log_scale.shape[:-1] + x2.shape[self.dim :])
 
-        #log_scale = clamp_preserve_gradients(
+        # log_scale = clamp_preserve_gradients(
         #    log_scale, self.log_scale_min_clip, self.log_scale_max_clip
-        #)
-        log_scale = -1.0*torch.tanh(log_scale)
+        # )
+        log_scale = -1.0 * torch.tanh(log_scale)
 
-        
         self._cached_log_scale = log_scale
 
         y1 = x1
@@ -415,17 +383,17 @@ class AffineCouplingTanH(TransformModule):
         )
         x1 = y1
 
-        # Now that we can split on an arbitrary dimension, we have do a bit of reshaping...
+        # Now that we can split on an arbitrary dimension,
+        # we have do a bit of reshaping...
         mean, log_scale = self.nn(x1.reshape(x1.shape[: self.dim] + (-1,)))
         mean = mean.reshape(mean.shape[:-1] + y2.shape[self.dim :])
         log_scale = log_scale.reshape(log_scale.shape[:-1] + y2.shape[self.dim :])
 
-        #log_scale = clamp_preserve_gradients(
+        # log_scale = clamp_preserve_gradients(
         #    log_scale, self.log_scale_min_clip, self.log_scale_max_clip
-        #)
-        log_scale = -1.0*torch.tanh(log_scale)
-        
-        
+        # )
+        log_scale = -1.0 * torch.tanh(log_scale)
+
         self._cached_log_scale = log_scale
 
         x2 = (y2 - mean) * torch.exp(-log_scale)
@@ -444,14 +412,12 @@ class AffineCouplingTanH(TransformModule):
             )
             _, log_scale = self.nn(x1.reshape(x1.shape[: self.dim] + (-1,)))
             log_scale = log_scale.reshape(log_scale.shape[:-1] + x2.shape[self.dim :])
-            #log_scale = clamp_preserve_gradients(
+            # log_scale = clamp_preserve_gradients(
             #    log_scale, self.log_scale_min_clip, self.log_scale_max_clip
-            #)
-            log_scale = -1.0*torch.tanh(log_scale)
-        
-        
-        return _sum_rightmost(log_scale, self.event_dim)
+            # )
+            log_scale = -1.0 * torch.tanh(log_scale)
 
+        return _sum_rightmost(log_scale, self.event_dim)
 
 
 class ConditionalAffineCouplingTanH(ConditionalTransformModule):

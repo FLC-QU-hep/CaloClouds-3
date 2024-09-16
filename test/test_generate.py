@@ -3,24 +3,10 @@ Module to test the functions in evaluation.generate
 """
 import os
 import torch
-from pointcloud.config_varients import default, wish
 from pointcloud.evaluation import generate
 
+from helpers import config_creator
 from helpers.sample_models import write_fake_flow_model, write_fake_wish_model
-
-
-def make_config(use_wish=False):
-    if use_wish:
-        config = wish.Configs()
-    else:
-        config = default.Configs()
-    # no logging for tests, as we would need a comet key
-    config.log_comet = False
-    test_dir = os.path.dirname(os.path.realpath(__file__))
-    config.dataset_path = os.path.join(test_dir, "mini_data_sample.hdf5")
-    config.max_iters = 2
-    config.device = "cpu"
-    return config
 
 
 def test_make_params_dict():
@@ -38,7 +24,7 @@ def test_make_params_dict():
 
 
 def test_load_flow_model_caloclouds(tmpdir):
-    config = make_config()
+    config = config_creator.make("caloclouds_3", my_tmpdir=tmpdir)
     test_model_path = str(tmpdir) + "/example_flow_model.pt"
     write_fake_flow_model(config, test_model_path)
     _, distribution = generate.load_flow_model(config, model_path=test_model_path)
@@ -79,14 +65,14 @@ def test_load_flow_model_caloclouds(tmpdir):
 
 
 def test_load_flow_model_wish(tmpdir):
-    config = make_config(use_wish=True)
+    config = config_creator.make("wish", my_tmpdir=tmpdir)
     flow, distribution = generate.load_flow_model(config, model_path="dummy")
     assert flow is None
     assert distribution is None
 
 
 def test_load_diffusion_model_calocloud():
-    config = make_config()
+    config = config_creator.make("caloclouds_3")
     # only testing the cm model, becuse the file is small and
     # can be kept in the test dir of the repo
     model_name = "cm"
@@ -110,7 +96,7 @@ def test_load_diffusion_model_calocloud():
 
 
 def test_load_diffusion_model_wish(tmpdir):
-    config = make_config(use_wish=True)
+    config = config_creator.make("wish", my_tmpdir=tmpdir)
     test_model_path = os.path.join(str(tmpdir), "wish_model.pt")
     write_fake_wish_model(config, test_model_path)
     model_name = "wish"
@@ -134,7 +120,7 @@ def test_load_diffusion_model_wish(tmpdir):
 
 
 def test_generate_showers(tmpdir):
-    cfg = make_config()
+    cfg = config_creator.make()
     params_dict = generate.make_params_dict()
     # make it short for testing
     params_dict["n_events"] = 10
@@ -156,7 +142,7 @@ def test_generate_showers(tmpdir):
 
 
 def test_write_showers(tmpdir):
-    cfg = make_config()
+    cfg = config_creator.make()
     params_dict = generate.make_params_dict()
     # make it short for testing
     params_dict["n_events"] = 10

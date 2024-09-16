@@ -3,8 +3,6 @@ import torch
 import numpy as np
 import random
 import time
-import logging
-import logging.handlers
 from nflows import transforms, distributions, flows
 import torch.nn as nn
 from typing import Callable
@@ -66,25 +64,40 @@ class CheckpointManager(object):
     def get_latest_ckpt_idx(self):
         idx = -1
         latest_it = -1
-        for i, ckpt in enumerate(self.ckpts):
-            if ckpt["iteration"] > latest_it:
-                idx = i
-                latest_it = ckpt["iteration"]
+        try:
+            for i, ckpt in enumerate(self.ckpts):
+                if ckpt["iteration"] > latest_it:
+                    idx = i
+                    latest_it = ckpt["iteration"]
+        except KeyError:
+            print(
+                "No iteration information found in checkpoint filenames."
+                "Returning the latest checkpoint based on the file timestamp."
+            )
+            timestamps = [
+                os.path.getmtime(os.path.join(self.save_dir, ckpt["file"]))
+                for ckpt in self.ckpts
+            ]
+            print(timestamps)
+            if timestamps:
+                idx = np.argmax(timestamps)
         return idx if idx >= 0 else None
 
     def save(self, model, args, score, others=None, step=None):
+        ckpt = {"score": score}
         if step is None:
             fname = f"ckpt_{float(score):.6f}_.pt"
         else:
             fname = f"ckpt_{float(score):.6f}_{int(step)}.pt"
-        path = os.path.join(self.save_dir, fname)
+            ckpt["iteration"] = step
+        ckpt["file"] = fname
 
+        path = os.path.join(self.save_dir, fname)
         torch.save(
             {"args": args, "state_dict": model.state_dict(), "others": others}, path
         )
 
-        self.ckpts.append({"score": score, "file": fname})
-
+        self.ckpts.append(ckpt)
         return True
 
     def load_best(self):
@@ -118,9 +131,18 @@ def seed_all(seed=42):
 
 
 def get_new_log_dir(root="./logs", postfix="", prefix="", start_time=time.localtime()):
+    if not os.path.exists(root):
+        print(f"Also creating directory {root}")
+    else:
+        assert os.path.isdir(root), f"{root} is not a directory, cant create log dir"
     log_dir = os.path.join(
         root, prefix + time.strftime("%Y_%m_%d__%H_%M_%S", start_time) + postfix
     )
+    if os.path.exists(log_dir):
+        print(f"Directory {log_dir} already exists, trying another one.")
+        postfix += "_{}".format(random.randint(0, 1000))
+        get_new_log_dir(root, postfix, prefix, start_time)
+        return
     os.makedirs(log_dir)
     return log_dir
 

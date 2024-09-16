@@ -1,7 +1,8 @@
 import torch
 import torch.nn as nn
+import os
 
-from pyro.nn import ConditionalDenseNN, DenseNN, ConditionalAutoRegressiveNN
+from pyro.nn import ConditionalDenseNN, DenseNN
 import pyro.distributions as dist
 import pyro.distributions.transforms as T
 from .custom_pyro import ConditionalAffineCouplingTanH
@@ -95,6 +96,7 @@ class HybridTanH_factory:
         **transform_args
     ):
 
+        # TODO, could the params of the base dist also be added to the model?
         with seed_torch(42):
             base_dist = base_dist_gen(self.num_inputs, self.device, **transform_args)
             self.transforms = []
@@ -217,3 +219,17 @@ def compile_HybridTanH_alt2(num_blocks, num_inputs, num_cond_inputs, device):
 
     model, flow_dist = factory.create(num_blocks, transform_pattern, count_bins=8)
     return model, flow_dist
+
+
+def get_save_dir(base_path, dataset_path):
+    dataset_name_key = '.'.join(os.path.basename(dataset_path).split('.')[:-1])
+    if "{" in dataset_name_key:
+        dataset_name_key = dataset_name_key.split("{")[0]
+    if "seed" in dataset_name_key:
+        dataset_name_key = dataset_name_key.split("seed")[0]
+    if "file" in dataset_name_key:
+        dataset_name_key = dataset_name_key.split("file")[0]
+    dataset_name_key = dataset_name_key.strip("_")
+
+    showerflow_dir = os.path.join(base_path, "showerFlow", dataset_name_key)
+    return showerflow_dir

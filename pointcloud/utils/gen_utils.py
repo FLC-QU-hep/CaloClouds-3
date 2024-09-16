@@ -1,7 +1,6 @@
 import warnings
 import numpy as np
 import torch
-from tqdm import tqdm
 
 from .metadata import Metadata
 
@@ -9,10 +8,44 @@ from ..configs import Configs
 
 
 def get_cog(x, y, z, e):
+    """
+    Calculate the center of gravity of a shower.
+
+    Parameters
+    ----------
+    x : np.array
+        The x positions of the shower particles.
+    y : np.array
+        The y positions of the shower particles.
+    z : np.array
+        The z positions of the shower particles.
+    e : np.array
+        The energies of the shower particles.
+
+    Returns
+    -------
+    cog_x : np.array or float
+        The x position of the center of gravity.
+        If the input has multiple dimensions, this has one less,
+        otherwise it is a float.
+    cog_y : np.array or float
+        The y position of the center of gravity.
+        If the input has multiple dimensions, this has one less,
+        otherwise it is a float.
+    cog_z : np.array or float
+        The z position of the center of gravity.
+        If the input has multiple dimensions, this has one less,
+        otherwise it is a float.
+    """
+    summed_e = e.sum(axis=-1)
+    if len(e.shape) > 1:
+        summed_e[summed_e == 0] = 1  # avoid division by zero
+    elif not summed_e:
+        return 0, 0, 0
     return (
-        np.sum((x * e), axis=1) / e.sum(axis=1),
-        np.sum((y * e), axis=1) / e.sum(axis=1),
-        np.sum((z * e), axis=1) / e.sum(axis=1),
+        np.sum((x * e), axis=-1) / summed_e,
+        np.sum((y * e), axis=-1) / summed_e,
+        np.sum((z * e), axis=-1) / summed_e,
     )
 
 
@@ -38,6 +71,9 @@ def get_scale_factor(
 
 
 def get_shower(model, num_points, energy, cond_N, bs=1, config=Configs()):
+    """
+    Get a shower from the diffusion model.
+    """
     e = torch.ones((bs, 1), device=config.device) * energy
     n = torch.ones((bs, 1), device=config.device) * cond_N
 
@@ -51,19 +87,75 @@ def get_shower(model, num_points, energy, cond_N, bs=1, config=Configs()):
     return fake_shower
 
 
+def is_config(config):
+    return hasattr(config, "model_name")
+
+# for historic reasons, I don't want to mess with the
+# argument parsing of this function, but it's complex
+# so lets just make a separate function for it.
+# This is a fairly defensive function, that will complain
+# about any missing/unexpected arguments.
+def _shower_batch_arg_parser(*args, **kwargs):
+    # read the args differently for different models
+    n_required_args = 4
+    arg_values = {"model": None, "shower_flow": None, 
+                  "e_min": None, "e_max": None, "num": 2000,
+                  "bs": 32, "config": Configs(), "coef_real": None,
+                  "coef_fake": None, "n_scaling": True, "n_splines": None}
+    arg_positions = [
+        "model",
+        "shower_flow",
+        "e_min",
+        "e_max",
+        "num",
+        "bs",
+        "config",
+        "coef_real",
+        "coef_fake",
+        "n_scaling",
+        "n_splines",
+    ]
+    config_pos = arg_positions.index("config")
+    if "config" in kwargs:
+        assert len(args) <= config_pos, "config given twice, once as positional, once as kwarg"
+        config = kwargs["config"]
+    elif config_pos < len(args):
+        if is_config(args[config_pos]):
+            config = args[config_pos]
+        elif is_config(args[config_pos-1]):
+            config = args[config_pos-1]
+        else:
+            raise ValueError(f"Expected a Configs object in position {config_pos} or {config_pos-1}")
+    else:
+        config = Configs()
+
+    if config.model_name == "wish":
+        n_required_args -= 1
+        del arg_positions[1]
+        assert "shower_flow" not in kwargs, "For model named wish, the shower_flow argument is not expected"
+
+    assert len(args) + len(kwargs) <= (
+        len(arg_positions)
+    ), f"Too many arguments given, expected {len(arg_positions)} at most"
+    for i, name in enumerate(arg_positions):
+        in_kwargs = name in kwargs
+        if len(args) > i:
+            assert (
+                not in_kwargs
+            ), f"Argument {name} given twice, once as positional, once as kwarg"
+            arg_values[name] = args[i]
+        elif in_kwargs:
+            arg_values[name] = kwargs.pop(name)
+        else:
+            assert i >= n_required_args, f"Argument {name} (position {i}) is required"
+    assert not kwargs, f"Unknown arguments given: {kwargs.keys()}"
+    return arg_values.values()
+
+
 # batch inference
 def gen_showers_batch(
-    model,
-    shower_flow,
-    e_min,
-    e_max=None,
-    num=2000,
-    bs=32,
-    config=Configs(),
-    coef_real=None,
-    coef_fake=None,
-    n_scaling=True,
-    n_splines=None,
+    *args,
+    **kwargs,
 ):
     """
     Generate a batch of showers for evaluation purposes.
@@ -71,62 +163,78 @@ def gen_showers_batch(
 
     Parameters
     ----------
-    model : torch.nn.Module
+    models : torch.nn.Module
         The model to generate showers from.
-    shower_flow : torch.distributions.Distribution (optional)
+        If the configs.model_name specifies a model
+        that uses a shower flow, like caloclouds, then this should
+        be both the model and the flow distribution;
+    shower_flow : torch.distributions.Distribution, (optional)
         The flow to sample from. Only needed for models that use one,
-        for models that don't like Wish, the e_min can be the second
-        positional argument, or shower_flow can be None.
+        for models that don't, like Wish, this argument
+        isn't needed (either positionally, or as a kwarg).
     e_min : float
         The minimum incident energy of the showers.
     e_max : float
         The maximum incident energy of the showers.
+        It is required for all models.
     num : int
         Total number of showers to generate.
+        (default is 2000)
     bs : int
         The inner batch size to generate the batch in ....
+        (default is 32)
     config : configs.Configs
         The configuration object. Used to determine the device
         and the model.
+        (default is Configs())
     coef_real : list
         The coefficients of the real energy calibration polynomial,
         only used for v1 style models.
+        (default is None)
     coef_fake : list
         The coefficients of the fake energy calibration polynomial,
         only used for v1 style models.
+        (default is None)
     n_scaling : bool
         Whether to scale the number of clusters or not.
         Only used for v1 style models.
+        (default is True)
     n_splines : dict
         The spline models for the number of clusters.
         Alterative to coef_real and coef_fake.
         Only used for v1 style models.
+        (default is None)
 
     Returns
     -------
     showers : np.array (num, configs.max_points, 4)
         The generated showers. The third dimension is (x, y, z, e)
-    cond_E : np.array (num, 1)
-        The energy of the incident particle that conditions the showers.
+    cond : np.array (num, C)
+        The conditioning variables for the showers,
+        in the case that the showers are conditioned on just energy, this
+        is just a (num, 1) array of the incident energies.
 
     """
-    if config.model_name == "wish":
-        # for this model, we don't have to give a shower_flow
-        if e_max is None:
-            e_min = shower_flow
-            e_max = e_min
-            shower_flow = None
-    else:
-        assert e_max is not None, (
-            f"For model named {config.model}, "
-            + "4 positional arguments are expected; "
-            + "model, shower_flow, e_min, e_max"
-        )
-    cond_E = torch.FloatTensor(num, 1).uniform_(e_min, e_max)  # B,1
-    fake_showers = gen_condE_showers_batch(
+    (
         model,
         shower_flow,
-        cond_E,
+        e_min,
+        e_max,
+        num,
+        bs,
+        config,
+        coef_real,
+        coef_fake,
+        n_scaling,
+        n_splines,
+    ) = _shower_batch_arg_parser(*args, **kwargs)
+
+    # TODO generalise
+    cond = torch.FloatTensor(num, 1).uniform_(e_min, e_max)  # B,1
+    fake_showers = gen_cond_showers_batch(
+        model,
+        shower_flow,
+        cond,
         bs,
         config,
         coef_real,
@@ -134,14 +242,14 @@ def gen_showers_batch(
         n_scaling,
         n_splines,
     )
-    cond_E = cond_E.detach().cpu().numpy()
-    return fake_showers, cond_E
+    cond = cond.detach().cpu().numpy()
+    return fake_showers, cond
 
 
-def gen_condE_showers_batch(
+def gen_cond_showers_batch(
     model,
     shower_flow,
-    cond_E=None,
+    cond=None,
     bs=32,
     config=Configs(),
     coef_real=None,
@@ -161,8 +269,10 @@ def gen_condE_showers_batch(
         The flow to sample from. Only needed for models that use one,
         for models that don't like Wish, the e_min can be the second
         positional argument, or shower_flow can be None.
-    cond_E : int
-        The incident energy of the showers.
+    cond : torch.Tensor (num, C)
+        The conditioning variable for the showers,
+        in the case that the showers are conditioned on just energy, this
+        is just a (num, 1) array of the incident energies.
     bs : int
         The inner batch size to generate the batch in ....
     config : configs.Configs
@@ -190,17 +300,17 @@ def gen_condE_showers_batch(
     """
     if config.model_name == "wish":
         # for this model, we don't have to give a shower_flow
-        if cond_E is None:
-            cond_E = shower_flow
+        if cond is None:
+            cond = shower_flow
         kw_args = {
             "model": model,
         }
         inner_batch_func = gen_wish_inner_batch
     else:
-        assert cond_E is not None, (
+        assert cond is not None, (
             f"For model named {config.model}, "
             + "3 positional arguments are expected; "
-            + "model, shower_flow, condE"
+            + "model, shower_flow, cond"
         )
         inner_batch_func = gen_v1_inner_batch
         kw_args = {
@@ -212,49 +322,55 @@ def gen_condE_showers_batch(
             "n_scaling": n_scaling,
             "n_splines": n_splines,
         }
-    num = cond_E.shape[0]
+    num = cond.shape[0]
     fake_showers = np.empty((num, config.max_points, 4))
-    for i, cond_E_batch in enumerate(cond_E_batcher(cond_E, bs)):
-        inner_batch_func(cond_E_batch, fake_showers, i * bs, **kw_args)
+    for i, cond_batch in enumerate(cond_batcher(cond, bs)):
+        inner_batch_func(cond_batch, fake_showers, i * bs, **kw_args)
 
     return fake_showers
 
 
-def cond_E_batcher(cond_E, batch_size):
+def cond_batcher(cond, batch_size):
     """
     Yield batches of incident energies to condition the showers on.
 
     Parameters
     ----------
-    cond_E : torch.Tensor (num, 1)
-        The incident energies to condition the showers on.
+    cond : torch.Tensor (num, C)
+        The conditioning variable for the showers,
+        in the case that the showers are conditioned on just energy, this
+        is just a (num, 1) array of the incident energies.
+        Energies is generaly expected to be the final value at the lowest dimension.
     batch_size : int
         Max batch size of incident energies to generate.
 
     Yields
     ------
-    cond_E_batch : torch.Tensor (batch_size or smaller, 1)
+    cond_batch : torch.Tensor (batch_size or smaller, 1)
         The batch of incident energies to condition the showers on.
 
     """
-    # sort by energyies for better batching and faster inference
-    mask = torch.argsort(cond_E.squeeze())
+    # sort by energies for better batching and faster inference
+    if len(cond.shape) > 1:
+        mask = torch.argsort(cond[..., -1].squeeze())
+    else:
+        mask = torch.argsort(cond)
     mask = np.atleast_1d(mask)
-    cond_E = cond_E[mask]
-    num = cond_E.size(0)
+    cond = cond[mask]
+    num = cond.size(0)
     for evt_id in range(0, num, batch_size):
-        cond_E_batch = cond_E[evt_id : evt_id + batch_size]
-        yield cond_E_batch
+        cond_batch = cond[evt_id : evt_id + batch_size]
+        yield cond_batch
 
 
-def gen_wish_inner_batch(cond_E_batch, destination_array, first_index, model):
+def gen_wish_inner_batch(cond_batch, destination_array, first_index, model):
     """
     Generate a batch of showers using the Wish model
     according to the given incident energies.
 
     Parameters
     ----------
-    cond_E_batch : torch.Tensor (batch_size, 1)
+    cond_batch : torch.Tensor (batch_size, 1)
         The incident energies to condition the showers on.
     destination_array : np.array (large, max_points, 4)
         The array to store the generated showers in.
@@ -264,18 +380,14 @@ def gen_wish_inner_batch(cond_E_batch, destination_array, first_index, model):
         The model to generate showers from.
     config : configs.Configs
         The configuration object, used to determine the max points.
-
-    Returns
-    -------
-    output : np.array (cond_E_batch.size(0), configs.max_points, 4)
-        The generated showers. The third dimension is (x, y, z, e)
     """
     max_points = destination_array.shape[1]
-    last_index = first_index + cond_E_batch.size(0)
-    destination_array[first_index:last_index] = model.sample(cond_E_batch, max_points)
+    last_index = first_index + cond_batch.size(0)
+    destination_array[first_index:last_index] = model.sample(cond_batch, max_points)
 
 
-def truescale_showerflow_output(samples, bs, config):
+def truescale_showerflow_output(samples, config):
+    bs = samples.shape[0]
     metadata = Metadata(config)
     # name samples
     num_clusters = np.clip(
@@ -286,16 +398,16 @@ def truescale_showerflow_output(samples, bs, config):
     # in MeV  (clip to a minimum energy of 40 MeV)
     energies = np.clip(energies, 40, None)
     cog_x = (samples[:, 2] * metadata.std_cog[0]) + metadata.mean_cog[0]
-    # cog_y = (samples[:, 3] * metadata.std_cog[1]) + metadata.mean_cog[1]
-    cog_z = (samples[:, 4] * metadata.std_cog[2]) + metadata.mean_cog[2]
+    cog_y = (samples[:, 3] * metadata.std_cog[1]) + metadata.mean_cog[1]
+    # cog_z = (samples[:, 4] * metadata.std_cog[2]) + metadata.mean_cog[2]
 
     clusters_per_layer_gen = np.clip(samples[:, 5:35], 0, 1)  # B,30
     e_per_layer_gen = np.clip(samples[:, 35:], 0, 1)  # B,30
-    return num_clusters, energies, cog_x, cog_z, clusters_per_layer_gen, e_per_layer_gen
+    return num_clusters, energies, cog_x, cog_y, clusters_per_layer_gen, e_per_layer_gen
 
 
 def gen_v1_inner_batch(
-    cond_E_batch,
+    cond_batch,
     destination_array,
     first_index,
     model,
@@ -312,7 +424,7 @@ def gen_v1_inner_batch(
 
     Parameters
     ----------
-    cond_E_batch : torch.Tensor (batch_size, 1)
+    cond_batch : torch.Tensor (batch_size, 1)
         The incident energies to condition the showers on.
     model : torch.nn.Module
         The model to generate showers from.
@@ -343,15 +455,15 @@ def gen_v1_inner_batch(
 
     Returns
     -------
-    output : np.array (cond_E_batch.size(0), configs.max_points, 4)
+    output : np.array (cond_batch.size(0), configs.max_points, 4)
         The generated showers. The third dimension is (x, y, z, e)
     """
     metadata = Metadata(config)
-    bs = cond_E_batch.size(0)
+    bs = cond_batch.size(0)
 
     # sample from shower flow
     samples = (
-        shower_flow.condition(cond_E_batch / metadata.incident_rescale)
+        shower_flow.condition(cond_batch / metadata.incident_rescale)
         .sample(
             torch.Size(
                 [
@@ -367,15 +479,17 @@ def gen_v1_inner_batch(
         num_clusters,
         energies,
         cog_x,
-        cog_z,
+        cog_y,
         clusters_per_layer_gen,
         e_per_layer_gen,
-    ) = truescale_showerflow_output(samples, bs, config)
+    ) = truescale_showerflow_output(samples, config)
 
-    scale_factor = 1.
+    scale_factor = 1.0
     if n_scaling:
         if all(v is None for v in [n_splines, coef_real, coef_fake]):
-            warnings.warn("Warning; not scaling number of clusters as no scaling parameters given")
+            warnings.warn(
+                "Warning; not scaling number of clusters as no scaling parameters given"
+            )
         else:
             scale_factor = get_scale_factor(
                 num_clusters, coef_real, coef_fake, n_splines
@@ -410,7 +524,7 @@ def gen_v1_inner_batch(
     fake_showers = get_shower(
         model,
         max_num_clusters,
-        cond_E_batch,
+        cond_batch,
         cond_N,
         bs=bs,
         config=config,
@@ -424,7 +538,7 @@ def gen_v1_inner_batch(
     #       break
 
     # loop over events
-    y_positions = metadata.layer_bottom_pos + metadata.cell_thickness / 2
+    z_positions = metadata.layer_bottom_pos_global + metadata.cell_thickness_global / 2
     for i, hits_per_layer in enumerate(hits_per_layer_all):
         # for i, (hits_per_layer, e_per_layer) in enumerate(
         #     zip(hits_per_layer_all, e_per_layer_all)
@@ -432,18 +546,18 @@ def gen_v1_inner_batch(
 
         n_hits_to_concat = max_num_clusters - hits_per_layer.sum()
 
-        y_flow = np.repeat(y_positions, hits_per_layer)
-        y_flow = np.concatenate([y_flow, np.zeros(n_hits_to_concat)])
+        z_flow = np.repeat(z_positions, hits_per_layer)
+        z_flow = np.concatenate([z_flow, np.zeros(n_hits_to_concat)])
 
         mask = np.concatenate(
             [np.ones(hits_per_layer.sum()), np.zeros(n_hits_to_concat)]
         )
 
-        fake_showers[i, :, 1][mask == 0] = 10
+        fake_showers[i, :, 2][mask == 0] = 10
         idx_dm = np.argsort(fake_showers[i, :, 1])
-        fake_showers[i, :, 1][idx_dm] = y_flow
+        fake_showers[i, :, 2][idx_dm] = z_flow
 
-        fake_showers[i, :, :][y_flow == 0] = 0
+        fake_showers[i, :, :][z_flow == 0] = 0
 
         # fake_showers[:, :, -1] = abs(fake_showers[:, :, -1])
         fake_showers[
@@ -456,8 +570,8 @@ def gen_v1_inner_batch(
         # )  # energy rescaling to predicted e_sum
 
         # energy per layer calibration
-        for j in range(len(y_positions)):
-            mask = fake_showers[i, :, 1] == y_positions[j]
+        for j in range(len(z_positions)):
+            mask = fake_showers[i, :, 2] == z_positions[j]
             fake_showers[i, :, -1][mask] = (
                 fake_showers[i, :, -1][mask]
                 / fake_showers[i, :, -1][mask].sum()
@@ -470,13 +584,19 @@ def gen_v1_inner_batch(
     )  # B, max_points, 4
 
     fake_showers[:, :, 0] = (fake_showers[:, :, 0] + 1) / 2
-    fake_showers[:, :, 2] = (fake_showers[:, :, 2] + 1) / 2
+    fake_showers[:, :, 1] = (fake_showers[:, :, 1] + 1) / 2
 
     fake_showers[:, :, 0] = (
-        fake_showers[:, :, 0] * (metadata.Xmin - metadata.Xmax) + metadata.Xmax
+        fake_showers[:, :, 0] * (metadata.Xmin_global - metadata.Xmax_global)
+        + metadata.Xmax_global
     )
-    fake_showers[:, :, 2] = (
-        fake_showers[:, :, 2] * (metadata.Zmin - metadata.Zmax) + metadata.Zmax
+    if not metadata.global_shower_axis_char == "y":
+        raise NotImplementedError(
+            "We haven't implemented any other global shower directions than y"
+        )
+    fake_showers[:, :, 1] = (
+        fake_showers[:, :, 1] * (metadata.Zmin_global - metadata.Zmax_global)
+        + metadata.Zmax_global
     )
 
     # CoG calibration
@@ -487,5 +607,5 @@ def gen_v1_inner_batch(
         fake_showers[:, :, 3],
     )
     fake_showers[:, :, 0] -= (cog[0] - cog_x)[:, None]
-    fake_showers[:, :, 2] -= (cog[2] - cog_z)[:, None]
+    fake_showers[:, :, 1] -= (cog[1] - cog_y)[:, None]
     destination_array[first_index : first_index + bs] = fake_showers

@@ -105,12 +105,11 @@ def test_weibull_params():
     npt.assert_allclose(distribution.stddev, 2, atol=1)
 
     scale, concentration = maths.weibull_params(
-        torch.tensor(1), torch.tensor(2), tune=True
+        torch.tensor(1), torch.tensor(2.5), tune=True
     )
-    print(scale, concentration)
     distribution = torch.distributions.weibull.Weibull(scale, concentration)
     npt.assert_allclose(distribution.mean, 1, atol=1e-1)
-    npt.assert_allclose(distribution.stddev, 2, atol=1e-1)
+    npt.assert_allclose(distribution.stddev, 2.5, atol=1e-1)
 
     scale, concentration = maths.weibull_params(
         torch.tensor(2), torch.tensor(3), tune=True

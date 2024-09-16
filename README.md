@@ -43,8 +43,13 @@ The entry points, however, are all in the `scripts` folder.
 
 ## Getting started
 
+Commonly changed settings are stored in a `Configs` object.
+Most notably, file paths to data and models are in the `Configs` object.
+So a good strategy would be to start out using the default configs, then when you get file-path related errors,
+make your own configs with the right file paths for your machine.
 Configs are stored in [`pointcloud/config_varients/`](./pointcloud/config_varients/), and the default choice is determined by what the soft link `pointcloud/configs.py` is pointing to.
-To make a new config;
+
+To make your own config;
 - Make the base file with `cd pointcloud && cp config_varients/default.py config_varients/my_funky_new_config_name.py`.
 - Edit the funky new config to your taste.
     It's also possible to `from .config_varients import default` to inherit from that `Configs` class, and change only what you need.
@@ -52,17 +57,18 @@ To make a new config;
 - Remove the existing symbolic link with `rm configs.py`
 - Link your config `ln -s config_varients/my_funky_new_config_name.py configs.py`
 
+Then, if you are training the CaloClouds model family, you need to train two (or three) models; the teacher diffusion model (and optionally the distilled student model)
+and also the Shower Flow model.
 The teacher model is trained using [`scripts/main.py`](./scripts/main.py), and the student model is trained with [`scripts/cd.py`](./scripts/cd.py).
 It should be called as a script, like; `python3 script/main.py`.
 
-The Shower Flow (to predict energy and hist per layer) is trained via the notebook [`scripts/ShowerFlow.ipynb`](./scripts/ShowerFlow.ipynb).
-It will work in a jupyter notebook.
+The Shower Flow (to predict energy and hist per layer) is trained via the script [`scripts/ShowerFlow.py`](./scripts/ShowerFlow.py).
+If you like jupyter notebooks, you can also use [`scripts/ShowerFlow.ipynb`](./scripts/ShowerFlow.ipynb), which does basically the same thing
+(however, if the notebook doesn't work, look at the script, because the script is in the unit tests, whereas the notebook is not).
 
 The polynomial fits for the occupancy calculations are performed in [`scripts/occupancy_scale.ipynb`](./scripts/occupancy_scale.ipynb).
 
 An outline of the sampling process for both CaloClouds II and CaloClouds II (CM) can be found in [`pointcloud/evaluation/generate.py`](./pointcloud/evaluation/generate.py).
-
-The timing of the models is benchmarked with [`scripts/timing.py`](./scripts/timing.py), also called as a script.
 
 ---
 
@@ -81,8 +87,9 @@ Also, if you would be interested in generating some data, useful code can be fou
 There are tools for quickly generating some standard metrics for comparing model performance.
 The functions and classes in [`pointcloud/evaluation/bin_standard_metrics.py`](./pointcloud/evaluation/bin_standard_metrics.py) work with the script [`scripts/create_standard_metrics.py`](./scripts/create_standard_metrics.py) to generate and save some kinematic bins for standard variables,
 which are saved as `.npz` in the log directory (as specified by the configs).
-
-These can then be plotted using [`scripts/plotting/standard_metrics.ipynb`](./scripts/plotting/standard_metrics.ipynb), which also has some reference values for comparison.
+So to make pretty plots, first check your model is in (see below) [`scripts/create_standard_metrics.py`](./scripts/create_standard_metrics.py) and run it.
+Then use [`scripts/plotting/standard_metrics.ipynb`](scripts/plotting/standard_metrics.ipynb) to visualise the performance of the model.
+[`scripts/plotting/standard_metrics.ipynb`](./scripts/plotting/standard_metrics.ipynb) also has some reference values for comparison.
 
 If you have a new model, and it has been trained for the ILD detector, it would be good to add it to this comparison. To add a new model;
 
@@ -93,6 +100,8 @@ If you have a new model, and it has been trained for the ILD detector, it would 
 5. Rerun [`scripts/create_standard_metrics.py`](./scripts/create_standard_metrics.py) and [`scripts/plotting/standard_metrics.ipynb`](./scripts/plotting/standard_metrics.ipynb).
 
 Done.
+
+The timing of the models is benchmarked with [`scripts/timing.py`](./scripts/timing.py), also called as a script.
 
 ---
 
@@ -132,4 +141,4 @@ new_model = load_wish_from_accumulator("path/to/save/accumulated.h5", configs)
 - The consistency distillation is based on: https://github.com/openai/consistency_models/
 - The PointWise Net is adapted from: https://github.com/luost26/diffusion-point-cloud
 - Code base for our CaloClouds (1) model: https://github.com/FLC-QU-hep/CaloClouds
-- Code used for lazy operations on h5py arrays is from: https://github.com/catalystneuro/lazy_ops It is not installed from a repository because a bug fix was needed, and the maintainer cannot be reached. For simplicities sake, the relevant patched file is in `pointcloud/externals/lazy_ops` along with the licence file for the code.
+- Code used for lazy operations on h5py arrays is from: https://github.com/catalystneuro/lazy_ops It is not installed from a repository because a bug fix was needed, and the maintainer cannot be reached. For simplicities sake, the relevant patched file is in `pointcloud/externals/lazy_ops` along with the licence file for the code. (This is currently not in use, and may be removed from future releases.)

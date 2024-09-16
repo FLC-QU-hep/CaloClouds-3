@@ -12,7 +12,7 @@ import torch
 cfg = Configs()
 meta = metadata.Metadata(cfg)
 layers_of_intrest = np.arange(0, 29, 3)
-n_layers = len(meta.layer_bottom_pos)
+n_layers = len(meta.layer_bottom_pos_global)
 batch_size = 100
 max_batches = 100
 total_size = batch_size * max_batches
@@ -104,7 +104,7 @@ def plot_batch(
     **scatter_kwargs
 ):
     layer_colours = plt.cm.viridis(np.linspace(0, 1, len(layers_of_intrest)))
-    cell_thickness = 0.5 * (normed_layer_bottom[1] - normed_layer_bottom[0])
+    cell_thickness_global = 0.5 * (normed_layer_bottom[1] - normed_layer_bottom[0])
     #wish.hist_batch_backbone(
     wish.scatter_batch_backbone(
     #wish.plot_batch_backbone_layer_correlations(
@@ -112,7 +112,7 @@ def plot_batch(
         layer_colours,
         batch,
         normed_layer_bottom,
-        cell_thickness,
+        cell_thickness_global,
         layers_of_intrest,
         value_name=value_name,
         **scatter_kwargs

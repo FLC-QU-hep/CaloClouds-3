@@ -22,10 +22,10 @@ def make(add_varients=False):
             layer_y = acc.layer_bottom[layer_n] + acc.cell_thickness / 2
             points_in_layer = np.array(
                 [
-                    [0.0, layer_y, 0.0, energy],
-                    [0.0, layer_y, 0.0, energy],
-                    [1.0, layer_y, 0.0, energy],
-                    [0.0, layer_y, 1.0, energy],
+                    [0.0, 0.0, layer_y, energy],
+                    [0.0, 0.0, layer_y, energy],
+                    [1.0, 0.0, layer_y, energy],
+                    [0.0, 1.0, layer_y, energy],
                 ]
             )
             return points_in_layer

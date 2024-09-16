@@ -138,15 +138,22 @@ def weibull_params(mean, standarddev, tune=False):
         # use an optimiser to improve the calculation
         # exspensive, but effective
         def to_minimise(args):
+            penalty = 0
+            for i in range(2):
+                if args[i] < 0:
+                    penalty += args[i] ** 2
+                    args[i] = _TORCH_TINY
             distribution = torch.distributions.Weibull(*args)
-            mean_diff = (distribution.mean - mean)**2
-            std_diff = (distribution.stddev - standarddev)**2
-            return mean_diff + std_diff
-        x0 = np.array([concentration, scale])
+            mean_diff = (distribution.mean - mean) ** 2
+            std_diff = (distribution.stddev - standarddev) ** 2
+            return mean_diff + std_diff + penalty
+
+        x0 = np.array([scale, concentration])
         initial_cost = to_minimise(x0)
         result = minimize(to_minimise, x0)
         scale, concentration = result.x
-        optimised_cost = to_minimise([concentration, scale])
+        optimised_cost = to_minimise([scale, concentration])
+        print(optimised_cost, initial_cost)
         if optimised_cost > initial_cost:
             warnings.warn("Warning: Tuning did not improve the result.")
             scale, concentration = x0
@@ -173,10 +180,9 @@ def logNorm_params(mean, standarddev):
     scale : torch Tensor
         The scale of the distribution.
     """
-    scale2 = torch.log(1 + (standarddev / mean)**2)
+    scale2 = torch.log(1 + (standarddev / mean) ** 2)
     scale = torch.sqrt(scale2)
     location = torch.log(mean) - 0.5 * scale2
-    max_val = torch.clip(location.abs(), _TORCH_TINY, 1.) * _TORCH_MAX
+    max_val = torch.clip(location.abs(), _TORCH_TINY, 1.0) * _TORCH_MAX
     scale = torch.clip(scale, _TORCH_TINY, max_val.item())
     return location, scale
-

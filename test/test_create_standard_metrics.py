@@ -3,12 +3,11 @@ Unit test for the script create_standard_metrics.py
 """
 import os
 
-from pointcloud.config_varients import wish
-
 from pointcloud.evaluation.bin_standard_metrics import get_path
 
 from helpers.sample_models import make_fake_wish_model
 from helpers.sample_accumulator import make as make_fake_accumulator
+from helpers import config_creator
 
 from scripts.create_standard_metrics import main
 
@@ -29,13 +28,7 @@ def fake_accumulator(logdir):
 
 
 def test_main(tmpdir):
-    configs = wish.Configs()
-    configs.log_comet = False
-    test_dir = os.path.dirname(os.path.realpath(__file__))
-    configs.dataset_path = os.path.join(test_dir, "mini_data_sample.hdf5")
-    configs.max_iters = 2
-    configs.logdir = tmpdir.mkdir("logs")
-    configs.device = "cpu"
+    configs = config_creator.make("wish", my_tmpdir=tmpdir)
 
     models = fake_models(configs)
     accumulator_path = fake_accumulator(configs.logdir)

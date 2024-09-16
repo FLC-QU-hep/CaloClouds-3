@@ -121,7 +121,7 @@ def main(
     dataset_path = configs.dataset_path
     meta = Metadata(configs)
     floors, ceilings = floors_ceilings(
-        meta.layer_bottom_pos_raw, meta.cell_thickness_raw, 0
+        meta.layer_bottom_pos_hdf5, meta.cell_thickness_hdf5, 0
     )
 
     g4_name = "Geant 4"
@@ -135,19 +135,19 @@ def main(
         print(f"Need to process {g4_name}")
 
         raw_floors, raw_ceilings = floors_ceilings(
-            meta.layer_bottom_pos_raw, meta.cell_thickness_raw, 0
+            meta.layer_bottom_pos_hdf5, meta.cell_thickness_hdf5, 0
         )
         xyz_limits = [
-            [meta.Xmin, meta.Xmax],
+            [meta.Xmin_global, meta.Xmax_global],
+            [meta.Zmax_global, meta.Zmin_global],
             [raw_floors[0], raw_ceilings[-1]],
-            [meta.Zmax, meta.Zmin],
         ]
         binned_g4 = BinnedData(
             "Geant 4",
             xyz_limits,
             1.0,
-            meta.layer_bottom_pos_raw,
-            meta.cell_thickness_raw,
+            meta.layer_bottom_pos_hdf5,
+            meta.cell_thickness_hdf5,
             # meta.gun_xz_pos_raw)
             np.array([0, -70]),
         )
@@ -176,28 +176,28 @@ def main(
                 n_events = n_g4_events
 
             # Standard normalised model output
-            xyz_limits = [[-1, 1], [0, 29], [-1, 1]]
+            xyz_limits = [[-1, 1], [-1, 1], [0, 29]]
             layer_bottom_pos = np.linspace(-0.1, 28.9, 30)
-            cell_thickness = 0.5
+            cell_thickness_global = 0.5
             rescale_energy = 1e3
-            gun_pos = np.array([0, -70])
+            gun_pos = np.array([0, -70, 0])
 
             if "caloclouds" in model_name.lower():  # this model unnorms itself.
                 xyz_limits = [
-                    [meta.Xmin, meta.Xmax],
+                    [meta.Xmin_global, meta.Xmax_global],
+                    [meta.Zmax_global, meta.Zmin_global],
                     [floors[0], ceilings[-1]],
-                    [meta.Zmax, meta.Zmin],
                 ]
-                layer_bottom_pos = meta.layer_bottom_pos_raw
+                layer_bottom_pos = meta.layer_bottom_pos_hdf5
                 rescale_energy = 1e3
-                gun_pos = np.array([0, -70])
+                gun_pos = np.array([0, -70, 0])
 
             binned = BinnedData(
                 model_name,
                 xyz_limits,
                 rescale_energy,
                 layer_bottom_pos,
-                cell_thickness,
+                cell_thickness_global,
                 gun_pos,
             )
             some_energies, some_events = sample_model(
@@ -217,17 +217,17 @@ def main(
     if redo_g4_acc_data or not os.path.exists(acc_save_path):
         print(f"Need to process {acc_name}")
 
-        xyz_limits = [[-1, 1], [0, 29], [-1, 1]]
+        xyz_limits = [[-1, 1], [-1, 1], [0, 29]]
         layer_bottom_pos = np.linspace(-0.1, 28.9, 30)
-        cell_thickness = 1
-        gun_pos = np.array([0, -70])
+        cell_thickness_global = 1
+        gun_pos = np.array([0, -70, 0])
         rescale_energy = 1e4
         binned_acc = BinnedData(
             acc_name,
             xyz_limits,
             rescale_energy,
             layer_bottom_pos,
-            cell_thickness,
+            cell_thickness_global,
             gun_pos,
         )
 

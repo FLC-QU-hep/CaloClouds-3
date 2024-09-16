@@ -1,7 +1,6 @@
 """
-Loading data and trainign autoencoder
+Loading data and training autoencoder
 """
-
 
 import numpy as np
 import os

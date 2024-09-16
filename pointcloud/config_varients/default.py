@@ -2,7 +2,7 @@ import os
 
 
 class Configs:
-    def __init__(self):
+    def __init__(self, **kwargs):
         # Experiment Name
         self.name = "CD_"  # options: [TEST_, kCaloClouds_, CaloClouds_, CD_]
         self.comet_project = (
@@ -14,18 +14,13 @@ class Configs:
         self.comet_workspace = "henrydayhall"
 
         # Model arguments
-        self.model_name = "epicVAE_nFlow_kDiffusion"  # choices=['flow', 'AllCond_epicVAE_nFlow_PointDiff', 'epicVAE_nFlow_kDiffusion]
+        self.model_name = "epicVAE_nFlow_kDiffusion"  # choices=['AllCond_epicVAE_nFlow_PointDiff', 'epicVAE_nFlow_kDiffusion]
         self.latent_dim = 32  # caloclouds default: 256
         self.beta_1 = 1e-4
         self.beta_T = 0.02
         self.sched_mode = "quardatic"  # options: ['linear', 'quardatic', 'sigmoid]
         self.flexibility = 0.0
-        self.truncate_std = 2.0
-        self.latent_flow_depth = 14
-        self.latent_flow_hidden_dim = 256
-        self.num_samples = 4
         self.features = 4
-        self.sample_num_points = 2048
         self.kl_weight = 1e-3  # default: 0.001 = 1e-3
         self.residual = False  # choices=[True, False]   # !! for CaloClouds was True, but for EDM False might be better (?)
 
@@ -35,7 +30,6 @@ class Configs:
 
         # EPiC arguments
         self.use_epic = False
-        self.epic_layers = 5
         self.hidden_dim = 128  # default: 128
         self.sum_scale = 1e-3
         self.weight_norm = True
@@ -47,6 +41,19 @@ class Configs:
         self.flow_hidden_dims = 128
         self.tails = "linear"
         self.tail_bound = 10
+
+        # showerflow arguments
+        self.shower_flow_version = 'original'  # options: ['original', 'alt1', 'alt2']
+        self.shower_flow_inputs = [
+                "total_clusters",
+                "total_energy",
+                "cog_x",
+                "cog_y",
+                "cog_z",
+                "clusters_per_layer",
+                "energy_per_layer",
+                ]
+        self.shower_flow_num_blocks = 4
 
         # Data
         self.storage_base = "/beegfs/desy/user/"
@@ -65,7 +72,6 @@ class Configs:
         # Dataloader
         self.workers = 32
         self.train_bs = 64  # k-diffusion: 128 / CD: 256
-        self.pin_memory = False  # choices=[True, False]
         self.shuffle = True  # choices=[True, False]
         self.max_points = 6_000
 
@@ -88,8 +94,6 @@ class Configs:
         self.seed = 42
         self.val_freq = 10_000  #  1e3          # saving intervall for checkpoints
 
-        self.test_freq = 30 * 1e3
-        self.test_size = 400
         self.tag = None
         self.log_iter = 100  # log every n iterations, default: 100
 
@@ -122,9 +126,6 @@ class Configs:
         self.s_noise = 1.0
 
         # Consistency Distillation parameters
-        # self.model_path = 'kCaloClouds_2023_05_24__14_54_09/ckpt_0.000000_500000.pt'
-        # self.model_path = 'kCaloClouds_2023_05_31__17_57_11/ckpt_0.000000_1690000.pt'
-        # self.model_path = 'kCaloClouds_2023_06_29__23_08_31/ckpt_0.000000_2000000.pt'   # lat 0
         self.model_path = (
             "kCaloClouds_2023_07_02__20_30_03/ckpt_0.000000_2000000.pt"  # lat 32
         )
@@ -132,6 +133,20 @@ class Configs:
         self.start_ema = 0.95
         # self.ema_rate = 0.999943    # decay rate of separately saved EMA model (not implemented yet)
         self.cm_random_init = False  # kinda like consistency training, but still with a teacher score function
+        # if we are given kwargs, assume they are meant to overwrite the defaults
+        self.process_kwargs(kwargs)
+
+    def process_kwargs(self, kwargs):
+        for key, value in kwargs.items():
+            if hasattr(self, key):
+                attr_type = type(getattr(self, key))
+                try:
+                    value = attr_type(value)
+                except ValueError:
+                    pass
+            else:
+                print(f"Warning: {key} added to Configs")
+            setattr(self, key, value)
 
     @property
     def dataset_path(self):

@@ -119,4 +119,3 @@ def lr_func(epoch):
         return (1 - frac) * 1.0 + frac * (end_lr / start_lr)
     else:
         return end_lr / start_lr
-

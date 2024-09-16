@@ -1,19 +1,19 @@
 from tqdm import tqdm
 import numpy as np
-from functools import lru_cache
 
 from ..configs import Configs
 
 from .metadata import Metadata
+from ..data.read_write import local_to_global
 
 
-def get_offset(half_cell_size, dm):
+def get_offset(half_cell_size_global, dm):
     """
     Get the offset for the cell map.
 
     Parameters
     ----------
-    half_cell_size : float
+    half_cell_size_global : float
         Half the size of the cells in the detector,
         perpendicular to the radial direction
     dm : int
@@ -25,7 +25,7 @@ def get_offset(half_cell_size, dm):
     offset : float
         The cell size divided by the dimension split multiplicity
     """
-    return half_cell_size * 2 / dm
+    return half_cell_size_global * 2 / dm
 
 
 def create_map(
@@ -33,13 +33,14 @@ def create_map(
     Y=None,
     Z=None,
     layer_bottom_pos=None,
-    half_cell_size=None,
-    cell_thickness=None,
+    half_cell_size_global=None,
+    cell_thickness_global=None,
     dm=1,
     configs=Configs(),
 ):
     """
     Using metadata about the detector, create a map of the cells in the detector.
+    Will be in global coordinates i.e. detector coordinates.
 
     Parameters
     ----------
@@ -47,10 +48,10 @@ def create_map(
         ILD coordinates of sensors as shown by muon hits
     layer_bottom_pos : np.array
         Array of the bottom positions of the layers.
-    half_cell_size : float
+    half_cell_size_global : float
         Half the size of the cells in the detector,
         perpendicular to the radial direction
-    cell_thickness : float
+    cell_thickness_global : float
         Thickness of the cells in the detector, in the radial direction
     dm : int
         dimension split multiplicity
@@ -73,20 +74,20 @@ def create_map(
         X, Y, Z, E = confine_to_box(*metadata.load_muon_map(), metadata=metadata)
 
     if layer_bottom_pos is None:
-        layer_bottom_pos = metadata.layer_bottom_pos
-    if half_cell_size is None:
-        half_cell_size = metadata.half_cell_size
-    if cell_thickness is None:
-        cell_thickness = metadata.cell_thickness
+        layer_bottom_pos = metadata.layer_bottom_pos_global
+    if half_cell_size_global is None:
+        half_cell_size_global = metadata.half_cell_size_global
+    if cell_thickness_global is None:
+        cell_thickness_global = metadata.cell_thickness_global
 
-    offset = get_offset(half_cell_size, dm)
+    offset = get_offset(half_cell_size_global, dm)
 
     layers = []
     for layer_n in range(len(layer_bottom_pos)):  # loop over layers
         # layers are well seperated, so take a 0.5 buffer either side
         idx = np.where(
-            (Y <= (layer_bottom_pos[layer_n] + cell_thickness * 1.5))
-            & (Y >= layer_bottom_pos[layer_n] - cell_thickness / 2)
+            (Y <= (layer_bottom_pos[layer_n] + cell_thickness_global * 1.5))
+            & (Y >= layer_bottom_pos[layer_n] - cell_thickness_global / 2)
         )
 
         xedges = np.array([])
@@ -95,26 +96,26 @@ def create_map(
         unique_X = np.unique(X[idx])
         unique_Z = np.unique(Z[idx])
 
-        xedges = np.append(xedges, unique_X[0] - half_cell_size)
-        xedges = np.append(xedges, unique_X[0] + half_cell_size)
+        xedges = np.append(xedges, unique_X[0] - half_cell_size_global)
+        xedges = np.append(xedges, unique_X[0] + half_cell_size_global)
 
         for i in range(len(unique_X) - 1):  # loop over X coordinate cell centers
-            if abs(unique_X[i] - unique_X[i + 1]) > half_cell_size * 1.9:
-                xedges = np.append(xedges, unique_X[i + 1] - half_cell_size)
-                xedges = np.append(xedges, unique_X[i + 1] + half_cell_size)
+            if abs(unique_X[i] - unique_X[i + 1]) > half_cell_size_global * 1.9:
+                xedges = np.append(xedges, unique_X[i + 1] - half_cell_size_global)
+                xedges = np.append(xedges, unique_X[i + 1] + half_cell_size_global)
 
                 for of_m in range(dm):
                     xedges = np.append(
-                        xedges, unique_X[i + 1] - half_cell_size + offset * of_m
+                        xedges, unique_X[i + 1] - half_cell_size_global + offset * of_m
                     )  # for higher granularity
 
         for z in unique_Z:  # loop over Z coordinate cell centers
-            zedges = np.append(zedges, z - half_cell_size)
-            zedges = np.append(zedges, z + half_cell_size)
+            zedges = np.append(zedges, z - half_cell_size_global)
+            zedges = np.append(zedges, z + half_cell_size_global)
 
             for of_m in range(dm):
                 zedges = np.append(
-                    zedges, z - half_cell_size + offset * of_m
+                    zedges, z - half_cell_size_global + offset * of_m
                 )  # for higher granularity
 
         zedges = np.unique(zedges)
@@ -155,17 +156,17 @@ def normalise_map(MAP):
         list of dictionaries, each containing the grid of cells for a layer
         As returned by create_map, but normalised
     """
-    for l in range(len(MAP)):
-        xedges = MAP[l]["xedges"]
-        zedges = MAP[l]["zedges"]
+    for layer in range(len(MAP)):
+        xedges = MAP[layer]["xedges"]
+        zedges = MAP[layer]["zedges"]
         xedges = (xedges - xedges[0]) / (xedges[-1] - xedges[0]) * 2 - 1
         zedges = (zedges - zedges[0]) / (zedges[-1] - zedges[0]) * 2 - 1
-        MAP[l]["xedges"] = xedges
-        MAP[l]["zedges"] = zedges
+        MAP[layer]["xedges"] = xedges
+        MAP[layer]["zedges"] = zedges
     return MAP
 
 
-def floors_ceilings(layer_bottom_pos, cell_thickness, percent_buffer=0.5):
+def floors_ceilings(layer_bottom_pos, cell_thickness_global, percent_buffer=0.5):
     """
     Find top and bottom coordinates for the layers in the detector.
 
@@ -173,7 +174,7 @@ def floors_ceilings(layer_bottom_pos, cell_thickness, percent_buffer=0.5):
     ----------
     layer_bottom_pos : np.array
         Array of the bottom positions of the layers.
-    cell_thickness : float
+    cell_thickness_global : float
         Thickness of the cells in the detector, in the radial direction
     percent_buffer : float
         Percentage beyond the thickness of the cell to include hits
@@ -189,12 +190,12 @@ def floors_ceilings(layer_bottom_pos, cell_thickness, percent_buffer=0.5):
         Array of the top positions of the layers.
     """
     # naive calculation of the layer floors and ceilings
-    layer_floors = layer_bottom_pos - percent_buffer * cell_thickness
-    layer_ceilings = layer_bottom_pos + (1 + percent_buffer) * cell_thickness
+    layer_floors = layer_bottom_pos - percent_buffer * cell_thickness_global
+    layer_ceilings = layer_bottom_pos + (1 + percent_buffer) * cell_thickness_global
     # Unless the cells are thicker than the layers, (which they shouldn't be)
     # the true ceiling for each layer is the bottom of the layer plus the thickness
     true_ceilings = np.minimum(
-        (layer_bottom_pos + cell_thickness)[:-1], layer_bottom_pos[1:]
+        (layer_bottom_pos + cell_thickness_global)[:-1], layer_bottom_pos[1:]
     )
     # we dont' want any extention to cross the midpoint between the true
     # ceiling and the bottom of the next layer
@@ -205,7 +206,9 @@ def floors_ceilings(layer_bottom_pos, cell_thickness, percent_buffer=0.5):
     return layer_floors, layer_ceilings
 
 
-def split_to_layers(points, layer_bottom_pos, cell_thickness, percent_buffer=0.5):
+def split_to_layers(
+    points, layer_bottom_pos, cell_thickness_global, percent_buffer=0.5, layer_axis=2
+):
     """
     Yield points by their layer
 
@@ -216,13 +219,17 @@ def split_to_layers(points, layer_bottom_pos, cell_thickness, percent_buffer=0.5
         in coordinates (x, y, z, energy)
     layer_bottom_pos : np.array
         Array of the bottom positions of the layers.
-    cell_thickness : float
+    cell_thickness_global : float
         Thickness of the cells in the detector, in the radial direction
     percent_buffer : float
         Percentage beyond the thickness of the cell to include hits
         in the layer. Won't extent the layer beyond the bottom of
         the next layer.
         (default is 0.5)
+    layer_axis : int
+        The index of the last axis that corrisponds to
+        the direction crossing through the layers.
+        (default is 2)
 
     Yields
     ------
@@ -230,18 +237,18 @@ def split_to_layers(points, layer_bottom_pos, cell_thickness, percent_buffer=0.5
         2D array containing hits of the points on this layer,
         in coordinates (x, y, z, energy)
     """
-    y_coord = points[:, 1]
+    z_coord = points[:, layer_axis]
 
     layer_floors, layer_ceilings = floors_ceilings(
-        layer_bottom_pos, cell_thickness, percent_buffer
+        layer_bottom_pos, cell_thickness_global, percent_buffer
     )
     for floor, ceiling in zip(layer_floors, layer_ceilings):
-        mask = (y_coord >= floor) & (y_coord < ceiling)
+        mask = (z_coord >= floor) & (z_coord < ceiling)
         yield points[mask]
 
 
 def points_to_cells(
-    points, MAP, layer_bottom_pos, cell_thickness, include_artifacts=False
+    points, MAP, layer_bottom_pos, cell_thickness_global, include_artifacts=False
 ):
     """
     Project the generated pointss onto the detector map.
@@ -250,13 +257,14 @@ def points_to_cells(
     ----------
     points : np.array (N, 4)
         2D array containing hits of the points,
-        in coordinates (x, y, z, energy)
+        in global coordinates (x, y, z, energy)
     MAP : list
         list of dictionaries, each containing the grid of cells for a layer
+        In global coordinates
         As returned by create_map
     layer_bottom_pos : np.array
         Array of the bottom positions of the layers.
-    cell_thickness : float
+    cell_thickness_global : float
         Thickness of the cells in the detector, in the radial direction
     include_artifacts : bool
         Should the projection include hits in cells that don't have
@@ -273,28 +281,28 @@ def points_to_cells(
     """
     layers = []
 
-    for l, points in enumerate(
-        split_to_layers(points, layer_bottom_pos, cell_thickness)
+    for layer, points in enumerate(
+        split_to_layers(points, layer_bottom_pos, cell_thickness_global, layer_axis=1)
     ):
         x_coord, y_coord, z_coord, e_coord = points.T
 
         layers.append(
-            layer_to_cells(x_coord, z_coord, e_coord, MAP[l], include_artifacts)
+            layer_to_cells(x_coord, z_coord, e_coord, MAP[layer], include_artifacts)
         )
 
     return layers
 
 
-def layer_to_cells(x_coord, z_coord, e_coord, MAP_layer, include_artifacts=False):
+def layer_to_cells(x_coord, y_coord, e_coord, MAP_layer, include_artifacts=False):
     """
     Project this layer of points onto the detector map.
 
     Parameters
     ----------
     x_coord : np.array
-        x coordinates of the points in this layer
-    z_coord : np.array
-        z coordinates of the points in this layer
+        shower local x coordinates of the points in this layer
+    y_coord : np.array
+        shower local y coordinates of the points in this layer
     e_coord : np.array
         energy of the points in this layer
     MAP_layer : dict
@@ -311,14 +319,16 @@ def layer_to_cells(x_coord, z_coord, e_coord, MAP_layer, include_artifacts=False
         list of 2D arrays, each containing the energy deposited in each cell of the layer
         with the arangement specified by MAP
         in the style of a histogram
+        This is arranged as in the global coordinates of the detector
 
     """
     xedges = MAP_layer["xedges"]
     zedges = MAP_layer["zedges"]
     H_base = MAP_layer["grid"]
 
+    # flip x and y due to the rotation of the local coordinates
     H, xedges, zedges = np.histogram2d(
-        x_coord, z_coord, bins=(xedges, zedges), weights=e_coord
+        y_coord, x_coord, bins=(xedges, zedges), weights=e_coord
     )
     if not include_artifacts:
         H[H_base == 0] = 0
@@ -327,7 +337,12 @@ def layer_to_cells(x_coord, z_coord, e_coord, MAP_layer, include_artifacts=False
 
 
 def cells_to_points(
-    layers, MAP, layer_bottom_pos, half_cell_size, cell_thickness, length_to_pad=None
+    layers,
+    MAP,
+    layer_bottom_pos,
+    half_cell_size_global,
+    cell_thickness_global,
+    length_to_pad=None,
 ):
     """
     Given the energy deposited in each cell of the detector, convert
@@ -341,13 +356,14 @@ def cells_to_points(
         in the style of a histogram
     MAP : list
         list of dictionaries, each containing the grid of cells for a layer
+        in global coordinates
         As returned by create_map
     layer_bottom_pos : np.array
         Array of the bottom positions of the layers.
-    half_cell_size : float
+    half_cell_size_global : float
         Half the size of the cells in the detector,
         perpendicular to the radial direction
-    cell_thickness : float
+    cell_thickness_global : float
         Thickness of the cells in the detector, in the radial direction
     length_to_pad : int (optional)
         Required length of the output array. If the number of hits is less than
@@ -358,23 +374,24 @@ def cells_to_points(
     -------
     points : np.array (n_hits, 4)
         2D array containing hits of the points,
-        in coordinates (x, y, z, energy)
+        in global coordinates (x, y, z, energy)
     """
 
     points = []
-    for l, layer in enumerate(layers):
-        xedges = MAP[l]["xedges"]
-        zedges = MAP[l]["zedges"]
+    for ln, layer in enumerate(layers):
+        xedges = MAP[ln]["xedges"]
+        zedges = MAP[ln]["zedges"]
 
         x_indx, z_indx = np.where(layer > 0)
 
         cell_energy = layer[layer > 0]
-        cell_coordinate_x = xedges[x_indx] + half_cell_size
+        cell_coordinate_x = xedges[x_indx] + half_cell_size_global
         cell_coordinate_y = np.repeat(
-            layer_bottom_pos[l] + cell_thickness / 2, len(x_indx)
+            layer_bottom_pos[ln] + cell_thickness_global / 2, len(x_indx)
         )
-        cell_coordinate_z = zedges[z_indx] + half_cell_size
+        cell_coordinate_z = zedges[z_indx] + half_cell_size_global
 
+        # rever the rotation to get shower local coordinates
         points.append(
             [
                 cell_coordinate_x,
@@ -396,8 +413,8 @@ def get_projections(
     showers,
     MAP,
     layer_bottom_pos=None,
-    half_cell_size=None,
-    cell_thickness=None,
+    half_cell_size_global=None,
+    cell_thickness_global=None,
     return_cell_point_cloud=False,
     include_artifacts=False,
     max_num_hits=None,
@@ -411,19 +428,19 @@ def get_projections(
     ----------
     showers : iterable
         iterable of 2D arrays, each containing the hits of a shower
-        in coordinates (x, y, z, energy)
+        in shower local coordinates (x, y, z, energy)
     MAP : list
         list of dictionaries, each containing the grid of cells for a layer
-        As returned by create_map
+        As returned by create_map, in detector global coordinates
     layer_bottom_pos : np.array (optional)
         Array of the bottom positions of the layers.
         If not given, the config will be used to generate a Metadata object
         and the layer_bottom_pos will be taken from there.
-    half_cell_size : float (optional)
+    half_cell_size_global : float (optional)
         Half the size of the cells in the detector, in the radial direction.
         If not given, the config will be used to generate a Metadata object
-        and the half_cell_size will be taken from there.
-    cell_thickness : float (optional)
+        and the half_cell_size_global will be taken from there.
+    cell_thickness_global : float (optional)
         Thickness of the cells in the detector, in the radial direction
         If not given, the config will be used to generate a Metadata object
         and the layer_bottom_pos will be taken from there.
@@ -457,16 +474,17 @@ def get_projections(
 
     metadata = Metadata(configs)
     if layer_bottom_pos is None:
-        layer_bottom_pos = metadata.layer_bottom_pos
-    if half_cell_size is None:
-        half_cell_size = metadata.half_cell_size
-    if cell_thickness is None:
-        cell_thickness = metadata.cell_thickness
+        layer_bottom_pos = metadata.layer_bottom_pos_global
+    if half_cell_size_global is None:
+        half_cell_size_global = metadata.half_cell_size
+    if cell_thickness_global is None:
+        cell_thickness_global = metadata.cell_thickness
 
     events = []
-    for shower in tqdm(showers):
+    points = local_to_global(showers, metadata.orientation, metadata.orientation_global)
+    for shower in tqdm(points):
         layers = points_to_cells(
-            shower, MAP, layer_bottom_pos, cell_thickness, include_artifacts
+            shower, MAP, layer_bottom_pos, cell_thickness_global, include_artifacts
         )
         events.append(layers)
 
@@ -476,7 +494,12 @@ def get_projections(
     cell_point_clouds = []
     for event in tqdm(events):
         point_cloud = cells_to_points(
-            event, MAP, layer_bottom_pos, half_cell_size, cell_thickness, max_num_hits
+            event,
+            MAP,
+            layer_bottom_pos,
+            half_cell_size_global,
+            cell_thickness_global,
+            max_num_hits,
         )
         cell_point_clouds.append(point_cloud)
 
@@ -495,7 +518,7 @@ def confine_to_box(X, Y, Z, E, metadata=Metadata()):
     Parameters
     ----------
     X, Y, Z : array like (N)
-        hit coordinates
+        hit global detector coordinates
     E : array like (N)
         hit energies
     metadata : Metadata (optional)
@@ -509,11 +532,11 @@ def confine_to_box(X, Y, Z, E, metadata=Metadata()):
 
     """
     inbox_idx = np.where(
-        (Y > metadata.Ymin)
-        & (X < metadata.Xmax)
-        & (X > metadata.Xmin)
-        & (Z < metadata.Zmax)
-        & (Z > metadata.Zmin)
+        (Y > metadata.Ymin_global)
+        & (X < metadata.Xmax_global)
+        & (X > metadata.Xmin_global)
+        & (Z < metadata.Zmax_global)
+        & (Z > metadata.Zmin_global)
     )[0]
     # inbox_idx = np.where(Y > Ymin)[0]
 
