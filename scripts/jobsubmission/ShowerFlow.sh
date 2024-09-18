@@ -2,7 +2,7 @@
 #SBATCH --time 5-00:00:00
 #SBATCH --nodes 1
 #SBATCH --partition maxgpu
-#SBATCH --job-name SF_alt2_4
+#SBATCH --job-name SF_alt1_4
 #SBATCH --mail-type=FAIL
 #SBATCH --mail-user=henry.day-hall@desy.de
 #SBATCH --output /gpfs/dust/maxwell/user/dayhallh/point-cloud-diffusion-logs/joblogs/%j.out      # terminal output
@@ -17,8 +17,8 @@ gun_henry_path=\
 "/gpfs/dust/maxwell/user/dayhallh/data/ILCsoftEvents/p22_th90_ph90_en10-100_joined"\
 "/p22_th90_ph90_en10-100_seed{}_all_steps.hdf5"
 anatolli_data=\
-"/beegfs/desy/user/akorol/projects/2_sim_calo/angular/out/"\
-"sim-E1261AT600AP180-180_file_{}.slcio.hdf5"
+"/beegfs/desy/user/akorol/data/AngularShowers_RegularDetector/"\
+"hdf5_for_CC/sim-E1261AT600AP180-180_file_{}slcio.hdf5"
 
 python3 scripts/ShowerFlow.py caloclouds_3 dataset_path=$anatolli_data \
-    n_dataset_files=88 shower_flow_version=alt2 shower_flow_num_blocks=4
+    n_dataset_files=88 shower_flow_version=alt1 shower_flow_num_blocks=4
