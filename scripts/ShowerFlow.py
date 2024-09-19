@@ -79,7 +79,8 @@ def main(configs, batch_size=2048, total_epochs=1_000_000_000, shuffle=True):
     n_events = np.sum(get_n_events(configs.dataset_path, configs.n_dataset_files))
     if configs.device == "cuda":
         # on the gpu we can use all the data
-        local_batch_size = n_events
+        #local_batch_size = n_events
+        local_batch_size = 100_000
     else:
         local_batch_size = 10_000
 
