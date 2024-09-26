@@ -2,7 +2,7 @@
 #SBATCH --time 5-00:00:00
 #SBATCH --nodes 1
 #SBATCH --partition maxgpu
-#SBATCH --job-name SF_alt1_4
+#SBATCH --job-name SF_ori_6
 #SBATCH --mail-type=FAIL
 #SBATCH --mail-user=henry.day-hall@desy.de
 #SBATCH --output /gpfs/dust/maxwell/user/dayhallh/point-cloud-diffusion-logs/joblogs/%j.out      # terminal output
@@ -21,4 +21,4 @@ anatolli_data=\
 "hdf5_for_CC/sim-E1261AT600AP180-180_file_{}slcio.hdf5"
 
 python3 scripts/ShowerFlow.py caloclouds_3 dataset_path=$anatolli_data \
-    n_dataset_files=88 shower_flow_version=alt1 shower_flow_num_blocks=4
+    n_dataset_files=88 shower_flow_version=original shower_flow_num_blocks=6

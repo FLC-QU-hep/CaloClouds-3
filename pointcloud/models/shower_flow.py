@@ -221,15 +221,9 @@ def compile_HybridTanH_alt2(num_blocks, num_inputs, num_cond_inputs, device):
     return model, flow_dist
 
 
-def get_save_dir(base_path, dataset_path):
-    dataset_name_key = '.'.join(os.path.basename(dataset_path).split('.')[:-1])
-    if "{" in dataset_name_key:
-        dataset_name_key = dataset_name_key.split("{")[0]
-    if "seed" in dataset_name_key:
-        dataset_name_key = dataset_name_key.split("seed")[0]
-    if "file" in dataset_name_key:
-        dataset_name_key = dataset_name_key.split("file")[0]
-    dataset_name_key = dataset_name_key.strip("_")
+versions_dict = {
+    "original": compile_HybridTanH_model,
+    "alt1": compile_HybridTanH_alt1,
+    "alt2": compile_HybridTanH_alt2,
+}
 
-    showerflow_dir = os.path.join(base_path, "showerFlow", dataset_name_key)
-    return showerflow_dir

@@ -21,7 +21,6 @@ from pointcloud.data.read_write import get_n_events
 from pointcloud.utils import showerflow_training
 from pointcloud.utils.metadata import Metadata
 from pointcloud.models.shower_flow import (
-    get_save_dir,
     compile_HybridTanH_model,
     compile_HybridTanH_alt1,
     compile_HybridTanH_alt2,
@@ -39,23 +38,11 @@ def main(configs, batch_size=2048, total_epochs=1_000_000_000, shuffle=True):
     }
     shower_flow_compiler = versions[configs.shower_flow_version]
 
-    max_input_dims = 65
-    inputs_used = np.zeros(max_input_dims, dtype=bool)
-    if "total_clusters" in configs.shower_flow_inputs:
-        inputs_used[0] = True
-    if "total_energy" in configs.shower_flow_inputs:
-        inputs_used[1] = True
-    for c in "xyz":
-        if f"cog_{c}" in configs.shower_flow_inputs:
-            inputs_used[2 + "xyz".index(c)] = True
-    if "clusters_per_layer" in configs.shower_flow_inputs:
-        inputs_used[5:35] = True
-    if "energy_per_layer" in configs.shower_flow_inputs:
-        inputs_used[35:] = True
-
+    cond_used = showerflow_training.get_cond_mask(configs)
+    cond_dim = np.sum(cond_used)
+    inputs_used = showerflow_training.get_input_mask(configs)
+    cut_inputs = np.where(~inputs_used)[0]
     input_dim = np.sum(inputs_used)
-    inputs_used_as_binary = "".join(["1" if i else "0" for i in inputs_used])
-    inputs_used_as_base10 = int(inputs_used_as_binary, 2)
 
     # use cuda if avaliable
     if torch.cuda.is_available():
@@ -68,8 +55,7 @@ def main(configs, batch_size=2048, total_epochs=1_000_000_000, shuffle=True):
     model, distribution = shower_flow_compiler(
         num_blocks=configs.shower_flow_num_blocks,
         num_inputs=input_dim,
-        # when 'conditioning' on additional Esum, Nhits etc add them on as inputs
-        num_cond_inputs=1,
+        num_cond_inputs=cond_dim,
         device=device,
     )  # num_cond_inputs
     # ## Setup
@@ -79,15 +65,12 @@ def main(configs, batch_size=2048, total_epochs=1_000_000_000, shuffle=True):
     n_events = np.sum(get_n_events(configs.dataset_path, configs.n_dataset_files))
     if configs.device == "cuda":
         # on the gpu we can use all the data
-        #local_batch_size = n_events
+        # local_batch_size = n_events
         local_batch_size = 100_000
     else:
         local_batch_size = 10_000
 
-    data_dir = os.path.join(configs.storage_base, "dayhallh/point-cloud-diffusion-data")
-    # data_dir = "/home/dayhallh/Data/"
-    print(f"Data dir is {data_dir}")
-    showerflow_dir = get_save_dir(data_dir, configs.dataset_path)
+    showerflow_dir = showerflow_training.get_showerflow_dir(configs)
     print(f"Showerflow data will be saved to {showerflow_dir}")
     os.makedirs(showerflow_dir, exist_ok=True)
 
@@ -99,6 +82,13 @@ def main(configs, batch_size=2048, total_epochs=1_000_000_000, shuffle=True):
     pointsE_path = showerflow_training.get_incident_npts_visible(
         configs, showerflow_dir, redo=False, local_batch_size=local_batch_size
     )
+
+    if "p_norm_local" in configs.shower_flow_cond_features:
+        direction_path = showerflow_training.get_gun_direction(
+            configs, showerflow_dir, redo=False, local_batch_size=local_batch_size
+        )
+    else:
+        direction_path = None
     # Calculating clusters per layer takes ~ 5 mins, so it's saved between runs.
 
     clusters_per_layer_path = showerflow_training.get_clusters_per_layer(
@@ -163,7 +153,12 @@ def main(configs, batch_size=2048, total_epochs=1_000_000_000, shuffle=True):
     # this will be repeated for each epoch.
 
     make_train_ds = showerflow_training.train_ds_function_factory(
-        pointsE_path, cog_path, clusters_per_layer_path, energy_per_layer_path, configs
+        pointsE_path,
+        cog_path,
+        clusters_per_layer_path,
+        energy_per_layer_path,
+        configs,
+        direction_path=direction_path,
     )
 
     start_points = np.arange(0, n_events, local_batch_size)
@@ -183,14 +178,11 @@ def main(configs, batch_size=2048, total_epochs=1_000_000_000, shuffle=True):
     outpath = os.path.join(showerflow_dir, prefix)
     print(f"Saving to {outpath}")
 
-    name_base = (
-        f"ShowerFlow_{configs.shower_flow_version}_nb{configs.shower_flow_num_blocks}"
-        f"_inputs{inputs_used_as_base10}"
+    _, best_model_path, best_data_path = showerflow_training.model_save_paths(
+        configs, configs.shower_flow_version, configs.shower_flow_num_blocks, cut_inputs
     )
-    best_model_path = os.path.join(showerflow_dir, f"{name_base}_best.pth")
-    latest_model_path = os.path.join(showerflow_dir, f"{name_base}_latest.pth")
-    best_data_path = os.path.join(showerflow_dir, f"{name_base}_best_data.txt")
-    history_data_path = os.path.join(showerflow_dir, f"{name_base}_history.npy")
+    latest_model_path = best_model_path.replace("best", "latest")
+    history_data_path = best_data_path.replace("best_data.txt", "history.npy")
     print(f"Best model will be saved to {best_model_path}")
     print(f"Latest model will be saved to {latest_model_path}")
     print(f"Best data will be saved to {best_data_path}")
@@ -205,8 +197,12 @@ def main(configs, batch_size=2048, total_epochs=1_000_000_000, shuffle=True):
     # model.load_state_dict(torch.load(outpath+f'ShowerFlow_{epoch_load}.pth')['model'])
     # optimizer.load_state_dict(torch.load(outpath+f'ShowerFlow_{epoch_load}.pth')['optimizer'])
     if os.path.exists(best_model_path) and not start_over:
-        model.load_state_dict(torch.load(best_model_path)["model"])
-        optimizer.load_state_dict(torch.load(best_model_path)["optimizer"])
+        model.load_state_dict(
+            torch.load(best_model_path, map_location=configs.device)["model"]
+        )
+        optimizer.load_state_dict(
+            torch.load(best_model_path, map_location=configs.device)["optimizer"]
+        )
 
         # load best_loss
         with open(best_data_path, "r") as f:
@@ -250,49 +246,14 @@ def main(configs, batch_size=2048, total_epochs=1_000_000_000, shuffle=True):
             end="\r\r",
         )
         loss_list = []
-        for batch_idx, (
-            energy,
-            num_points,
-            visible_energy,
-            cog_x,
-            cog_y,
-            cog_z,
-            clusters_per_layer,
-            e_per_layer,
-        ) in enumerate(train_loader):
+        for batch_idx, data in enumerate(train_loader):
+            context = data[:, :cond_dim].to(device).float()
+            input_data = data[:, cond_dim:].to(device).float()
             if batch_idx % 10 == 0:
                 print(f"{batch_idx/batch_len:.0%}", end="\r")
 
-            E_true = energy.view(-1, 1).to(device).float()
-            num_points = num_points.view(-1, 1).to(device).float()
-            energy_sum = visible_energy.view(-1, 1).to(device).float()
-            cog_x = cog_x.view(-1, 1).to(device).float()
-            cog_y = cog_y.view(-1, 1).to(device).float()
-            cog_z = cog_z.view(-1, 1).to(device).float()
-            clusters_per_layer = clusters_per_layer.to(device).float()
-            e_per_layer = e_per_layer.to(device).float()
-
-            input_data = torch.cat(
-                (
-                    num_points,
-                    energy_sum,
-                    cog_x,
-                    cog_y,
-                    cog_z,
-                    clusters_per_layer,
-                    e_per_layer,
-                ),
-                1,
-            )  # input data structure required for network
-            # filter any unused inputs
-            input_data = input_data[:, inputs_used].to(device)
             # with additional features in latent space (e.g. Esum)
             optimizer.zero_grad()
-            # try to add context for conditioning by concatenating
-            context = E_true
-
-            if np.any(np.isnan(input_data.clone().detach().cpu().numpy())):
-                print("Nans in the training data!")
 
             # check if any of the weights are nans
             if torch.stack([torch.isnan(p).any() for p in model.parameters()]).any():
@@ -371,40 +332,45 @@ def main(configs, batch_size=2048, total_epochs=1_000_000_000, shuffle=True):
     cog_z_list = []
     clusters_per_layer_list = []
     e_per_layer_list = []
-    for batch_idx, (
-        energy,
-        num_points,
-        visible_energy,
-        cog_x,
-        cog_y,
-        cog_z,
-        clusters_per_layer,
-        e_per_layer,
-    ) in enumerate(tqdm(train_loader)):
-        E_true = energy.view(-1, 1).to(device).float()
-        E_true = (E_true / 100).float()
+    for batch_idx, data in enumerate(tqdm(train_loader)):
+        context = data[:, :cond_dim].to(device).float()
+        input_data = data[:, cond_dim:].to(device).float()
         with torch.no_grad():
             samples = (
-                distribution.condition(E_true)
+                distribution.condition(context)
                 .sample(
                     torch.Size(
                         [
-                            E_true.shape[0],
+                            context.shape[0],
                         ]
                     )
                 )
                 .cpu()
                 .numpy()
             )
-        E_true_list.append(E_true.cpu().numpy())
+        E_true_list.append(context[:, -1].cpu().numpy())
         samples_list.append(samples)
-        num_points_list.append(num_points.cpu().numpy())
-        visible_energy_list.append(visible_energy.cpu().numpy())
-        cog_x_list.append(cog_x.cpu().numpy())
-        cog_y_list.append(cog_y.cpu().numpy())
-        cog_z_list.append(cog_z.cpu().numpy())
-        clusters_per_layer_list.append(clusters_per_layer.cpu().numpy())
-        e_per_layer_list.append(e_per_layer.cpu().numpy())
+        i = 0
+        if "total_clusters" in configs.shower_flow_inputs:
+            num_points_list.append(input_data[:, i].cpu().numpy())
+            i += 1
+        if "total_energy" in configs.shower_flow_inputs:
+            visible_energy_list.append(input_data[:, i].cpu().numpy())
+            i += 1
+        if "cog_x" in configs.shower_flow_inputs:
+            cog_x_list.append(input_data[:, i].cpu().numpy())
+            i += 1
+        if "cog_y" in configs.shower_flow_inputs:
+            cog_y_list.append(input_data[:, i].cpu().numpy())
+            i += 1
+        if "cog_z" in configs.shower_flow_inputs:
+            cog_z_list.append(input_data[:, i].cpu().numpy())
+            i += 1
+        if "clusters_per_layer" in configs.shower_flow_inputs:
+            clusters_per_layer_list.append(input_data[:, i : i + 30].cpu().numpy())
+            i += 30
+        if "energy_per_layer" in configs.shower_flow_inputs:
+            e_per_layer_list.append(input_data[:, i : i + 30].cpu().numpy())
 
     raw_E_true = np.concatenate(E_true_list, axis=0)
     samples = np.concatenate(samples_list, axis=0)
@@ -414,6 +380,8 @@ def main(configs, batch_size=2048, total_epochs=1_000_000_000, shuffle=True):
     raw_cog_y = np.concatenate(cog_y_list, axis=0)
     raw_cog_z = np.concatenate(cog_z_list, axis=0)
     samples.shape, raw_E_true.shape
+    clusters_per_layer = np.concatenate(clusters_per_layer_list, axis=0)
+    e_per_layer = np.concatenate(e_per_layer_list, axis=0)
     # sampled
     num_points_sampled = samples[:, 0] * meta.n_pts_rescale
     visible_energy_sampled = samples[:, 1] * meta.vis_eng_rescale

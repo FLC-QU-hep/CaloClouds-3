@@ -54,6 +54,7 @@ class Configs:
                 "energy_per_layer",
                 ]
         self.shower_flow_num_blocks = 4
+        self.shower_flow_cond_features = ["energy"]
 
         # Data
         self.storage_base = "/beegfs/desy/user/"

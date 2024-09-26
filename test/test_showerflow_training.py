@@ -38,6 +38,11 @@ def test_get_to_factory(tmpdir):
     assert np.all(loaded["num_points"] >= 0)
     assert loaded["num_points"].shape == (n_events,)
 
+    direction_path = showerflow_training.get_gun_direction(configs, showerflow_dir)
+    assert os.path.exists(direction_path)
+    loaded = np.load(direction_path)
+    assert loaded.shape == (n_events, 3)
+
     clusters_path = showerflow_training.get_clusters_per_layer(configs, showerflow_dir)
     assert os.path.exists(clusters_path)
     loaded = np.load(clusters_path)
@@ -74,4 +79,4 @@ def test_get_to_factory(tmpdir):
     assert callable(factory)
     dataset = factory(0, 3)
     item_0 = dataset[0]
-    assert len(item_0) == 8
+    assert len(item_0) == 66

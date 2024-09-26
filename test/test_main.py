@@ -1,4 +1,6 @@
 # get the folder above on the path
+import shutil
+import os
 import glob
 import pytest
 from scripts.main import main
@@ -9,16 +11,18 @@ def test_calotranf(tmpdir):
     cfg = config_creator.make("configs_calotransf", my_tmpdir=tmpdir)
     # no logging for tests, as we would need a comet key
     # run from scratch
-    # cfg.model_path = ""
+    cfg.model_path = ""
     main(cfg)
-    # assert glob.glob(f"{cfg.logdir_uda}/{cfg.name}*/ckpt_*.pt")
+    model_glob = glob.glob(f"{cfg.logdir}/{cfg.name}*/ckpt_*.pt")
+    assert model_glob
     # the calotransf needs to check that a recent checkpoint can be loaded.
-    # cfg.model_path = "pointcloud/calotransfer/pretrained/ckpt_0.000000_2000000.pt"
-    # shutil.copy(os.path.join(test_dir, cfg.model_path), cfg.logdir_uda)
-    # print(os.listdir(cfg.logdir_uda))
-    # main(cfg)
-    # check the model ckpt was created
-    # assert glob.glob(f"{cfg.logdir}/{cfg.name}*/ckpt_*.pt")
+    model_written = model_glob[-1]
+    shutil.copy(model_written, cfg.logdir_uda)
+    cfg.model_path = os.path.basename(model_written)
+    main(cfg)
+    # check a new model has been made
+    second_glob = glob.glob(f"{cfg.logdir}/{cfg.name}*/ckpt_*.pt")
+    assert len(second_glob) > len(model_glob)
 
 
 

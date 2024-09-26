@@ -4,9 +4,11 @@ import os
 class Configs:
     def __init__(self):
         # Experiment Name
-        self.name = 'CaloChallange_CD' # options: [TEST_, kCaloClouds_, CaloClouds_, CD_]
+        self.name = (
+            "CaloChallange_CD"  # options: [TEST_, kCaloClouds_, CaloClouds_, CD_]
+        )
         self.comet_project = (
-            'calotransfer'  # options: ['k-CaloClouds', 'calo-consistency']
+            "calotransfer"  # options: ['k-CaloClouds', 'calo-consistency']
         )
         # self.Acomment = 'baseline with lat_dim = 32, max_iter 10M, lr=1e-4 FIXED, dropout_rate=0.0, ema_power=2/3 (long training)'  # log_iter 100
         self.Acomment = "long baseline with lat_dim = 32, max_iter 10M, lr=2e-4 fixed, num_steps=18, bs=64, simga_max=80, epoch=2M, EMA"  # log_iter 100
@@ -58,22 +60,22 @@ class Configs:
         # self._dataset_path = 'korcariw/CaloClouds/dataset/showers/photons_10_100GeV_float32_sorted_train.h5'
         # self._dataset_path = 'korcariw/CaloClouds/dataset/showers/photons_50GeV_sorted.h5'
         # self._dataset_path = 'akorol/projects/getting_high/ILDConfig/StandardConfig/production/out/photons_50GeV_40k.slcio.hdf5'
-        
-        self.dataset_path = '/beegfs/desy/user/valentel/CaloTransfer/data/calo-challenge/dataset_3_xyz_smearing_10-90GeV.hdf5'
+
+        self.dataset_path = "/beegfs/desy/user/valentel/CaloTransfer/data/calo-challenge/dataset_3_xyz_smearing_10-90GeV.hdf5"
 
         self.quantized_pos = False
 
         # Dataloader
-        self.workers = 4    #32
+        self.workers = 4  # 32
         self.train_bs = 64  # k-diffusion: 128 / CD: 256
         self.percentage = 0.01  # training data percentage -> between [0,1]
         self.pin_memory = False  # choices=[True, False]
         self.shuffle = True  # choices=[True, False]
         self.max_points = 6_000
 
-        self.min_points = 240 # [***? fro ILD, 200 for CaloChallenge]
-        self.max_energy = 100 # [100 GeV for ILD, 1_000_000 MeV for CaloChallenge]
-        self.min_energy = 10 # [10 GeV for ILD, 1_000 MeV for CaloChallenge]
+        self.min_points = 240  # [***? fro ILD, 200 for CaloChallenge]
+        self.max_energy = 100  # [100 GeV for ILD, 1_000_000 MeV for CaloChallenge]
+        self.min_energy = 10  # [10 GeV for ILD, 1_000 MeV for CaloChallenge]
 
         # Optimizer and scheduler
         self.optimizer = "RAdam"  # choices=['Adam', 'RAdam']
@@ -90,7 +92,7 @@ class Configs:
         # Others
         self.device = "cuda"
         self.logdir_in_storage = False
-        self._logdir = '/beegfs/desy/user/valentel/logs/calo-challenge-uda-v2'
+        self._logdir = "/beegfs/desy/user/valentel/logs/calo-challenge-uda-v2"
         self.seed = 42
         self.val_freq = 10_000  #  1e3          # saving intervall for checkpoints
 
@@ -128,29 +130,28 @@ class Configs:
         self.s_noise = 1.0
 
         # Universal Domain Adaptation (UDA) parameters
-        self.logdir_uda = '/home/valentel/projects/point-cloud-diffusion/pointcloud/calotransfer/logs/'   
+        self.logdir_uda = "/home/valentel/projects/point-cloud-diffusion/pointcloud/calotransfer/logs/"
         # self.logdir_uda = '/beegfs/desy/user/valentel/6_PointCloudDiffusion/'
 
         # uda = universal domain adaptaion
         # self.logdir_uda = "../point-cloud-diffusion-logs/calotransf/"
         # self.uda = True
-        self.model_path = self.logdir_uda.rstrip('/logs/') + "/pretrained/ckpt_0.000000_2000000.pt"
-        # /home/valentel/projects/point-cloud-diffusion/pointcloud/calotransfer/pretrained/ckpt_0.000000_2000000.pt           
+        self.model_path = (
+            self.logdir_uda.rstrip("/logs/") + "/pretrained/ckpt_0.000000_2000000.pt"
+        )
+        # /home/valentel/projects/point-cloud-diffusion/pointcloud/calotransfer/pretrained/ckpt_0.000000_2000000.pt
         # layers in the model to use for UDA adaptive training
-        self.uda_layers = [0,1,2,3,4,5]
-
+        self.uda_layers = [0, 1, 2, 3, 4, 5]
 
         # Consistency Distillation parameters
         # self.model_path = 'kCaloClouds_2023_05_24__14_54_09/ckpt_0.000000_500000.pt'
         # self.model_path = 'kCaloClouds_2023_05_31__17_57_11/ckpt_0.000000_1690000.pt'
         # self.model_path = 'kCaloClouds_2023_06_29__23_08_31/ckpt_0.000000_2000000.pt'   # lat 0
-        #self.model_path = (
+        # self.model_path = (
         #    "kCaloClouds_2023_07_02__20_30_03/ckpt_0.000000_2000000.pt"  # lat 32
-        #)
-        
+        # )
 
-
-        #EMA
+        # EMA
         self.use_ema_trainer = True
         self.start_ema = 0.95
         # self.ema_rate = 0.999943    # decay rate of separately saved EMA model (not implemented yet)
@@ -160,11 +161,10 @@ class Configs:
     def uda_model_path(self):
         return os.path.join(self.logdir_uda, self.model_path)
 
-
     @property
     def dataset_path(self):
         if self.dataset_path_in_storage:
-            return self.storage_base + self._dataset_path
+            return os.path.join(self.storage_base, self._dataset_path)
         else:
             return self._dataset_path
 
@@ -181,7 +181,7 @@ class Configs:
     @property
     def logdir(self):
         if self.logdir_in_storage:
-            return self.storage_base + self._logdir
+            return os.path.join(self.storage_base, self._logdir)
         else:
             return self._logdir
 
@@ -194,4 +194,3 @@ class Configs:
         else:
             self.logdir_in_storage = False
             self._logdir = value
-
