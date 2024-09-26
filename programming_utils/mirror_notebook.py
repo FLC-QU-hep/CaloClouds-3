@@ -92,7 +92,10 @@ def list_of_notebooks():
     notebooks : list of Path
         List of paths to the notebooks.
     """
-    path_root = Path(__file__).parents[1]
+    programming_utils_path = os.path.realpath(
+        Path(os.path.abspath(__file__)).parents[0]
+    )
+    path_root = os.path.abspath(os.path.join(programming_utils_path, ".."))
     # iterate over all the subfolders looking for notebooks
     notebooks = []
     for root, dirs, files in os.walk(path_root):

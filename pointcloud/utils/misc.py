@@ -141,8 +141,8 @@ def get_new_log_dir(root="./logs", postfix="", prefix="", start_time=time.localt
     if os.path.exists(log_dir):
         print(f"Directory {log_dir} already exists, trying another one.")
         postfix += "_{}".format(random.randint(0, 1000))
-        get_new_log_dir(root, postfix, prefix, start_time)
-        return
+        log_dir = get_new_log_dir(root, postfix, prefix, start_time)
+        return log_dir
     os.makedirs(log_dir)
     return log_dir
 

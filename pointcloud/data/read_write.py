@@ -117,12 +117,12 @@ def regularise_event_axes(events, is_transposed=None, known_regular=False):
         while len(events.shape) > 3:
             # don't want to straight up squeeze in case there is only one event
             events = events[0]
-    if is_transposed == True:
+    if is_transposed:
         assert (
             events.shape[1] == 4
         ), "The second last axes must be length 4 in transposed events"
         events = events.transpose(0, 2, 1)
-    elif is_transposed == False:
+    elif isinstance(is_transposed, bool):  # then it's false
         assert (
             events.shape[2] == 4
         ), "The last axes must be length 4 in non-transposed events"
@@ -184,11 +184,12 @@ def events_to_local(events, orientation):
     ----------
     events : array
         The input showers tensor.
-    global_shower_orientation : char
-        "x", "y", or "z", the direction of the "z" axis of the local
-        shower coordinate system in the detector coordinate system.
+    orientation : str
+        The relationship between orientation on disk and local coordinates.
 
     """
+    if 0 in events.shape:
+        return
     local_orientation = _validate_orientations(orientation)
     column_target = ["xyz".index(c) for c in local_orientation]
     events[..., column_target] = events[..., [0, 1, 2]]
@@ -302,7 +303,7 @@ def global_to_local(events, orientation, orientation_global):
     return new_events
 
 
-def read_raw_regaxes(config, pick_events=None, total_size=None):
+def read_raw_regaxes(config, pick_events=None, total_size=None, per_event_cols=None):
     """
     Draw raw events form the dataset, reshape, and move to local axis orientation,
     but don't alter values.
@@ -319,10 +320,15 @@ def read_raw_regaxes(config, pick_events=None, total_size=None):
         Ignored if pick_events is not None
         If set to -1, read all events.
         Optional, default is 100
+    per_event_cols: list of str
+        The event level metadata columns to read
+        Optional, default is None, then only ["energy"] is read
+        if it is present.
 
     Returns
     -------
-    energy: array
+    per_event: array
+        Event level variables, such as
         Incident energies of the events
         The first index is the event number
     events: array
@@ -332,6 +338,8 @@ def read_raw_regaxes(config, pick_events=None, total_size=None):
         the third is the coordinate number in xyze format
 
     """
+    if per_event_cols is None:
+        per_event_cols = ["energy"]
     if not hasattr(config, "n_dataset_files"):
         config.n_dataset_files = 0
     n_events = get_n_events(config.dataset_path, config.n_dataset_files)
@@ -339,6 +347,8 @@ def read_raw_regaxes(config, pick_events=None, total_size=None):
     if total_size is None:
         total_size = min(100, n_total_events)
     if pick_events is None:
+        if total_size == 0:
+            return np.zeros(0), np.zeros(0)
         if total_size == -1:
             pick_events = np.arange(n_total_events)
         else:
@@ -368,39 +378,65 @@ def read_raw_regaxes(config, pick_events=None, total_size=None):
             )
             file_start = file_end
 
-    energy = []
+    per_event = []
     events = []
     for name, indices in zip(file_names, file_indices):
         with h5py.File(name, "r") as dataset:
             events_here = dataset["events"]
-            energy_here = dataset["energy"]
 
             # treat empty files
             if len(events_here) == 0:
-                events.append(np.zeros((0, 0, 4)))
-                energy.append(np.zeros(0))
+                events.append(np.zeros(0))
+                per_event.append(np.zeros(0))
                 continue
 
             # account for the variations in shower axes layout
+            n_events_here = events_here.shape[-3]
             events_here = events_here[..., indices, :, :]
             # and make the axes order regular
             events_here = regularise_event_axes(events_here)
             events.append(events_here)
 
-            # energy has more randomness again
+            # event level variables have more randomness again
             # can be (n_events,) or (1, n_events) or even (1, n_events, 1)
-            axes_index = [0 for _ in energy_here.shape]
-            axes_index[np.argmax(energy_here.shape)] = indices
-            energy_here = energy_here[tuple(axes_index)]
-            energy.append(energy_here)
+            # or even have other additional axes
+            per_event_here = []
+            for col, name in enumerate(per_event_cols):
+                shape_here = dataset[name].shape
+                found_slice = False
+                found_event_axis = False
+                filter_idxs = []
+                event_axis = 0
+                for s in shape_here:
+                    if not found_event_axis and s == n_events_here:
+                        filter_idxs.append(indices.tolist())
+                        found_event_axis = True
+                    elif s == 1:
+                        filter_idxs.append(0)
+                    else:
+                        if not found_event_axis:
+                            event_axis += 1
+                        assert not found_slice, "Only one slice allowed"
+                        filter_idxs.append(slice(None))
+                        found_slice = True
+                here = dataset[name][tuple(filter_idxs)]
+                if not found_slice:
+                    # give it the dimensionalty needed to concatenate
+                    here = here[..., None]
+                if event_axis != 0:
+                    here = here.swapaxes(0, event_axis)
+                per_event_here.append(here)
+            per_event.append(np.concatenate(per_event_here, axis=1))
 
-    energy = np.concatenate(energy)
+    per_event = np.vstack(per_event)
+    if per_event.shape[1] == 1:
+        per_event = per_event[:, 0]
     events = np.vstack(events)
 
     metadata = Metadata(config)
     events_to_local(events, metadata.orientation)
 
-    return energy, events
+    return per_event, events
 
 
 def check_regaxes(incedent_energy, events):

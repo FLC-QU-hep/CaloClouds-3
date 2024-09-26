@@ -13,11 +13,11 @@ from helpers import config_creator
 from helpers.mock_metadata import TemporaryMetadata
 
 
-@TemporaryMetadata("WdatasetW")
 class TestReaders:
     """Test the readers in the read_write module."""
 
     energy0 = np.array([[1.0]])
+    direction0 = np.array([[10.0, 20.0, 30.0]])
     reg_energy0 = np.array([1.0])
     # one event, 4 points
     # designed to make it impossible to tell that the
@@ -45,6 +45,9 @@ class TestReaders:
         ]
     )
     energy1 = np.array([[2.0, 3.0, 4.0]])
+    direction1 = np.array(
+        [[[10.0, 20.0, 30.0], [40.0, 50.0, 60.0], [70.0, 80.0, 90.0]]]
+    )
     reg_energy1 = np.array([2.0, 3.0, 4.0])
     # three events, 1 point, 2 points, 1 point
     events1 = np.array(
@@ -82,6 +85,7 @@ class TestReaders:
     folders = {}
     paths = {}
     tmpdir = tempfile.mkdtemp()
+    temp_meta = TemporaryMetadata("WdatasetW")
 
     # as this deals in the global filesystem, we may as well have a
     # classmethod to create directories
@@ -97,11 +101,13 @@ class TestReaders:
         The readers require data on disk to read, so we need to create
         some test data.
         """
+        cls.temp_meta.__enter__()
         # the first will contain one empty dataset
         cls.folders["empty"] = cls.mkdir("empty_dataset")
         path_format = os.path.join(cls.folders["empty"], "empty_dataset.h5")
         with h5py.File(path_format, "w") as f:
             f.create_dataset("energy", data=np.empty(0))
+            f.create_dataset("direction", data=np.empty(0))
             f.create_dataset("events", data=np.empty(0))
         cls.paths["empty"] = path_format
         # the second will contain one dataset with one event
@@ -111,9 +117,11 @@ class TestReaders:
             cls.folders["one_event"], "one_event_dataset.h5"
         )
         energy = np.array([1.0])
+        direction = np.array([[10.0, 10.0, 10.0]])
         events = np.array([[[1.0, 2.0, 3.0, 4.0], [5.0, 6.0, 7.0, 8.0]]])
         with h5py.File(cls.paths["one_event"], "w") as f:
             f.create_dataset("energy", data=energy)
+            f.create_dataset("direction", data=direction)
             f.create_dataset("events", data=events)
         # the third will contain four events, split between 2 files
         # in 1, event, xyze, point format
@@ -124,9 +132,11 @@ class TestReaders:
         cls.paths["four_events"] = path_format
         with h5py.File(path_format.format(0), "w") as f:
             f.create_dataset("energy", data=cls.energy0)
+            f.create_dataset("direction", data=cls.direction0)
             f.create_dataset("events", data=cls.events0)
         with h5py.File(path_format.format(1), "w") as f:
             f.create_dataset("energy", data=cls.energy1)
+            f.create_dataset("direction", data=cls.direction1)
             f.create_dataset("events", data=cls.events1)
         # the fourth will be just the last part of the third
         cls.folders["last_segment"] = cls.folders["four_events"]
@@ -141,6 +151,7 @@ class TestReaders:
         for i in range(3):
             with h5py.File(cls.paths["nine_events"].format(i), "w") as f:
                 f.create_dataset("energy", data=cls.energy1)
+                f.create_dataset("direction", data=cls.direction1)
                 f.create_dataset("events", data=cls.events1)
 
     @classmethod
@@ -148,6 +159,7 @@ class TestReaders:
         """
         Remove the test data from disk.
         """
+        cls.temp_meta.__exit__()
         # remove the test data
         shutil.rmtree(cls.tmpdir)
 
@@ -219,7 +231,7 @@ class TestReaders:
             found_energy, found_events = read_write.read_raw_regaxes(configs)
             npt.assert_allclose(found_energy, [1.0])
             npt.assert_allclose(
-                found_events, [[[1.0, 2.0, 3.0, 4.0], [5.0, 6.0, 7.0, 8.0]]]
+                found_events, [[[3.0, 1.0, 2.0, 4.0], [7.0, 5.0, 6.0, 8.0]]]
             )
         # becuase there are 4 points int he longest event,
         # this should throw RuntimeError
@@ -232,18 +244,67 @@ class TestReaders:
         configs.dataset_path = self.paths["last_segment"]
         found_energy, found_events = read_write.read_raw_regaxes(configs)
         npt.assert_allclose(found_energy, self.reg_energy1)
-        npt.assert_allclose(found_events, self.reg_events1)
+        local_ax_1 = self.reg_events1[..., [2, 0, 1, 3]]
+        npt.assert_allclose(found_events, local_ax_1)
 
         # finally, the nine events should be fine
         configs.dataset_path = self.paths["nine_events"]
         configs.n_dataset_files = 1
         found_energy, found_events = read_write.read_raw_regaxes(configs)
         npt.assert_allclose(found_energy, self.reg_energy1)
-        npt.assert_allclose(found_events, self.reg_events1)
+        npt.assert_allclose(found_events, local_ax_1)
         configs.n_dataset_files = 3
         found_energy, found_events = read_write.read_raw_regaxes(configs)
         npt.assert_allclose(found_energy, [2.0, 3.0, 4.0, 2.0, 3.0, 4.0, 2.0, 3.0, 4.0])
-        npt.assert_allclose(found_events, np.tile(self.reg_events1, (3, 1, 1)))
+        npt.assert_allclose(found_events, np.tile(local_ax_1, (3, 1, 1)))
+
+    def test_read_raw_regaxes_direction(self):
+        # Again, but with the direction vector too
+        configs = config_creator.make()
+        configs.dataset_path = self.paths["empty"]
+        configs.n_dataset_files = 0
+        per_event_cols = ["energy", "direction"]
+        found_cond, found_events = read_write.read_raw_regaxes(
+            configs, per_event_cols=per_event_cols
+        )
+        assert len(found_cond) == 0
+        assert len(found_events) == 0
+        configs.dataset_path = self.paths["one_event"]
+        for i in range(2):
+            configs.n_dataset_files = i
+            found_cond, found_events = read_write.read_raw_regaxes(
+                configs, per_event_cols=per_event_cols
+            )
+            npt.assert_allclose(found_cond, [[1.0, 10.0, 10.0, 10.0]])
+            npt.assert_allclose(
+                found_events, [[[3.0, 1.0, 2.0, 4.0], [7.0, 5.0, 6.0, 8.0]]]
+            )
+
+        # this should work
+        configs.dataset_path = self.paths["last_segment"]
+        found_cond, found_events = read_write.read_raw_regaxes(
+            configs, per_event_cols=per_event_cols
+        )
+        cond = np.hstack([self.reg_energy1[:, None], self.direction1[0]])
+        npt.assert_allclose(found_cond, cond)
+        local_ax_1 = self.reg_events1[..., [2, 0, 1, 3]]
+        npt.assert_allclose(found_events, local_ax_1)
+
+        # finally, the nine events should be fine
+        configs.dataset_path = self.paths["nine_events"]
+        configs.n_dataset_files = 1
+        found_cond, found_events = read_write.read_raw_regaxes(
+            configs, per_event_cols=per_event_cols
+        )
+        npt.assert_allclose(found_cond, cond)
+        npt.assert_allclose(found_events, local_ax_1)
+        configs.n_dataset_files = 3
+        found_cond, found_events = read_write.read_raw_regaxes(
+            configs, per_event_cols=per_event_cols
+        )
+        cond = np.tile(cond, (3, 1))
+        npt.assert_allclose(found_cond, cond)
+        npt.assert_allclose(found_events, np.tile(local_ax_1, (3, 1, 1)))
 
 
 def test_regularise_event_axes():
@@ -345,6 +406,11 @@ def test_local_global_exchanges():
     # start with local_to_global
     no_change = "hdf5:xyz==local:xyz"
     no_change_global = "hdf5:xyz==global:xyz"
+    # check empty events don't make it choke
+    empty_events = np.empty((0, 4, 4))
+    found = read_write.local_to_global(empty_events, no_change, no_change_global)
+    assert empty_events.shape == found.shape
+    # check some simple cases
     found = read_write.local_to_global(events, no_change, no_change_global)
     npt.assert_allclose(events, found)
     to_rotate = "hdf5:xyz==local:yzx"
@@ -355,9 +421,10 @@ def test_local_global_exchanges():
         NotImplementedError, read_write.local_to_global, events, no_change, no_change
     )
     # now global_to_local
+    found = read_write.global_to_local(empty_events, no_change, no_change_global)
+    assert empty_events.shape == found.shape
     found = read_write.global_to_local(events, no_change, no_change_global)
     npt.assert_allclose(events, found)
     found = read_write.global_to_local(events, to_rotate, no_change_global)
     expected = events[:, :, [2, 0, 1, 3]]
     npt.assert_allclose(found, expected)
-

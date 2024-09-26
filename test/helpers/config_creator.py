@@ -36,4 +36,6 @@ def make(module_name="default", start_from=None, my_tmpdir=None):
         config.model_path = "mini_ckpt_sample.pt"
         # actually put the model in the logdir
         shutil.copy(os.path.join(test_dir, config.model_path), config.logdir)
+        # and in the uda logdir
+        shutil.copy(os.path.join(test_dir, config.model_path), config.logdir_uda)
     return config
