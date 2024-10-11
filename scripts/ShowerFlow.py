@@ -52,7 +52,7 @@ def main(configs, batch_size=2048, total_epochs=1_000_000_000, shuffle=True):
     device = torch.device(configs.device)
 
     meta = Metadata(configs)
-    model, distribution = shower_flow_compiler(
+    model, distribution, transforms = shower_flow_compiler(
         num_blocks=configs.shower_flow_num_blocks,
         num_inputs=input_dim,
         num_cond_inputs=cond_dim,

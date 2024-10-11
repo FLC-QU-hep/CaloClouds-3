@@ -150,6 +150,8 @@ def compile_HybridTanH_model(num_blocks, num_inputs, num_cond_inputs, device):
         The trainable model that will define the transformaitons.
     flow_dist : dist.ConditionalTransformedDistribution
         The distribution created by the transformations.
+    transforms : list
+        The list of transformations that the model applies.
 
     """
     factory = HybridTanH_factory(num_inputs, num_cond_inputs, device)

@@ -84,7 +84,7 @@ def load_flow_model(
     """
     if config.model_name == "wish":
         return None, None
-    flow, distribution = compile_HybridTanH_model(
+    flow, distribution, transforms = compile_HybridTanH_model(
         num_blocks=10,
         # when 'condioning' on additional Esum,
         # Nhits etc add them on as inputs rather than
@@ -109,7 +109,7 @@ def load_flow_model(
     checkpoint = torch.load(model_path)  # trained about 350 epochs
     flow.load_state_dict(checkpoint["model"])
     flow.eval().to(config.device)
-    return flow, distribution
+    return flow, distribution, transforms
 
 
 def load_diffusion_model(
@@ -289,7 +289,7 @@ def generate_showers(
 
     """
     # unpack params
-    flow, distribution = flow_model
+    flow, distribution, transforms = flow_model
     model, coef_real, coef_fake, n_splines = diffusion_model
     s_t = time.time()
     showers, cond_E = gen_utils.gen_showers_batch(
