@@ -252,8 +252,7 @@ def main(config=Configs()):
     ckpt_mgr.save(model, config, loss, others=opt_states, step=it)
     print("training done in %.2f seconds" % (time.time() - start_time))
 
-
+#checkt ob es als skript aufgehrufen wurde
 if __name__ == "__main__":
-    from pointcloud.config_varients import caloclouds_3
-
-    main(caloclouds_3.Configs())
+    main(Configs())
+    
