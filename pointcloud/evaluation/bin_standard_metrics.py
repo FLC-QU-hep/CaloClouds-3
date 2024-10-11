@@ -650,7 +650,7 @@ def get_caloclouds_models(
         torch.load(caloclouds_path, map_location=device)["state_dict"]
     )
 
-    flow_model, flow_dist = compile_HybridTanH_model(
+    flow_model, flow_dist, transforms = compile_HybridTanH_model(
         num_blocks=10, num_inputs=65, num_cond_inputs=1, device=device
     )
     flow_model.load_state_dict(

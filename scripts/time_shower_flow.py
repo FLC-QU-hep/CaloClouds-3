@@ -27,7 +27,7 @@ def time_pattern(factory, pattern, count_bins, incident_energies, pattern_repeat
         print(f"{q/10:.0%}", end="\r")
         for r, repeats in reversed(list(enumerate(pattern_repeats))):
         #for r, repeats in enumerate(pattern_repeats):
-            _, flow_dist = factory.create(repeats, pattern, count_bins=count_bins)
+            _, flow_dist, _ = factory.create(repeats, pattern, count_bins=count_bins)
             for i, incident_energy in enumerate(incident_energies):
                 dist = flow_dist.condition(incident_energy)
                 t0 = time.time()

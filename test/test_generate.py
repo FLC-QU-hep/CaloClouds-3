@@ -27,7 +27,10 @@ def test_load_flow_model_caloclouds(tmpdir):
     config = config_creator.make("caloclouds_3", my_tmpdir=tmpdir)
     test_model_path = str(tmpdir) + "/example_flow_model.pt"
     write_fake_flow_model(config, test_model_path)
-    _, distribution = generate.load_flow_model(config, model_path=test_model_path)
+    _, distribution, transforms = generate.load_flow_model(
+        config, model_path=test_model_path
+    )
+    assert isinstance(transforms, list)
     # ignoring the flow, as we don't use it in generate
     batch_size = 10
     cond_E_batch = torch.FloatTensor(batch_size, 1).uniform_(10, 20).to(config.device)

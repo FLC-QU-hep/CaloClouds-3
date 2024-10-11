@@ -127,7 +127,7 @@ class TestGenMethods:
         params_dict["batch_size"] = 2
 
         # fake the flow model
-        flow, distribution = compile_HybridTanH_model(
+        flow, distribution, transforms = compile_HybridTanH_model(
             num_blocks=configs.shower_flow_num_blocks,
             num_inputs=65,
             num_cond_inputs=1,
