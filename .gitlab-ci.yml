@@ -21,10 +21,12 @@ pytest:
     - henry_dev_newTests
     - merge_requests
   script:
-    - echo "Installing requirments"
+    - # "add the install file to the path"
+    - PATH=/home/apprunner/.local/bin:$PATH
+    - # "Installing requirments"
     - pip install -r requirements.txt
     - pip install pytest pytest-mock coverage
-    - echo "Running pytests"
+    - # "Running pytests"
     - coverage run -m pytest test/test*py test/externals/test*py
     - coverage xml
     - coverage report
