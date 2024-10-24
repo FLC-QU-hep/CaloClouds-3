@@ -23,6 +23,7 @@ from pointcloud.evaluation.bin_standard_metrics import (
     sample_accumulator,
     get_path,
     get_wish_models,
+    get_fish_models,
     get_caloclouds_models,
 )
 
@@ -32,36 +33,57 @@ from pointcloud.evaluation.bin_standard_metrics import (
 # but the dataset_path may be incorrect.
 models = {}
 log_base = "../point-cloud-diffusion-logs/"
-log_base = "/beegfs/desy/user/dayhallh/point-cloud-diffusion-logs/"
-data_base = "../point-cloud-diffusion-data/"
-data_base = "/beegfs/desy/user/dayhallh/point-cloud-diffusion-data/"
+# log_base = "/beegfs/desy/user/dayhallh/point-cloud-diffusion-logs/"
+log_base = "/gpfs/dust/maxwell/user/dayhallh/point-cloud-diffusion-logs"
+# data_base = "../point-cloud-diffusion-data/"
+# data_base = "/beegfs/desy/user/dayhallh/point-cloud-diffusion-data/"
+data_base = "/gpfs/dust/maxwell/user/dayhallh/point-cloud-diffusion-data/"
 try:
     pass
-    wish_path = os.path.join(
-        log_base, "wish/dataset_accumulators/p22_th90_ph90_en10-1/try2_wish_poly{}.pt"
-    )
-    models.update(
-        get_wish_models(
-            wish_path=wish_path,
-            n_poly_degrees=4,
-        )
-    )
+#    wish_path = os.path.join(
+#        log_base, "wish/dataset_accumulators/p22_th90_ph90_en10-1/try2_wish_poly{}.pt"
+#    )
+#    models.update(
+#        get_wish_models(
+#            wish_path=wish_path,
+#            n_poly_degrees=4,
+#        )
+#    )
 except FileNotFoundError as e:
     print("Wish models not found")
     print(e)
 
 try:
     pass
+#    fish_path = os.path.join(
+#        log_base, "wish/fish/fish.npz"
+#    )
+#    models.update(
+#        get_fish_models(fish_path=fish_path)
+#    )
+except FileNotFoundError as e:
+    print("Wish models not found")
+    print(e)
+try:
+    pass
     caloclouds_path = os.path.join(
         log_base,
-        "p22_th90_ph90_en10-100/CD_2024_05_24__14_47_04/ckpt_0.000000_990000.pt",
+        "p22_th90_ph90_en10-100/CD_2024_08_23__16_13_16/ckpt_0.439563_30000.pt"
+        #"p22_th90_ph90_en10-100/CD_2024_08_23__16_13_16/ckpt_0.447468_870000.pt",
     )
-    showerflow_path = os.path.join(data_base, "showerFlow/ShowerFlow_best.pth")
-    models.update(
-        get_caloclouds_models(
-            caloclouds_path=caloclouds_path, showerflow_path=showerflow_path
-        )
+    parts = [
+        f"{varient}_nb{repeats}_inputs36893488147419103231"
+        for varient in ["original", "alt1", "alt2"]
+        for repeats in [4, 10]
+    ]
+    showerflow_paths = [
+        os.path.join(data_base, f"showerFlow/ShowerFlow_{part}_best.pth")
+        for part in parts
+    ]
+    caloclouds = get_caloclouds_models(
+        caloclouds_paths=caloclouds_path, showerflow_paths=showerflow_paths
     )
+    models.update(caloclouds)
 except FileNotFoundError as e:
     print("CaloClouds models not found")
     print(e)
@@ -77,8 +99,8 @@ accum_path = os.path.join(
 
 def main(
     configs=Configs(),
-    redo_g4_data=True,
-    redo_g4_acc_data=True,
+    redo_g4_data=False,
+    redo_g4_acc_data=False,
     redo_model_data=True,
     max_g4_events=0,
     max_model_events=0,
@@ -149,7 +171,7 @@ def main(
             meta.layer_bottom_pos_hdf5,
             meta.cell_thickness_hdf5,
             # meta.gun_xz_pos_raw)
-            np.array([0, -70]),
+            np.array([0, -50]),
         )
         sample_g4(configs, binned_g4, n_g4_events)
         binned_g4.save(g4_save_path)
@@ -190,6 +212,15 @@ def main(
                 ]
                 layer_bottom_pos = meta.layer_bottom_pos_hdf5
                 rescale_energy = 1e3
+                gun_pos = np.array([0, -60, 0])
+            elif "fish" in model_name.lower():
+                xyz_limits = [
+                    [-1, 1],
+                    [-1, 1],
+                    [-1, 1],
+                ]
+                layer_bottom_pos = np.linspace(-0.75, 0.75, 30)
+                cell_thickness = layer_bottom_pos[1] - layer_bottom_pos[0]
                 gun_pos = np.array([0, -70, 0])
 
             binned = BinnedData(
