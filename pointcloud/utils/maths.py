@@ -6,8 +6,8 @@ import numpy as np
 import torch
 from scipy.optimize import minimize
 
-_TORCH_TINY = torch.finfo(torch.float32).tiny
-_TORCH_MAX = torch.finfo(torch.float32).max
+_TORCH_TINY = torch.tensor(torch.finfo(torch.float32).tiny)
+_TORCH_MAX = torch.tensor(torch.finfo(torch.float32).max)
 
 
 def torch_polyval(coefficients, x):
@@ -83,8 +83,25 @@ def gumbel(x, mu, beta, height, lift):
     array_like
         The Gumbel function evaluated at x.
     """
+    # this can create overflow errors and other numerical issues
+    # need safeguards
     z = (x - mu) / beta
-    return lift + height * np.exp(-z - np.exp(-z))
+    with np.errstate(over="raise"):
+        try:
+            # this is the correct formula
+            distribution = lift + height * np.exp(-z - np.exp(-z))
+        except FloatingPointError:
+            warnings.warn("Warning: Numerical issues with Gumbel function.")
+            # assume that the -z - exp(-z) term is very negative
+            shaped = (x - x) + 1
+            distribution = lift * shaped
+    # TODO maybe remove
+    # max_unnormed_gumbel = 0.37  # unnormalised gumbel is between 0 and 0.3679...
+    # max_value = lift + height * max_unnormed_gumbel
+    # if (distribution > max_value).any():
+    #    # if we exceeded the maximum value, assume the results are bad
+    #    distribution[distribution > max_value] = lift
+    return distribution
 
 
 def gumbel_params(mean, varience):
@@ -180,9 +197,14 @@ def logNorm_params(mean, standarddev):
     scale : torch Tensor
         The scale of the distribution.
     """
-    scale2 = torch.log(1 + (standarddev / mean) ** 2)
+    # TODO, this seems to throw so really odd results...
+    ratio = (standarddev / mean).nan_to_num()
+    scale2 = torch.clip(torch.log(1 + ratio**2), _TORCH_TINY, None)
     scale = torch.sqrt(scale2)
     location = torch.log(mean) - 0.5 * scale2
-    max_val = torch.clip(location.abs(), _TORCH_TINY, 1.0) * _TORCH_MAX
-    scale = torch.clip(scale, _TORCH_TINY, max_val.item())
-    return location, scale
+    # can't just set nan to 0, as nan appears where location should be negative
+    minimal_location = location[~torch.isnan(location)].min().item()
+    clean_location = location.nan_to_num(nan=minimal_location)
+    max_val = torch.clip(clean_location.abs(), _TORCH_TINY, 1.0) * _TORCH_MAX
+    clean_scale = torch.clip(scale.nan_to_num(), _TORCH_TINY, max_val.max())
+    return clean_location, clean_scale
