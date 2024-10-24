@@ -24,7 +24,8 @@ pytest:
     - echo "add the install file to the path"
     - PATH=/home/apprunner/.local/bin:$PATH
     - echo "Installing requirments"
-    - pip install -r requirements.txt
+    - pip install setuptools==69.0.3
+    - pip install -r requirements_fixed.txt
     - pip install pytest pytest-mock coverage
     - echo "Running pytests"
     - coverage run -m pytest test/test*py test/externals/test*py
