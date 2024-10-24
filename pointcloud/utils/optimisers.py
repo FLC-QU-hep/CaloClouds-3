@@ -180,7 +180,7 @@ def evaluator_factory(f, xdata, ydata, sigma=None):
 
     def score_func(params):
         func = _wrap_func(f, xdata, ydata, transform)
-        return np.sum(func(params) ** 2)
+        return (func(params) ** 2).sum()
     return score_func
 
 
