@@ -78,6 +78,85 @@ def test_StatsAccumulator(tmpdir):
     assert np.sum(acc.total_events) == 6
 
 
+def test_AlignedStatsAccumulator(tmpdir):
+    save_dir = tmpdir.mkdir("test_AlignedStatsAccumulator")
+    save_name = os.path.join(save_dir, "test_stats_accumulator.h5")
+
+    acc = stats_accumulator.AlignedStatsAccumulator("mean")
+    assert np.all(acc.counts_hist == 0)
+    assert np.all(acc.energy_hist == 0)
+    assert np.all(acc.layer_offset_hist == 0)
+    assert np.sum(acc.total_events) == 0
+
+    acc.save(save_name)
+    assert os.path.exists(save_name)
+    acc = stats_accumulator.AlignedStatsAccumulator.load(save_name, "mean")
+
+    assert np.all(acc.counts_hist == 0)
+    assert np.all(acc.energy_hist == 0)
+    assert np.all(acc.layer_offset_hist == 0)
+    assert np.sum(acc.total_events) == 0
+
+    # put one event in with one centeral point
+    center = np.array([0.0, 0.0, 0.0, 1.0])
+    acc.add([0], [50], np.array([[center]]))
+
+    assert np.sum(acc.counts_hist) == 1
+    assert np.sum(acc.energy_hist) == 1
+    assert np.sum(acc.counts_hist > 0) == 1
+    assert np.sum(acc.layer_offset_hist) == 1
+    assert np.sum(acc.layer_offset_hist > 0) == 1
+    assert np.sum((acc.counts_hist * acc.energy_hist) > 0) == 1
+    assert np.sum(acc.total_events) == 1
+
+    # put another two events in with two points, both at the center
+    acc.add([1, 2], [50, 50], np.array([[center * 2, center], [center, center]]))
+
+    assert np.sum(acc.counts_hist) == 5
+    assert np.sum(acc.energy_hist) == 6
+    assert np.sum(acc.counts_hist > 0) == 1
+    assert np.sum(acc.layer_offset_hist) == 3
+    assert np.sum(acc.layer_offset_hist > 0) == 1
+    assert np.sum((acc.counts_hist * acc.energy_hist) > 0) == 1
+    assert np.sum(acc.total_events) == 3
+
+    # now put in one more event with two points,
+    # one in the same place as before, one in another incident bin
+    acc.add([3, 4], [50, 80], np.array([[center], [center]]))
+
+    assert np.sum(acc.counts_hist) == 7
+    assert np.sum(acc.energy_hist) == 8
+    assert np.sum(acc.counts_hist > 0) == 2
+    assert np.sum(acc.layer_offset_hist) == 5
+    assert np.sum(acc.layer_offset_hist > 0) == 2
+    assert np.sum((acc.counts_hist * acc.energy_hist) > 0) == 2
+    assert np.sum(acc.total_events) == 5
+
+    # one more event, in the original incident bin
+    # but with a different z value
+    acc.add([5], [50], np.array([[[0.0, 0.0, 0.5, 1.0]]]))
+
+    assert np.sum(acc.counts_hist) == 8
+    assert np.sum(acc.energy_hist) == 9
+    assert np.sum(acc.counts_hist > 0) == 2  # shift realigns it back over other events
+    assert np.sum(acc.layer_offset_hist) == 6
+    assert np.sum(acc.layer_offset_hist > 0) == 3
+    assert np.sum((acc.counts_hist * acc.energy_hist) > 0) == 2
+    assert np.sum(acc.total_events) == 6
+
+    acc.save(save_name)
+    assert os.path.exists(save_name)
+    acc = stats_accumulator.AlignedStatsAccumulator.load(save_name, "mean")
+
+    assert np.sum(acc.counts_hist) == 8
+    assert np.sum(acc.energy_hist) == 9
+    assert np.sum(acc.counts_hist > 0) == 2
+    assert np.sum(acc.layer_offset_hist) == 6
+    assert np.sum(acc.layer_offset_hist > 0) == 3
+    assert np.sum((acc.counts_hist * acc.energy_hist) > 0) == 2
+    assert np.sum(acc.total_events) == 6
+
+
 def test_save_location(tmpdir):
     config = default.Configs()
     config.logdir = tmpdir.mkdir("test_save_location")

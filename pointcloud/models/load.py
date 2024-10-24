@@ -3,6 +3,7 @@ from pointcloud.models.allCond_epicVAE_nflow_PointDiff import (
 )
 from pointcloud.models.epicVAE_nflows_kDiffusion import epicVAE_nFlow_kDiffusion
 from pointcloud.models.wish import Wish
+from pointcloud.models.fish import Fish
 
 
 def get_model_class(configs):
@@ -12,9 +13,11 @@ def get_model_class(configs):
         m_class = epicVAE_nFlow_kDiffusion
     elif configs.model_name == "wish":
         m_class = Wish
+    elif configs.model_name == "fish":
+        m_class = Fish
     else:
         raise NotImplementedError(
             f"Model {configs.model_name} not implemented, known models: "
-            "AllCond_epicVAE_nFlow_PointDiff, epicVAE_nFlow_kDiffusion, wish"
+            "AllCond_epicVAE_nFlow_PointDiff, epicVAE_nFlow_kDiffusion, wish, fish"
         )
     return m_class

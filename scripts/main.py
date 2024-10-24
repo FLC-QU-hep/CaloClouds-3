@@ -1,5 +1,6 @@
 # in the public repo this is training.py
 # this trains the teacher model
+import os
 import torch
 from torch.nn.utils import clip_grad_norm_
 
@@ -92,7 +93,6 @@ def main(config=Configs()):
             if config.latent_dim > 0:
                 optimizer_flow.zero_grad()
         model.train()
-
 
         loss = None
         loss_flow = None
@@ -211,6 +211,30 @@ def main(config=Configs()):
                     )
         return loss, loss_flow
 
+    def make_checkpoint():
+        opt_states = {}
+        if config.model_name == "flow":
+            opt_states = {
+                "optimizer": optimizer.state_dict(),
+                "scheduler": scheduler.state_dict(),
+            }
+        elif config.model_name in [
+            "AllCond_epicVAE_nFlow_PointDiff",
+            "epicVAE_nFlow_kDiffusion",
+            "wish",
+        ]:
+            opt_states = {
+                "model_ema": model_ema.state_dict(),  # save the EMA model
+                "ema_sched": ema_sched.state_dict(),
+                "optimizer": optimizer.state_dict(),
+                # 'optimizer_flow': optimizer_flow.state_dict(),
+                "scheduler": scheduler.state_dict(),
+                # 'scheduler_flow': scheduler_flow.state_dict(),
+            }
+            if loss_flow is not None:
+                opt_states["loss_flow"] = loss_flow.item()
+        ckpt_mgr.save(model, config, loss, others=opt_states, step=it)
+
     # Main loop
     print("Start training...")
 
@@ -225,34 +249,13 @@ def main(config=Configs()):
             if loss is not None:
                 loss = loss.item()
             if it % config.val_freq == 0 or it == config.max_iters:
-                if config.model_name == "flow":
-                    opt_states = {
-                        "optimizer": optimizer.state_dict(),
-                        "scheduler": scheduler.state_dict(),
-                    }
-                elif config.model_name in [
-                    "AllCond_epicVAE_nFlow_PointDiff",
-                    "epicVAE_nFlow_kDiffusion",
-                    "wish",
-                ]:
-                    opt_states = {
-                        "model_ema": model_ema.state_dict(),  # save the EMA model
-                        "ema_sched": ema_sched.state_dict(),
-                        "optimizer": optimizer.state_dict(),
-                        # 'optimizer_flow': optimizer_flow.state_dict(),
-                        "scheduler": scheduler.state_dict(),
-                        # 'scheduler_flow': scheduler_flow.state_dict(),
-                    }
-                    if loss_flow is not None:
-                        opt_states["loss_flow"] = loss_flow.item()
-                ckpt_mgr.save(model, config, loss, others=opt_states, step=it)
+                make_checkpoint()
             if it >= config.max_iters:
                 stop = True
                 break
-    ckpt_mgr.save(model, config, loss, others=opt_states, step=it)
+    make_checkpoint()
     print("training done in %.2f seconds" % (time.time() - start_time))
 
-#checkt ob es als skript aufgehrufen wurde
+
 if __name__ == "__main__":
     main(Configs())
-    
