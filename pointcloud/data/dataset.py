@@ -176,14 +176,14 @@ class PointCloudDataset(Dataset):
             idxs = slice(idx - self.bs, idx)
         return idxs
 
-    def _fuzz(self, event):
+    def _fuzz_parallel(self, event):
         pos_offset_x = np.random.uniform(0, self.offset, 1)
         pos_offset_y = np.random.uniform(0, self.offset, 1)
         event[:, :, 0] = event[:, :, 0] + pos_offset_x
         event[:, :, 1] = event[:, :, 1] + pos_offset_y
 
     @classmethod
-    def normalize_xyze(cls, event):
+    def normalize_xyze(cls, event, fuzz_perpendicular=False):
         """
         Ensure that the x, y and z go from -1 to 1.
         Also rescale the energy values to by the classes energy_scale.
@@ -194,10 +194,14 @@ class PointCloudDataset(Dataset):
         event : np.ndarray, (..., 4)
             One or more events. The last dimension should be 4
             with coordinates x, y, z, and energy.
+        fuzz_perpendicular : bool, optional
+            If true, the points will be uniformly distirbuted in
+            each layer, rather than respecting the relative location
+            in the perpendicular direction found in the received data.
 
         """
         cls.normalize_parallal(event)
-        cls.normalize_perpendicular(event)
+        cls.normalize_perpendicular(event, fuzz_perpendicular)
         event[..., 3] *= cls.energy_scale
 
     @classmethod
@@ -237,7 +241,7 @@ class PointCloudDataset(Dataset):
     normalised_bounds = np.linspace(-1, 1, len(metadata.layer_bottom_pos_hdf5) + 1)
 
     @classmethod
-    def normalize_perpendicular(cls, event):
+    def normalize_perpendicular(cls, event, and_fuzz):
         """
         Normalise in the direction perpendicular to the layers.
         Map the relevant coordinate to a linspace from -1 to 1.
@@ -250,6 +254,10 @@ class PointCloudDataset(Dataset):
         event : np.ndarray, (..., 4)
             One or more events. The last dimension should be 4
             with coordinates x, y, z, and energy.
+        and_fuzz : bool, optional
+            If true, the points will be uniformly distirbuted in
+            each layer, rather than respecting the relative location
+            in the perpendicular direction found in the received data.
 
         Raises
         ------
@@ -257,10 +265,10 @@ class PointCloudDataset(Dataset):
             If some points are outside the layers.
 
         """
-        return cls._normalize_perpendicular(event, perpendicular_axis=2)
+        return cls._normalize_perpendicular(event, and_fuzz, perpendicular_axis=2)
 
     @classmethod
-    def _normalize_perpendicular(cls, event, perpendicular_axis=2):
+    def _normalize_perpendicular(cls, event, and_fuzz, perpendicular_axis=2):
         """
         Normalise in the direction perpendicular to the layers.
         Map the relevant coordinate to a linspace from -1 to 1.
@@ -273,6 +281,11 @@ class PointCloudDataset(Dataset):
         event : np.ndarray, (..., 4)
             One or more events. The last dimension should be 4
             with coordinates x, y, z, and energy.
+        and_fuzz : bool, optional
+            If true, the points will be uniformly distirbuted in
+            each layer, rather than respecting the relative location
+            in the perpendicular direction found in the received data.
+
 
         Raises
         ------
@@ -305,12 +318,17 @@ class PointCloudDataset(Dataset):
             )
             new_floor = cls.normalised_bounds[i]
             new_ceiling = cls.normalised_bounds[i + 1]
-            event[..., perpendicular_axis][mask] = np.clip(
-                ((event[..., perpendicular_axis][mask] - layer_floors[i]) * rescales[i])
-                + new_floor,
-                new_floor,
-                new_ceiling,
-            )
+            if and_fuzz:
+                event[..., perpendicular_axis][mask] = np.random.uniform(
+                    new_floor, new_ceiling, mask.sum()
+                )
+            else:
+                event[..., perpendicular_axis][mask] = np.clip(
+                    ((event[..., perpendicular_axis][mask] - floor) * rescales[i])
+                    + new_floor,
+                    new_floor,
+                    new_ceiling,
+                )
             done[mask] = True
         if not np.all(done):
             msg = "Some points appear to be outside all layers"
@@ -342,9 +360,10 @@ class PointCloudDataset(Dataset):
             event = event[:, :trim_len]
 
         if not self.quantized_pos:
-            self._fuzz(event)
+            self._fuzz_parallel(event)
 
-        self.normalize_xyze(event)
+        self.normalize_xyze(event, fuzz_perpendicular=(not self.quantized_pos))
+
         return event
 
     def __getitem__(self, idx):
@@ -409,7 +428,7 @@ class PointCloudDatasetGH(PointCloudDataset):
         # avoid repeat calculation
         self._len = len(self.index_list)
 
-    def _fuzz(self, event):
+    def _fuzz_parallel(self, event):
         raise NotImplementedError("Why are you fuzzing the GH dataset?")
 
 
