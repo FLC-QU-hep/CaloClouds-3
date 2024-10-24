@@ -1,5 +1,5 @@
 # GitLab Continuous Integration configuration for the repository.
-image: gitlab.desy.de:5555/ftx-sft/generative/point-cloud-diffusion-docker/unittesting:latest
+image: gitlab.desy.de:5555/ftx-sft/generative/point-cloud-diffusion-docker:latest
 # image: gitlab.desy.de:5555/fh-sustainability-forum/sustainable-coding-tutorial/tutorial-containers/unittesting
 
 
@@ -23,10 +23,10 @@ pytest:
   script:
     - echo "add the install file to the path"
     - PATH=/home/apprunner/.local/bin:$PATH
-    - echo "Installing requirments"
-    - pip install setuptools==69.0.3
-    - pip install -r requirements_fixed.txt
-    - pip install pytest pytest-mock coverage
+      #    - echo "Installing requirments"
+      #    - pip install setuptools==69.0.3
+      #    - pip install -r requirements_fixed.txt
+      #    - pip install pytest pytest-mock coverage
     - echo "Running pytests"
     - coverage run -m pytest test/test*py test/externals/test*py
     - coverage xml -i
