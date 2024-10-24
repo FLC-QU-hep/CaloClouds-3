@@ -1,5 +1,5 @@
 # GitLab Continuous Integration configuration for the repository.
-image: gitlab.desy.de:5555/ftx-sft/generative/point-cloud-diffusion-docker/unittesting
+image: gitlab.desy.de:5555/ftx-sft/generative/point-cloud-diffusion-docker/unittesting:latest
 # image: gitlab.desy.de:5555/fh-sustainability-forum/sustainable-coding-tutorial/tutorial-containers/unittesting
 
 
