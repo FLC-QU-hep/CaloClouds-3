@@ -29,8 +29,8 @@ pytest:
     - pip install pytest pytest-mock coverage
     - echo "Running pytests"
     - coverage run -m pytest test/test*py test/externals/test*py
-    - coverage xml
-    - coverage report
+    - coverage xml -i
+    - coverage report -i
   coverage: '/TOTAL.*\s+(\d+%)$/'
   artifacts:
     reports:
