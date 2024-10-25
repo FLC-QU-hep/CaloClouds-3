@@ -6,6 +6,8 @@ from .metadata import Metadata
 
 from ..configs import Configs
 
+from .showerflow_utils import truescale_showerflow_output
+
 
 def get_cog(x, y, z, e):
     """
@@ -383,6 +385,7 @@ def gen_wish_inner_batch(cond_batch, destination_array, first_index, model):
     """
     Generate a batch of showers using the Wish model
     according to the given incident energies.
+    Also works on fish.
 
     Parameters
     ----------
@@ -400,26 +403,6 @@ def gen_wish_inner_batch(cond_batch, destination_array, first_index, model):
     max_points = destination_array.shape[1]
     last_index = first_index + cond_batch.size(0)
     destination_array[first_index:last_index] = model.sample(cond_batch, max_points)
-
-
-def truescale_showerflow_output(samples, config):
-    bs = samples.shape[0]
-    metadata = Metadata(config)
-    # name samples
-    num_clusters = np.clip(
-        (samples[:, 0] * metadata.n_pts_rescale).reshape(bs, 1), 1, config.max_points
-    )
-    gev_to_mev = 1000
-    energies = (samples[:, 1] * metadata.vis_eng_rescale * gev_to_mev).reshape(bs, 1)
-    # in MeV  (clip to a minimum energy of 40 MeV)
-    energies = np.clip(energies, 40, None)
-    cog_x = (samples[:, 2] * metadata.std_cog[0]) + metadata.mean_cog[0]
-    cog_y = (samples[:, 3] * metadata.std_cog[1]) + metadata.mean_cog[1]
-    # cog_z = (samples[:, 4] * metadata.std_cog[2]) + metadata.mean_cog[2]
-
-    clusters_per_layer_gen = np.clip(samples[:, 5:35], 0, 1)  # B,30
-    e_per_layer_gen = np.clip(samples[:, 35:], 0, 1)  # B,30
-    return num_clusters, energies, cog_x, cog_y, clusters_per_layer_gen, e_per_layer_gen
 
 
 def gen_v1_inner_batch(
@@ -496,6 +479,7 @@ def gen_v1_inner_batch(
         energies,
         cog_x,
         cog_y,
+        _,
         clusters_per_layer_gen,
         e_per_layer_gen,
     ) = truescale_showerflow_output(samples, config)

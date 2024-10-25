@@ -2,7 +2,6 @@
 #
 # utilty functions for scripts/Showerflow.py
 
-import pandas as pd
 import torch
 import numpy as np
 import os
@@ -11,116 +10,6 @@ from pointcloud.utils.metadata import Metadata
 from pointcloud.data.read_write import get_n_events, read_raw_regaxes
 from pointcloud.utils.detector_map import floors_ceilings
 from pointcloud.utils.gen_utils import get_cog as cog_from_kinematics
-from pointcloud.models.shower_flow import versions_dict
-
-
-def get_data_dir(configs):
-    data_dir = os.path.join(configs.storage_base, "dayhallh/point-cloud-diffusion-data")
-    if not os.path.exists(data_dir):
-        data_dir = os.path.join(configs.storage_base, "point-cloud-diffusion-data")
-    if not os.path.exists(data_dir):
-        data_dir = "/home/dayhallh/Data/"
-    return data_dir
-
-
-def get_showerflow_dir(configs):
-    dataset_path = configs.dataset_path
-    base_path = get_data_dir(configs)
-    dataset_name_key = ".".join(os.path.basename(dataset_path).split(".")[:-1])
-    if "{" in dataset_name_key:
-        dataset_name_key = dataset_name_key.split("{")[0]
-    if "seed" in dataset_name_key:
-        dataset_name_key = dataset_name_key.split("seed")[0]
-    if "file" in dataset_name_key:
-        dataset_name_key = dataset_name_key.split("file")[0]
-    dataset_name_key = dataset_name_key.strip("_")
-
-    showerflow_dir = os.path.join(base_path, "showerFlow", dataset_name_key)
-    return showerflow_dir
-
-
-def model_save_paths(configs, version, num_blocks, cut_inputs):
-    showerflow_dir = get_showerflow_dir(configs)
-    max_input_dims = 65
-    inputs_used = np.ones(max_input_dims, dtype=bool)
-    for i in range(5):
-        if str(i) in cut_inputs:
-            inputs_used[i] = False
-    inputs_used_as_binary = "".join(["1" if i else "0" for i in inputs_used])
-    inputs_used_as_base10 = int(inputs_used_as_binary, 2)
-    name_base = f"ShowerFlow_{version}_nb{num_blocks}_inputs{inputs_used_as_base10}"
-    best_model_path = os.path.join(showerflow_dir, f"{name_base}_best.pth")
-    best_data_path = os.path.join(showerflow_dir, f"{name_base}_best_data.txt")
-
-    nice_name = f"{version}_nb{num_blocks}"
-    if cut_inputs:
-        nice_name += f"_wo{cut_inputs}"
-
-    return nice_name, best_model_path, best_data_path
-
-
-def get_cond_mask(configs):
-    max_cond_inputs = 4
-    inputs_used = np.zeros(max_cond_inputs, dtype=bool)
-    if "energy" in configs.shower_flow_cond_features:
-        inputs_used[0] = True
-    if "p_norm_local" in configs.shower_flow_cond_features:
-        inputs_used[1:] = True
-    return inputs_used
-
-
-def get_input_mask(configs):
-    max_input_dims = 65
-    inputs_used = np.zeros(max_input_dims, dtype=bool)
-    if "total_clusters" in configs.shower_flow_inputs:
-        inputs_used[0] = True
-    if "total_energy" in configs.shower_flow_inputs:
-        inputs_used[1] = True
-    for c in "xyz":
-        if f"cog_{c}" in configs.shower_flow_inputs:
-            inputs_used[2 + "xyz".index(c)] = True
-    if "clusters_per_layer" in configs.shower_flow_inputs:
-        inputs_used[5:35] = True
-    if "energy_per_layer" in configs.shower_flow_inputs:
-        inputs_used[35:] = True
-    return inputs_used
-
-
-def existing_models(configs):
-    versions = []
-    names = []
-    num_blocks = []
-    cut_inputs = []
-    best_loss = []
-    paths = []
-    for version in versions_dict:
-        for nb in range(1, 100):
-            for ci in ["", "01", "01234"]:
-                name, model_path, data_path = model_save_paths(configs, version, nb, ci)
-                if not os.path.exists(model_path):
-                    # print(f"Skipping {name}")
-                    continue
-                paths.append(model_path)
-                names.append(name)
-                versions.append(version)
-                num_blocks.append(nb)
-                cut_inputs.append(ci)
-                with open(data_path, "r") as f:
-                    text = f.read().split()
-                    best_loss.append(float(text[0]))
-                if nb == 4:
-                    print(f"{name} has best loss {best_loss[-1]}")
-    print(f"Found {len(names)} saved models")
-
-    saved_models = {
-        "names": names,
-        "version": versions,
-        "num_blocks": num_blocks,
-        "cut_inputs": cut_inputs,
-        "best_loss": best_loss,
-        "path": paths,
-    }
-    return saved_models
 
 
 def get_incident_npts_visible(
@@ -186,8 +75,8 @@ def get_incident_npts_visible(
 
 def get_gun_direction(configs, showerflow_dir, redo=False, local_batch_size=10_000):
     """
-    Save and return the unti vector for the gun direction for all showers in the dataset.
-    If found on disk, will just return.
+    Save and return the unti vector for the gun direction
+    for all showers in the dataset. If found on disk, will just return.
 
     Parameters
     ----------
@@ -453,6 +342,18 @@ def train_ds_function_factory(
     meta = Metadata(configs)
     device = configs.device
 
+    if getattr(configs, "shower_flow_fixed_input_norms", False):
+        clusters_per_layer_key = "clusters_per_layer"
+        energy_per_layer_key = "energy_per_layer"
+        n_layers = len(meta.layer_bottom_pos_hdf5)
+        clusters_per_layer_norm = n_layers / meta.n_pts_rescale
+        energy_per_layer_norm = n_layers / meta.vis_eng_rescale
+    else:
+        clusters_per_layer_key = "rescaled_clusters_per_layer"
+        energy_per_layer_key = "rescaled_energy_per_layer"
+        clusters_per_layer_norm = 1.0
+        energy_per_layer_norm = 1.0
+
     def make_train_ds(start_idx, end_idx):
         my_slice = slice(start_idx, end_idx)
         # mem-map the files to avoid loading all data
@@ -502,15 +403,17 @@ def train_ds_function_factory(
 
         if "clusters_per_layer" in configs.shower_flow_inputs:
             clusters = np.load(clusters_per_layer_path, mmap_mode="r")
-            clusters_per_layer = torch.tensor(
-                clusters["rescaled_clusters_per_layer"][my_slice]
-            ).to(device)
+            clusters_per_layer = (
+                torch.tensor(clusters[clusters_per_layer_key][my_slice]).to(device)
+                * clusters_per_layer_norm
+            )
             output.append(clusters_per_layer)
         if "energy_per_layer" in configs.shower_flow_inputs:
             energies = np.load(energy_per_layer_path, mmap_mode="r")
-            e_per_layer = torch.tensor(
-                energies["rescaled_energy_per_layer"][my_slice]
-            ).to(device)
+            e_per_layer = (
+                torch.tensor(energies[energy_per_layer_key][my_slice]).to(device)
+                * energy_per_layer_norm
+            )
             output.append(e_per_layer)
 
         for values in output:

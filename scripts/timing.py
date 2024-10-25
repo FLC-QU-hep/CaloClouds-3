@@ -88,10 +88,6 @@ def main(cfg, min_e, max_e, num, bs, iterations):
         map_location=torch.device(cfg.device),
     )  # trained about 350 epochs
 
-    # flow, distribution = compile_HybridTanH_model_s(num_blocks=8,
-    #                                         num_inputs=65,
-    #                                         num_cond_inputs=1, device=cfg.device,
-    #                                         input_dim_multiplier=10)
     # checkpoint = torch.load('/beegfs/desy/user/akorol/logs/220714_cog_e_layer_ShowerFlow_best.pth', map_location=torch.device(cfg.device))   # trained about 350 epochs
 
     flow.load_state_dict(checkpoint["model"])

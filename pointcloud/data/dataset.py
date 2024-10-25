@@ -445,7 +445,11 @@ class PointCloudAngular(PointCloudDataset):
 
 
 class CaloChallangeDataset(Dataset):
-    def __init__(self, file_path, cfg, bs=32, max_ds_seq_len=22000):
+    Ymin, Ymax = -17, 17
+    Xmin, Xmax = -17, 17
+    Zmin, Zmax = 0, 44
+
+    def __init__(self, file_path, cfg, bs=32):
         dataset = h5py.File(file_path, "r")
 
         # Get the indices and shuffle them
@@ -463,16 +467,31 @@ class CaloChallangeDataset(Dataset):
             "events": dataset["events"][idx],
             "energy": dataset["energy"][idx],
         }
-        self.Ymin, self.Ymax = -17, 17
-        self.Xmin, self.Xmax = -17, 17
-        self.Zmin, self.Zmax = 0, 44
         self.bs = bs
-        self.max_ds_seq_len = max_ds_seq_len
         self.cfg = cfg
 
     def get_n_points(self, data, axis=-1):
         n_points_arr = (data[..., axis] != 0.0).sum(1)
         return n_points_arr
+
+    @classmethod
+    def normalize_xyze(cls, event):
+        event[..., 0] = (event[..., 0] - cls.Xmin) * 2 / (
+            cls.Xmax - cls.Xmin
+        ) - 1  # x coordinate normalization
+        event[..., 1] = (event[..., 1] - cls.Ymin) * 2 / (
+            cls.Ymax - cls.Ymin
+        ) - 1  # y coordinate normalization
+        event[..., 2] = (event[..., 2] - cls.Zmin) * 2 / (
+            cls.Zmax - cls.Zmin
+        ) - 1  # z coordinate normalization
+
+        # event[:, 3, :] = event[:, 3, :] # energy scale
+        event[..., 3] = event[..., 3] / 1000  # energy scale
+        # event[:, 3, :] = event[:, 3, :] / energy # energy scale E_depos/E_insident
+
+        # ensure padding xyz is 0
+        event[event[..., 3] == 0] = 0
 
     def __getitem__(self, idx):
         if idx > self.bs and idx < self.__len__() - self.bs:
@@ -489,28 +508,12 @@ class CaloChallangeDataset(Dataset):
             event = self.dataset["events"][idx - self.bs : idx].copy()
             energy = self.dataset["energy"][idx - self.bs : idx].copy()
 
-        # event[:, 3, :] = event[:, 3, :] # energy scale
-        event[:, 3, :] = event[:, 3, :] / 1000  # energy scale
-        # event[:, 3, :] = event[:, 3, :] / energy # energy scale E_depos/E_insident
-
         max_len = (event[:, -1, :] > 0).sum(axis=1).max()
         event = event[:, :, :max_len]
 
-        event[:, 0, :] = (event[:, 0, :] - self.Xmin) * 2 / (
-            self.Xmax - self.Xmin
-        ) - 1  # x coordinate normalization
-        event[:, 1, :] = (event[:, 1, :] - self.Ymin) * 2 / (
-            self.Ymax - self.Ymin
-        ) - 1  # y coordinate normalization
-        event[:, 2, :] = (event[:, 2, :] - self.Zmin) * 2 / (
-            self.Zmax - self.Zmin
-        ) - 1  # z coordinate normalization
-
         event = event[:, [0, 1, 2, 3]]
-
         event = np.moveaxis(event, -1, -2)
-
-        event[event[:, :, -1] == 0] = 0
+        self.normalize_xyze(event)
 
         # nPoints
         points = self.get_n_points(event, axis=-1).reshape(-1, 1)
