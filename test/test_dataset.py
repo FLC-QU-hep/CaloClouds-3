@@ -27,12 +27,14 @@ def make_test_batch(key, dataset_class, trim=False):
         points = np.concatenate([TestData.points0, TestData.points1])
     else:
         raise ValueError("Invalid key")
-    read_write.events_to_local(normed_copy, dataset_class.metadata.orientation)
+    not_challange = hasattr(dataset_class, "metadata")
+    if not_challange:
+        read_write.events_to_local(normed_copy, dataset_class.metadata.orientation)
     dataset_class.normalize_xyze(normed_copy)
     if trim:
         normed_copy = normed_copy[:, :trim]
         points = np.minimum(points, trim)
-    if len(energy.shape) == 1:
+    if len(energy.shape) == 1 and not_challange:
         energy = energy[:, np.newaxis]
     if len(points.shape) == 1:
         points = points[:, np.newaxis]
@@ -92,22 +94,29 @@ class TestData:
         events1[i, :n_points] = events_data1[i]
 
     @classmethod
-    def write_0(cls, filename):
+    def write_0(cls, filename, rolled_axis=False):
+        events = cls.events0
+        if rolled_axis:
+            events = np.moveaxis(events, -1, -2)
         with h5py.File(filename, "w") as f:
             f.create_dataset("energy", data=cls.energy0)
             f.create_dataset("n_points", data=cls.points0)
-            f.create_dataset("events", data=cls.events0)
+            f.create_dataset("events", data=events)
 
     @classmethod
-    def write_1(cls, filename):
+    def write_1(cls, filename, rolled_axis=False):
+        events = cls.events1
+        if rolled_axis:
+            events = np.moveaxis(events, -1, -2)
         with h5py.File(filename, "w") as f:
             # don't write n_points, make the dataset calculate it
             f.create_dataset("energy", data=cls.energy1)
-            f.create_dataset("events", data=cls.events1)
+            f.create_dataset("events", data=events)
 
 
 class AbsDatasetTest:
     paths = {}
+    rolled_axis = False
 
     # as this deals in the global filesystem, we may as well have a
     # classmethod to create directories
@@ -131,16 +140,16 @@ class AbsDatasetTest:
 
         folder0 = cls.mkdir("just0")
         cls.paths["data0"] = os.path.join(folder0, "data_0.h5")
-        TestData.write_0(cls.paths["data0"])
+        TestData.write_0(cls.paths["data0"], cls.rolled_axis)
 
         folder1 = cls.mkdir("just1")
         cls.paths["data1"] = os.path.join(folder1, "data_1.h5")
-        TestData.write_1(cls.paths["data1"])
+        TestData.write_1(cls.paths["data1"], cls.rolled_axis)
 
         folder01 = cls.mkdir("both")
         cls.paths["data01"] = os.path.join(folder01, "data_{}.h5")
-        TestData.write_0(cls.paths["data01"].format(0))
-        TestData.write_1(cls.paths["data01"].format(1))
+        TestData.write_0(cls.paths["data01"].format(0), cls.rolled_axis)
+        TestData.write_1(cls.paths["data01"].format(1), cls.rolled_axis)
 
     @classmethod
     def teardown_class(cls):
@@ -316,6 +325,33 @@ class TestPointCloudDataset(AbsDatasetTest):
             last_event[:, 3] / dataset.PointCloudDataset.energy_scale, np.arange(10) + 1
         )
 
+    def test_out_of_layers(self):
+        original_layers = dataset.PointCloudDataset.metadata.layer_bottom_pos_hdf5
+        original_thickness = dataset.PointCloudDataset.metadata.cell_thickness_hdf5
+
+        xmin = dataset.PointCloudDataset.metadata.Xmin_global
+        xmax = dataset.PointCloudDataset.metadata.Xmax_global
+        ymin = dataset.PointCloudDataset.metadata.Zmin_global
+        ymax = dataset.PointCloudDataset.metadata.Zmax_global
+        # make data
+        fake_event = np.vstack(
+            (
+                np.linspace(xmin, xmax, 10),
+                np.linspace(ymin, ymax, 10),
+                np.full(10, original_layers[-1] + original_thickness * 10),
+                np.arange(10) + 1,
+            )
+        ).T
+        fake_event = np.tile(fake_event, (2, 1, 1))
+
+        # should raise ValueError
+        try:
+            dataset.PointCloudDataset.normalize_xyze(fake_event)
+        except ValueError:
+            pass
+        else:
+            raise AssertionError("Should have raised ValueError")
+
 
 class TestPointCloudDatasetUnordered(AbsDatasetTest):
     ds_class = dataset.PointCloudDatasetUnordered
@@ -350,6 +386,137 @@ class TestPointCloudDatasetUnordered(AbsDatasetTest):
         batch = ds01[0]
         test_batch = make_test_batch("01", self.ds_class)
         compare_batches(batch, test_batch)
+
+
+class TestCaloChallangeDataset(AbsDatasetTest):
+    ds_class = dataset.CaloChallangeDataset
+    rolled_axis = True
+
+    def test_init(self):
+        cfg = config_creator.make("configs_calotransf")
+        cfg.percentage = 1.0
+
+        # For data0
+        ds0 = self.ds_class(self.paths["data0"], cfg, bs=10)
+        assert ds0.bs == 10
+        assert len(ds0) == 1
+
+        # For data1
+        ds1 = self.ds_class(self.paths["data1"], cfg, bs=10)
+        # remober it is sorted
+        assert ds1.bs == 10
+        assert len(ds1) == 3
+        cfg.percentage = 1 / 3
+        ds1 = self.ds_class(self.paths["data1"], cfg, bs=10)
+        assert len(ds1) == 1
+
+        assert ds1.Ymin == -17
+        assert ds1.Ymax == 17
+        assert ds1.Xmin == -17
+        assert ds1.Xmax == 17
+        assert ds1.Zmin == 0
+        assert ds1.Zmax == 44
+
+    def test_getitem(self):
+        cfg = config_creator.make("configs_calotransf")
+        cfg.percentage = 1.0
+        cfg.norm_cond = False
+        # For data0
+        ds0 = self.ds_class(self.paths["data0"], cfg, bs=10)
+        batch = ds0[0]
+        test_batch = make_test_batch("0", self.ds_class)
+        compare_batches(batch, test_batch)
+
+        # For data1
+        ds1 = self.ds_class(self.paths["data1"], cfg, bs=10)
+        batch = ds1[0]
+        test_batch = make_test_batch("1", self.ds_class)
+        compare_batches(batch, test_batch)
+
+    def test_get_n_points(self):
+        found = dataset.PointCloudDataset.get_n_points(TestData.events0)
+        npt.assert_array_equal(found, TestData.points0)
+        found = dataset.PointCloudDataset.get_n_points(TestData.events1)
+        npt.assert_array_equal(found, TestData.points1)
+
+    def test_normalize_xyze(self):
+        xmin = dataset.PointCloudDataset.metadata.Xmin_global
+        xmax = dataset.PointCloudDataset.metadata.Xmax_global
+        ymin = dataset.PointCloudDataset.metadata.Zmin_global
+        ymax = dataset.PointCloudDataset.metadata.Zmax_global
+        zmin = dataset.PointCloudDataset.metadata.layer_bottom_pos_hdf5[0]
+        zmax = (
+            dataset.PointCloudDataset.metadata.layer_bottom_pos_hdf5[-1]
+            + dataset.PointCloudDataset.metadata.cell_thickness_hdf5
+        )
+        # make data
+        fake_event = np.vstack(
+            (
+                np.linspace(xmin, xmax, 10),
+                np.linspace(ymin, ymax, 10),
+                np.linspace(zmin, zmax, 10),
+                np.arange(10) + 1,
+            )
+        ).T
+        fake_events = np.tile(fake_event, (2, 1, 1))
+
+        # for a single event
+        dataset.PointCloudDataset.normalize_xyze(fake_event)
+        npt.assert_allclose(
+            fake_event[:, 0], np.linspace(-1, 1, 10), atol=1e-3, rtol=1e-3
+        )
+        npt.assert_allclose(
+            fake_event[:, 1], np.linspace(-1, 1, 10), atol=1e-3, rtol=1e-3
+        )
+        npt.assert_allclose(
+            fake_event[:, 2], np.linspace(-1, 1, 10), atol=1e-3, rtol=1e-3
+        )
+        npt.assert_allclose(
+            fake_event[:, 3] / dataset.PointCloudDataset.energy_scale, np.arange(10) + 1
+        )
+
+        # for a batch of events
+        dataset.PointCloudDataset.normalize_xyze(fake_events)
+        last_event = fake_events[-1]
+        npt.assert_allclose(
+            last_event[:, 0], np.linspace(-1, 1, 10), atol=1e-3, rtol=1e-3
+        )
+        npt.assert_allclose(
+            last_event[:, 1], np.linspace(-1, 1, 10), atol=1e-3, rtol=1e-3
+        )
+        npt.assert_allclose(
+            last_event[:, 2], np.linspace(-1, 1, 10), atol=1e-3, rtol=1e-3
+        )
+        npt.assert_allclose(
+            last_event[:, 3] / dataset.PointCloudDataset.energy_scale, np.arange(10) + 1
+        )
+
+    def test_out_of_layers(self):
+        original_layers = dataset.PointCloudDataset.metadata.layer_bottom_pos_hdf5
+        original_thickness = dataset.PointCloudDataset.metadata.cell_thickness_hdf5
+
+        xmin = dataset.PointCloudDataset.metadata.Xmin_global
+        xmax = dataset.PointCloudDataset.metadata.Xmax_global
+        ymin = dataset.PointCloudDataset.metadata.Zmin_global
+        ymax = dataset.PointCloudDataset.metadata.Zmax_global
+        # make data
+        fake_event = np.vstack(
+            (
+                np.linspace(xmin, xmax, 10),
+                np.linspace(ymin, ymax, 10),
+                np.full(10, original_layers[-1] + original_thickness * 10),
+                np.arange(10) + 1,
+            )
+        ).T
+        fake_event = np.tile(fake_event, (2, 1, 1))
+
+        # should raise ValueError
+        try:
+            dataset.PointCloudDataset.normalize_xyze(fake_event)
+        except ValueError:
+            pass
+        else:
+            raise AssertionError("Should have raised ValueError")
 
 
 def test_dataset_class_from_config():

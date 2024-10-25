@@ -3,9 +3,12 @@ Check how long it takes to draw from variations of shower flow
 """
 
 import matplotlib.pyplot as plt
-from pointcloud.models.shower_flow import HybridTanH_factory
+from pointcloud.models.shower_flow import HybridTanH_factory, versions_dict
 from pointcloud.configs import Configs
-#from pointcloud.config_varients.wish import Configs
+from pointcloud.utils import showerflow_utils
+
+# from pointcloud.config_varients.wish import Configs
+# from pointcloud.config_varients.caloclouds_3 import Configs
 import time
 import numpy as np
 import torch
@@ -16,19 +19,19 @@ DEFAULT_NUM_COND = 1
 DEFAULT_COUNT_BINS = 8
 
 
-def time_pattern(factory, pattern, count_bins, incident_energies, pattern_repeats):
+def time_pattern(factory, pattern, count_bins, cond, pattern_repeats):
     """
     Generate a flow dist, and time how long it takes to draw from it.
     """
     sample_size = torch.Size([10000])
-    times = np.zeros((len(pattern_repeats), len(incident_energies)))
+    times = np.zeros((len(pattern_repeats), len(cond)))
     first = True
     for q in range(10):
         print(f"{q/10:.0%}", end="\r")
         for r, repeats in reversed(list(enumerate(pattern_repeats))):
-        #for r, repeats in enumerate(pattern_repeats):
-            _, flow_dist, _ = factory.create(repeats, pattern, count_bins=count_bins)
-            for i, incident_energy in enumerate(incident_energies):
+            # for r, repeats in enumerate(pattern_repeats):
+            _, flow_dist = factory.create(repeats, pattern, count_bins=count_bins)
+            for i, incident_energy in enumerate(cond):
                 dist = flow_dist.condition(incident_energy)
                 t0 = time.time()
                 dist.sample(sample_size)
@@ -42,21 +45,22 @@ def time_pattern(factory, pattern, count_bins, incident_energies, pattern_repeat
     return times
 
 
-def time_saved(models, incident_energies):
+def time_saved(models, cond):
     """
     Given a flow dist, time how long it takes to draw from it.
     """
     sample_size = torch.Size([10000])
-    times = np.zeros((len(models), len(incident_energies)))
+    times = np.zeros((len(models["names"]), len(cond)))
     repeats = 10
     ticks = repeats * len(models)
-    for r, model_params in enumerate(models):
-        flow_dist = model_loader(*model_params)
-        big_tick = r*repeats
+    for r, name in enumerate(models["names"]):
+        configs = showerflow_utils.construct_configs(Configs(), models, r)
+        flow_dist = model_loader(configs, models["paths"][r])
+        big_tick = r * repeats
         first = True
         for q in range(repeats):
             print(f"{(big_tick + q)/ticks:.0%}", end="\r")
-            for i, incident_energy in enumerate(incident_energies):
+            for i, incident_energy in enumerate(cond):
                 dist = flow_dist.condition(incident_energy)
                 t0 = time.time()
                 dist.sample(sample_size)
@@ -64,7 +68,7 @@ def time_saved(models, incident_energies):
                 if not first:  # Ignore first run
                     times[r, i] += t1 - t0
             first = False
-    times /= (repeats - 1)
+    times /= repeats - 1
     print()
     return times
 
@@ -80,91 +84,63 @@ patterns = {
 }
 pattern_repeats = np.arange(1, 11) * 10
 configs = Configs()
+n_cond_inputs = 4
+configs.logdir = "/gpfs/dust/maxwell/user/dayhallh/point-cloud-diffusion-logs/"
+configs.dataset_path = (
+    "/beegfs/desy/user/akorol/data/AngularShowers_RegularDetector/"
+    "hdf5_for_CC/sim-E1261AT600AP180-180_file_{}slcio.hdf5"
+)
 
 try:
     configs.device = "cuda"
-    incident_energies = torch.linspace(0.1, 1.0, 5)[:, None].to(configs.device)
+    cond = torch.linspace(0.1, 1.0, 5)[:, None].to(configs.device)
+
 except Exception as e:
     configs.device = "cpu"
-    incident_energies = torch.linspace(0.1, 1.0, 5)[:, None].to(configs.device)
+    cond = torch.linspace(0.1, 1.0, 5)[:, None].to(configs.device)
 
-#dataset_basename = "p22_th90_ph90_en10-100"
+if n_cond_inputs > 1:
+    cond = torch.tile(cond, (1, n_cond_inputs))
+
+# dataset_basename = "p22_th90_ph90_en10-100"
 dataset_basename = "sim-E1261AT600AP180-180"
-save_path = os.path.join(configs.logdir, dataset_basename, f"time_shower_flow_{configs.device}_disk.npz")
-
-
-def saved_name(version, num_blocks, cut_inputs):
-    max_input_dims = 65
-    inputs_used = np.ones(max_input_dims, dtype=bool)
-    for i in range(5):
-        if str(i) in cut_inputs:
-            inputs_used[i] = False
-    inputs_used_as_binary = ''.join(['1' if i else '0' for i in inputs_used])
-    inputs_used_as_base10 = int(inputs_used_as_binary, 2)
-    name_base = f"ShowerFlow_{version}_nb{num_blocks}_inputs{inputs_used_as_base10}"
-    data_dir = os.path.join(configs.storage_base, "dayhallh/point-cloud-diffusion-data")
-    # data_dir = "/home/dayhallh/Data/"
-    showerflow_dir = os.path.join(data_dir, f"showerFlow/{dataset_basename}")
-    best_model_path = os.path.join(showerflow_dir, f"{name_base}_best.pth")
-    best_data_path = os.path.join(showerflow_dir, f"{name_base}_best_data.txt")
-
-    nice_name = f"{version}_nb{num_blocks}"
-    if cut_inputs:
-        nice_name += f"_wo{cut_inputs}"
-
-    return nice_name, best_model_path, best_data_path
-
-from pointcloud.models.shower_flow import (
-    compile_HybridTanH_model,
-    compile_HybridTanH_alt1,
-    compile_HybridTanH_alt2,
+save_path = os.path.join(
+    configs.logdir, dataset_basename, f"time_shower_flow_{configs.device}_disk.npz"
 )
 
 
-versions_dict = {
-    "original": compile_HybridTanH_model,
-    "alt1": compile_HybridTanH_alt1,
-    "alt2": compile_HybridTanH_alt2,
-}
+def model_loader(configs, model_path):
+    shower_flow_compiler = versions_dict[configs.shower_flow_version]
 
+    cond_used = showerflow_utils.get_cond_mask(configs)
+    cond_dim = np.sum(cond_used)
+    inputs_used = showerflow_utils.get_input_mask(configs)
+    input_dim = np.sum(inputs_used)
 
-def model_loader(version_name, num_blocks, cut_inputs):
-    model, distribution = versions_dict[version_name](
-        num_blocks=num_blocks,
-        num_inputs=65 - len(cut_inputs),
-        num_cond_inputs=1,
-        device=configs.device,
-    )
-    model_path = saved_name(version_name, num_blocks, cut_inputs)[1]
+    # use cuda if avaliable
+    if torch.cuda.is_available():
+        configs.device = "cuda"
+    else:
+        configs.device = "cpu"
+    device = torch.device(configs.device)
+
+    model, distribution = shower_flow_compiler(
+        num_blocks=configs.shower_flow_num_blocks,
+        num_inputs=input_dim,
+        num_cond_inputs=cond_dim,
+        device=device,
+    )  # num_cond_inputs
     model.load_state_dict(torch.load(model_path)["model"])
     return distribution
 
 
 def get_saved_models(configs):
-    versions = []
-    names = []
-    num_blocks = []
-    cut_inputs = []
-    best_loss = []
-    for version in versions_dict:
-        for nb in range(1, 100):
-            for ci in ["", "01", "01234"]:
-                name, model_path, data_path = saved_name(version, nb, ci)
-                if not os.path.exists(model_path):
-                    #print(f"Skipping {name}")
-                    continue
-                names.append(name)
-                versions.append(version)
-                num_blocks.append(nb)
-                cut_inputs.append(ci)
-                with open(data_path, "r") as f:
-                    text = f.read().split()
-                    best_loss.append(float(text[0]))
-                if nb == 4:
-                    print(f"{name} has best loss {best_loss[-1]}")
-    print(f"Found {len(names)} saved models")
-
-    saved_models = {"names": names, "version": versions, "num_blocks": num_blocks, "cut_inputs": cut_inputs, "best_loss": best_loss}
+    configs.shower_flow_fixed_input_norms = True
+    saved_models = showerflow_utils.existing_models(configs)
+    configs.shower_flow_fixed_input_norms = False
+    other_models = showerflow_utils.existing_models(configs)
+    for k in other_models:
+        saved_models[k].extend(other_models[k])
     return saved_models
 
 
@@ -172,7 +148,7 @@ def time_all():
     to_save = {}
 
     to_save["pattern_repeats"] = pattern_repeats
-    to_save["incident_energies"] = incident_energies.cpu().numpy()
+    to_save["cond"] = cond.cpu().numpy()
     factory = HybridTanH_factory(DEFAULT_NUM_INPUTS, DEFAULT_NUM_COND, configs.device)
 
     for pattern in patterns:
@@ -181,7 +157,7 @@ def time_all():
             factory,
             patterns[pattern],
             DEFAULT_COUNT_BINS,
-            incident_energies,
+            cond,
             pattern_repeats,
         )
         to_save[pattern] = times
@@ -190,16 +166,15 @@ def time_all():
 
 def time_all_saved():
     saved_models = get_saved_models(configs)
-    model_params = list(zip(saved_models["version"], saved_models["num_blocks"], saved_models["cut_inputs"]))
-    times = time_saved(model_params, incident_energies)
-    to_save = {"incident_energies": incident_energies.cpu().numpy()}
+    times = time_saved(saved_models, cond)
+    to_save = {"cond": cond.cpu().numpy()}
     to_save.update(saved_models)
     to_save["times"] = times
     np.savez(save_path, **to_save)
 
 
 def update_losses_only():
-    saved_models = get_saved_models(configs)
+    saved_models = showerflow_utils.existing_models(configs)
     from_disk = np.load(save_path)
     new_data = {k: from_disk[k] for k in from_disk.files}
     for i, name in enumerate(saved_models["names"]):
@@ -216,7 +191,7 @@ def plot_pattern(name, axes=None, cmap="viridis", cmin=None, cmax=None):
     with np.load(save_path) as data:
         times = data[name]
         pattern_repeats = data["pattern_repeats"]
-        incident_energies = data["incident_energies"]
+        cond = data["cond"]
 
     if axes is None:
         fig, axes = plt.subplots(1, 2)
@@ -230,8 +205,8 @@ def plot_pattern(name, axes=None, cmap="viridis", cmin=None, cmax=None):
     plt.colorbar(heatmap, ax=ax)
     ax.set_xlabel("Incident Energy")
     ax.set_ylabel("Pattern Repeats")
-    ax.set_xticks(np.arange(len(incident_energies)))
-    ax.set_xticklabels(incident_energies.squeeze())
+    ax.set_xticks(np.arange(len(cond)))
+    ax.set_xticklabels(cond.squeeze())
     ax.set_yticks(np.arange(len(pattern_repeats)))
     ax.set_yticklabels(pattern_repeats)
 
@@ -242,7 +217,6 @@ def plot_pattern(name, axes=None, cmap="viridis", cmin=None, cmax=None):
     ax.set_ylabel("Mean Time (s)")
 
 
-
 if __name__ == "__main__":
-    #update_losses_only()
+    # update_losses_only()
     time_all_saved()
