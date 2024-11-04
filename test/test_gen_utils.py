@@ -48,54 +48,6 @@ def test_cond_batcher():
         npt.assert_allclose(batch, expected[i])
 
 
-def test_truescale_showerflow_output():
-    config = config_creator.make()
-    meta = metadata.Metadata(config)
-    mean_cog_x, mean_cog_y, _ = meta.mean_cog
-    std_cog_x, std_cog_y, _ = meta.std_cog
-    # showerflow output is an N by 65 element arrat
-    # start with an array full of zeros
-    sample = np.zeros((3, 65))
-    (
-        num_clusters,
-        energies,
-        cog_x,
-        cog_y,
-        clusters_per_layer,
-        e_per_layer,
-    ) = gen_utils.truescale_showerflow_output(sample, config)
-    npt.assert_allclose(num_clusters, np.ones((3, 1)))
-    npt.assert_allclose(energies, 40 * np.ones((3, 1)))  # clip to a min energy
-    npt.assert_allclose(cog_x, mean_cog_x)
-    npt.assert_allclose(cog_y, mean_cog_y)
-    npt.assert_allclose(clusters_per_layer, 0)
-    npt.assert_allclose(e_per_layer, 0)
-
-    # now try a random array with a large number of clusters
-    sample = np.random.rand(100, 65)
-    sample[:, [2, 3, 4]] -= 0.5
-    max_points = config.max_points
-    sample[:, [0, 1]] *= max_points * 10
-    sample[:, 5:] *= max_points * 10
-    (
-        num_clusters,
-        energies,
-        cog_x,
-        cog_y,
-        clusters_per_layer,
-        e_per_layer,
-    ) = gen_utils.truescale_showerflow_output(sample, config)
-    assert np.all(num_clusters >= 1)
-    assert np.all(num_clusters <= max_points)
-    assert np.all(energies >= 0)
-    npt.assert_allclose(np.mean(cog_x), mean_cog_x, atol=std_cog_x * 3)
-    npt.assert_allclose(np.mean(cog_y), mean_cog_y, atol=std_cog_y * 3)
-    assert np.all(clusters_per_layer >= 0)
-    assert np.all(clusters_per_layer <= 1)
-    assert np.all(e_per_layer >= 0)
-    assert np.all(e_per_layer <= 1)
-
-
 class TestGenMethods:
     configs = []
     models = []
@@ -127,7 +79,7 @@ class TestGenMethods:
         params_dict["batch_size"] = 2
 
         # fake the flow model
-        flow, distribution = compile_HybridTanH_model(
+        flow, distribution, transforms = compile_HybridTanH_model(
             num_blocks=configs.shower_flow_num_blocks,
             num_inputs=65,
             num_cond_inputs=1,

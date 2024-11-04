@@ -9,7 +9,12 @@ from pointcloud.utils.metadata import Metadata
 from pointcloud.utils.detector_map import floors_ceilings
 from pointcloud.data.read_write import read_raw_regaxes
 from pointcloud.models.wish import Wish
-from pointcloud.models.shower_flow import compile_HybridTanH_model
+from pointcloud.models.fish import Fish
+from pointcloud.models.shower_flow import (
+    compile_HybridTanH_model,
+    compile_HybridTanH_alt1,
+    compile_HybridTanH_alt2,
+)
 from pointcloud.models.load import get_model_class
 from pointcloud.utils.gen_utils import gen_cond_showers_batch
 
@@ -45,6 +50,7 @@ class BinnedData:
     Agrigate key metrics for calorimeter models
     into bins for easy plotting and comparison.
     """
+
     true_xyz_limits = [
         [meta.Xmin_global, meta.Xmax_global],
         [meta.Zmin_global, meta.Zmax_global],
@@ -278,6 +284,32 @@ class BinnedData:
         self.bins.append(bins)
         self.counts.append(np.zeros(n_bins))
 
+    def box_cut(self, raw_events):
+        """
+        Given some events, as produced by the model (not rescaled),
+        zero any points outside the xyz limits of the model.
+        Acts in place.
+
+        Parameters
+        ----------
+        raw_events : np.array (n_showers, n_points, 4)
+            The events to cut. Will not be modified.
+        """
+        in_x_range = np.logical_and(
+            raw_events[:, :, 0] >= self.xyz_limits[0][0],
+            raw_events[:, :, 0] <= self.xyz_limits[0][1],
+        )
+        in_y_range = np.logical_and(
+            raw_events[:, :, 1] >= self.xyz_limits[1][0],
+            raw_events[:, :, 1] <= self.xyz_limits[1][1],
+        )
+        in_z_range = np.logical_and(
+            raw_events[:, :, 2] >= self.xyz_limits[2][0],
+            raw_events[:, :, 2] <= self.xyz_limits[2][1],
+        )
+        in_range = np.logical_and(in_x_range, np.logical_and(in_y_range, in_z_range))
+        raw_events[~in_range] = 0
+
     def rescaled_events(self, events):
         """
         Apply the transformations to the event coordinates specified when
@@ -320,6 +352,7 @@ class BinnedData:
         events : np.array (n_showers, n_points, 4)
             The events to add to the histograms.
         """
+        self.box_cut(events)
         mask = events[:, :, 3] > 0
         raw_zs = events[:, :, 2][mask]
 
@@ -341,12 +374,13 @@ class BinnedData:
         energy_per_shower = np.sum(rescaled[:, :, 3] * mask, axis=1)
         self.counts[6] += np.histogram(energy_per_shower, self.bins[6])[0]
 
-        for i in range(3):
-            cog = (
-                np.sum((rescaled[:, :, i] * rescaled[:, :, 3]), axis=1)
-                / energy_per_shower
-            )
-            self.counts[7 + i] += np.histogram(cog, self.bins[7 + i])[0]
+        with np.errstate(divide="ignore", invalid="ignore"):
+            for i in range(3):
+                cog = (
+                    np.sum((gun_shifted[:, :, i] * gun_shifted[:, :, 3]), axis=1)
+                    / energy_per_shower
+                )
+                self.counts[7 + i] += np.histogram(cog, self.bins[7 + i])[0]
 
     def __str__(self):
         text = ""
@@ -373,6 +407,8 @@ class BinnedData:
         np.array
             The counts of the histogram, normalized by the total number of showers.
         """
+        if "mean" in self.y_labels[idx].lower():
+            return self.counts[idx]
         counts = self.counts[idx]
         hist_idx = self.hist_idx("number of showers", "number of hits")
         total_showers = np.sum(self.counts[hist_idx])
@@ -480,7 +516,10 @@ def sample_model(configs, binned, n_events, model, shower_flow=None):
     """
     if n_events == 0:
         return np.zeros(0), np.zeros((0, 0, 4))
-    batch_len = min(1000, n_events)
+    if configs.model_name == "fish":
+        batch_len = min(1000, n_events)
+    else:
+        batch_len = min(100, n_events)
     batch_starts = np.arange(0, n_events, batch_len)
     n_batches = np.ceil(n_events / batch_len)
 
@@ -616,24 +655,78 @@ def get_wish_models(
     return models
 
 
-def get_caloclouds_models(
-    caloclouds_path="../point-cloud-diffusion-logs/p22_th90_ph90_en10-100/CD_2024_05_24__14_47_04/ckpt_0.000000_990000.pt",
-    showerflow_path="../point-cloud-diffusion-data/showerFlow/ShowerFlow_best.pth",
+def get_fish_models(
+    fish_path="../point-cloud-diffusion-logs/fish/fish.npz",
     device="cpu",
+):
+    """
+    Gather a set of models for evaluation.
+
+    Parameters
+    ----------
+    fish_path : str, optional
+        The path to the fish model, by default
+        "../point-cloud-diffusion-logs/fish/fish.npz"
+    device : str, optional
+        The device to load the models onto, by default "cpu"
+
+    Returns
+    -------
+    models : dict of {str: (torch.nn.Module, None, Configs)}
+        The models to evaluate, with the key being the name of the model.
+        The value is a tuple of the model, None (no flow model), and the
+        configuration used to create the model.
+    """
+    models = {}
+    fish_model = Fish.load(fish_path)
+    # TODO fish isn't currently a torch Module
+    # may need to change this
+    # fish_model = fish_model.to(device)
+    configs = WishConfigs()
+    configs.model_name = "fish"
+    models["Fish"] = (fish_model, None, configs)
+    return models
+
+
+def filenames_to_labels(filenames):
+    base_names = [os.path.basename(path) for path in filenames]
+    assert len(set(base_names)) == len(base_names), "Duplicate filenames"
+    common_prefix = os.path.commonprefix(base_names)
+    common_suffix = os.path.commonprefix([basename[::-1] for basename in base_names])[
+        ::-1
+    ]
+    stripped_labels = [
+        name[len(common_prefix) : -len(common_suffix)] for name in base_names
+    ]
+    return stripped_labels
+
+
+def get_caloclouds_models(
+    caloclouds_paths="../point-cloud-diffusion-logs/p22_th90_ph90_en10-100/CD_2024_05_24__14_47_04/ckpt_0.000000_990000.pt",
+    showerflow_paths="../point-cloud-diffusion-data/showerFlow/ShowerFlow_best.pth",
+    device="cpu",
+    caloclouds_names="CaloClouds3",
+    showerflow_names="",
 ):
     """
     Gather a set of models for evaluation. Currently just one.
 
     Parameters
     ----------
-    caloclouds_path : str, optional
+    caloclouds_paths : str or list of str, optional
         The path to the caloclouds model, by default
         "../point-cloud-diffusion-logs/p22_th90_ph90_en10-100/CD_2024_05_24__14_47_04/ckpt_0.000000_990000.pt"
-    showerflow_path : str, optional
+    showerflow_paths : str or list of str, optional
         The path to the showerflow model, by default
         "../point-cloud-diffusion-data/showerFlow/ShowerFlow_best.pth"
     device : str, optional
         The device to load the models onto, by default "cpu"
+    caloclouds_names: list of str, optional
+        The names of the models, by default "CaloClouds3"
+        or if multiple paths are given, the filenames will be used.
+    showerflow_names: list of str, optional
+        The names of the models, by default empty
+        or if multiple paths are given, the filenames will be used
 
     Returns
     -------
@@ -646,17 +739,55 @@ def get_caloclouds_models(
     configs = CaloClouds3Configs()
     configs.device = device
     model = get_model_class(configs)(configs).to(device)
-    model.load_state_dict(
-        torch.load(caloclouds_path, map_location=device)["state_dict"]
-    )
 
-    flow_model, flow_dist = compile_HybridTanH_model(
-        num_blocks=10, num_inputs=65, num_cond_inputs=1, device=device
-    )
-    flow_model.load_state_dict(
-        torch.load(showerflow_path, map_location=device)["model"]
-    )
+    if isinstance(caloclouds_paths, str):
+        caloclouds_paths = [caloclouds_paths]
+        caloclouds_names = [caloclouds_names]
+    elif isinstance(caloclouds_names, str):
+        caloclouds_names = filenames_to_labels(caloclouds_paths)
+    if isinstance(showerflow_paths, str):
+        showerflow_paths = [showerflow_paths]
+        showerflow_names = [showerflow_names]
+    elif isinstance(showerflow_names, str):
+        showerflow_names = filenames_to_labels(showerflow_paths)
+    versions = {
+        "original": compile_HybridTanH_model,
+        "alt1": compile_HybridTanH_alt1,
+        "alt2": compile_HybridTanH_alt2,
+    }
 
-    models["CaloClouds3"] = (model, flow_dist, configs)
+    for calocloud_name, calocloud_path in zip(caloclouds_names, caloclouds_paths):
+        for showerflow_name, showerflow_path in zip(showerflow_names, showerflow_paths):
+            if not showerflow_name:
+                version = versions["original"]
+            else:
+                for name, version in versions.items():
+                    if name in showerflow_name:
+                        break
+            model.load_state_dict(
+                torch.load(calocloud_path, map_location=device)["state_dict"]
+            )
+            if "_nb" in showerflow_name:
+                num_blocks = showerflow_name.split("_nb")[1].split("_")[0]
+                num_blocks = int(num_blocks)
+            else:
+                num_blocks = 10
+            flow_model, flow_dist, _ = version(
+                num_blocks=num_blocks, num_inputs=65, num_cond_inputs=1, device=device
+            )
+            try:
+                flow_model.load_state_dict(
+                    torch.load(showerflow_path, map_location=device)["model"]
+                )
+            except Exception as e:
+                print(f"Failed to load {showerflow_path}", flush=True)
+                print(f"version: {version}, num_blocks: {num_blocks}", flush=True)
+                raise e
+            name = (
+                f"{calocloud_name}-{showerflow_name}"
+                if showerflow_name
+                else calocloud_name
+            )
+            models[name] = (model, flow_dist, configs)
 
     return models

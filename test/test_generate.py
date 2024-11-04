@@ -25,9 +25,14 @@ def test_make_params_dict():
 
 def test_load_flow_model_caloclouds(tmpdir):
     config = config_creator.make("caloclouds_3", my_tmpdir=tmpdir)
+    config.shower_flow_num_blocks = 10
+    config.shower_flow_cond_features = ["energy"]
     test_model_path = str(tmpdir) + "/example_flow_model.pt"
     write_fake_flow_model(config, test_model_path)
-    _, distribution = generate.load_flow_model(config, model_path=test_model_path)
+    _, distribution, transforms = generate.load_flow_model(
+        config, model_path=test_model_path
+    )
+    assert isinstance(transforms, list)
     # ignoring the flow, as we don't use it in generate
     batch_size = 10
     cond_E_batch = torch.FloatTensor(batch_size, 1).uniform_(10, 20).to(config.device)
@@ -66,6 +71,7 @@ def test_load_flow_model_caloclouds(tmpdir):
 
 def test_load_flow_model_wish(tmpdir):
     config = config_creator.make("wish", my_tmpdir=tmpdir)
+    config.shower_flow_num_blocks = 10
     flow, distribution = generate.load_flow_model(config, model_path="dummy")
     assert flow is None
     assert distribution is None
@@ -73,6 +79,8 @@ def test_load_flow_model_wish(tmpdir):
 
 def test_load_diffusion_model_calocloud():
     config = config_creator.make("caloclouds_3")
+    config.shower_flow_num_blocks = 10
+    config.shower_flow_cond_features = ["energy"]
     # only testing the cm model, becuse the file is small and
     # can be kept in the test dir of the repo
     model_name = "cm"
@@ -120,7 +128,9 @@ def test_load_diffusion_model_wish(tmpdir):
 
 
 def test_generate_showers(tmpdir):
-    cfg = config_creator.make()
+    config = config_creator.make("caloclouds_3", my_tmpdir=tmpdir)
+    config.shower_flow_num_blocks = 10
+    config.shower_flow_cond_features = ["energy"]
     params_dict = generate.make_params_dict()
     # make it short for testing
     params_dict["n_events"] = 10
@@ -128,21 +138,23 @@ def test_generate_showers(tmpdir):
 
     # fake the flow model
     test_model_path = str(tmpdir) + "/example_flow_model.pt"
-    write_fake_flow_model(cfg, test_model_path)
-    flow_model = generate.load_flow_model(cfg, model_path=test_model_path)
+    write_fake_flow_model(config, test_model_path)
+    flow_model = generate.load_flow_model(config, model_path=test_model_path)
 
     diff_model = generate.load_diffusion_model(
-        cfg, "cm", model_path="test/example_cm_model.pt"
+        config, "cm", model_path="test/example_cm_model.pt"
     )
     showers, cond_E = generate.generate_showers(
-        cfg, 10, 20, params_dict, flow_model, diff_model
+        config, 10, 20, params_dict, flow_model, diff_model
     )
-    assert showers.shape == (params_dict["n_events"], cfg.max_points, 4)
+    assert showers.shape == (params_dict["n_events"], config.max_points, 4)
     assert cond_E.shape == (params_dict["n_events"], 1)
 
 
 def test_write_showers(tmpdir):
-    cfg = config_creator.make()
+    config = config_creator.make("caloclouds_3", my_tmpdir=tmpdir)
+    config.shower_flow_num_blocks = 10
+    config.shower_flow_cond_features = ["energy"]
     params_dict = generate.make_params_dict()
     # make it short for testing
     params_dict["n_events"] = 10
@@ -153,9 +165,9 @@ def test_write_showers(tmpdir):
 
     # fake the flow model
     test_flow_model_path = str(tmpdir) + "/example_flow_model.pt"
-    write_fake_flow_model(cfg, test_flow_model_path)
+    write_fake_flow_model(config, test_flow_model_path)
 
     test_diff_model_path = "test/example_cm_model.pt"
 
-    generate.write_showers(cfg, params_dict, test_flow_model_path, test_diff_model_path)
+    generate.write_showers(config, params_dict, test_flow_model_path, test_diff_model_path)
     # probably should check the output.... TODO

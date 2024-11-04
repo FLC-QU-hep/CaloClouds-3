@@ -6,14 +6,14 @@ import numpy as np
 import torch
 import time
 
-from ..models.shower_flow import compile_HybridTanH_model
 from ..configs import Configs
-from ..utils import gen_utils
+from ..utils import gen_utils, showerflow_utils
 from ..data.read_write import regularise_event_axes
 
 from ..models import epicVAE_nflows_kDiffusion as mdls
 from ..models import allCond_epicVAE_nflow_PointDiff as mdls2
 from ..models.wish import Wish
+from ..models import shower_flow
 
 
 def make_params_dict() -> dict:
@@ -84,15 +84,20 @@ def load_flow_model(
     """
     if config.model_name == "wish":
         return None, None
-    flow, distribution = compile_HybridTanH_model(
-        num_blocks=10,
+
+    version = config.shower_flow_version
+    cond_used = showerflow_utils.get_cond_mask(config)
+    cond_dim = np.sum(cond_used)
+    inputs_used = showerflow_utils.get_input_mask(config)
+    input_dim = np.sum(inputs_used)
+
+    flow, distribution, transforms = shower_flow.versions_dict[version](
+        num_blocks=config.shower_flow_num_blocks,
         # when 'condioning' on additional Esum,
         # Nhits etc add them on as inputs rather than
         # adding 30 e layers
-        #  num_inputs=32,
-        #  num_inputs=35,
-        num_inputs=65,
-        num_cond_inputs=1,
+        num_inputs=input_dim,
+        num_cond_inputs=cond_dim,
         device=config.device,
     )  # num_cond_inputs
     # checkpoint = torch.load('/beegfs/desy/user/akorol'
@@ -106,10 +111,10 @@ def load_flow_model(
     # checkpoint = torch.load('/beegfs/desy/user/buhmae'
     #                         '/6_PointCloudDiffusion/shower_flow/'
     #                         '220713_cog_e_layer_ShowerFlow_best.pth')
-    checkpoint = torch.load(model_path)  # trained about 350 epochs
+    checkpoint = torch.load(model_path, map_location=config.device)
     flow.load_state_dict(checkpoint["model"])
     flow.eval().to(config.device)
-    return flow, distribution
+    return flow, distribution, transforms
 
 
 def load_diffusion_model(
@@ -289,7 +294,7 @@ def generate_showers(
 
     """
     # unpack params
-    flow, distribution = flow_model
+    flow, distribution, transforms = flow_model
     model, coef_real, coef_fake, n_splines = diffusion_model
     s_t = time.time()
     showers, cond_E = gen_utils.gen_showers_batch(

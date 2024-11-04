@@ -33,7 +33,7 @@ class PltConfigs:
         # legend font
         self.font = font_manager.FontProperties(
             family="serif",
-            size=23
+            size=23,
             # size=20
         )
         self.text_size = 20
@@ -227,23 +227,21 @@ def get_features(
             # get radial profile #######################
 
             x_hit_idx, y_hit_idx = np.where(hit_mask)
-            
+
             if not global_shower_axis_char == "y":
                 raise NotImplementedError(
-                        "We don't have a muon map system for different"
-                        " global shower directions than y"
-                        )
+                    "We don't have a muon map system for different"
+                    " global shower directions than y"
+                )
             # due to rotations, the x and z have been swapped.
             local_x = "z"
             local_y = "x"
 
             x_cell_coord = (
-                map_layers[i][f"{local_x}edges"][:-1][x_hit_idx]
-                + half_cell_size_global
+                map_layers[i][f"{local_x}edges"][:-1][x_hit_idx] + half_cell_size_global
             )
             y_cell_coord = (
-                map_layers[i][f"{local_y}edges"][:-1][y_hit_idx]
-                + half_cell_size_global
+                map_layers[i][f"{local_y}edges"][:-1][y_hit_idx] + half_cell_size_global
             )
             e_cell = layer[x_hit_idx, y_hit_idx]
             dist_to_origin = np.sqrt(
@@ -1728,12 +1726,12 @@ def heatmap_stack(
 
 def plot_event(
     event_n,
-    incident_energy,
+    cond_features,
     event,
     energy_scale=1,
-    xz_scale=1,
+    xy_scale=1,
     xlim=(-150, 150),
-    zlim=(-150, 150),
+    ylim=(-150, 150),
     ax=None,
 ):
     """
@@ -1743,8 +1741,8 @@ def plot_event(
     ----------
     event_n : int
         The event number, for the title.
-    incident_energy : float
-        The incident energy of the event, also for the title.
+    cond_features : float
+        The conditioning features of the event, also for the title.
     event : np.array (n_points, 4)
         The event to plot. The columns are (x, y, z, e).
     energy_scale : float, optional
@@ -1756,8 +1754,8 @@ def plot_event(
     xlim : tuple, optional
         The limits for the x axis.
         Default is (-150, 150).
-    zlim : tuple, optional
-        The limits for the z axis.
+    ylim : tuple, optional
+        The limits for the y axis.
         Default is (-150, 150).
     ax : matplotlib.axes.Axes, optional
         The axes to plot on.
@@ -1774,9 +1772,9 @@ def plot_event(
     mask = energy > 0
     n_points = sum(mask)
     energy = energy[mask] * energy_scale
-    xs = event[mask, 0] * xz_scale
-    ys = event[mask, 1]
-    zs = event[mask, 2] * xz_scale
+    xs = event[mask, 0] * xy_scale
+    ys = event[mask, 1] * xy_scale
+    zs = event[mask, 2]
     if ax is None:
         fig = plt.figure()
         ax = fig.add_subplot(111, projection="3d")
@@ -1785,12 +1783,14 @@ def plot_event(
     ax.set_ylabel("y")
     ax.set_zlabel("z")
     ax.set_xlim(*xlim)
-    ax.set_zlim(*zlim)
+    ax.set_ylim(*ylim)
     # write a title
     observed_energy = energy.sum()
+    formated_conditioning = ", ".join(f"{f:.2f}" for f in cond_features)
     ax.set_title(
-        f"Evt: {event_n}, $n_{{pts}}$: {n_points}, $E_{{in}}$: "
-        f"{incident_energy:.2f}, $E_{{vis}}$: {observed_energy:.2f}"
+        f"Evt: {event_n}, $n_{{pts}}$: {n_points}, conditioning: "
+        + formated_conditioning +
+        f"$E_{{vis}}$: {observed_energy:.2f}"
     )
     return ax
 
@@ -1822,3 +1822,140 @@ def plot_model(incident_energy, model):
     event[:, 2] = zs
     event[:, 3] = es
     return plot_event("Modeled", incident_energy, event, energy_scale=1.0, x_scale=150)
+
+
+def blank_axes(ax):
+    """
+    Remove the ticks and labels, and lines from the axes
+
+    Parameters
+    ----------
+    ax : matplotlib.axes.Axes
+        The axes to blank.
+
+    """
+    ax.set_xticks([])
+    ax.set_yticks([])
+    ax.set_xlabel("")
+    ax.set_ylabel("")
+    ax.grid(False)
+    ax.set_frame_on(False)
+
+
+def project_if_needed(element, element_type, sequence_len):
+    is_elem = isinstance(element, element_type)
+    if not is_elem:
+        assert (
+            len(element) == sequence_len
+        ), f"Expected length {sequence_len}, but see {len(element)}; {element}"
+        return element
+    return [element] * sequence_len
+
+
+class RatioPlots:
+    def __init__(
+        self,
+        x_labels,
+        truth_data,
+        truth_label="g4",
+        truth_color=(0.5, 0.5, 0.5, 0.5),
+        max_cols=3,
+        n_bins=50,
+        x_ranges=None,
+        logx=False,
+        logy=False,
+    ):
+        # set up plot axes
+        self.n_features = len(x_labels)
+        self.n_cols = min(self.n_features, max_cols)
+        self.n_rows = int(self.n_features / self.n_cols)
+        height_ratios = [3, 1] * self.n_rows
+        self.fig, self.axes = plt.subplots(
+            2 * self.n_rows,
+            self.n_cols,
+            figsize=(20, 5 * self.n_rows),
+            gridspec_kw={"height_ratios": height_ratios},
+        )
+        if self.n_cols == 1:
+            self.axes = self.axes[:, None]
+        # ylabels to the left
+        for row in range(self.n_rows):
+            ax = self.axes[row * 2, 0]
+            ax.set_ylabel("Counts")
+
+        # calculate bin locations
+        n_bins = project_if_needed(n_bins, int, self.n_features)
+        self.logx = project_if_needed(logx, bool, self.n_features)
+        self.logy = project_if_needed(logy, bool, self.n_features)
+        if x_ranges is None:
+            x_ranges = [(np.min(d), np.max(d)) for d in truth_data]
+        elif not hasattr(x_ranges[0], "__iter__"):
+            x_ranges = [x_ranges] * self.n_features
+
+        self.bins = []
+        for i, (x_min, x_max) in enumerate(x_ranges):
+            if self.logx[i] and x_max > 0:
+                if x_min <= 0:
+                    x_min = 0.0001
+                here = np.logspace(np.log10(x_min), np.log10(x_max), n_bins[i])
+            else:
+                here = np.linspace(x_min, x_max, n_bins[i])
+            self.bins.append(here)
+
+        # plot truth hists, and record their counts
+        truth_hist_kwargs = dict(
+            label=truth_label, histtype="stepfilled", color=truth_color
+        )
+        self.truth_counts = []
+
+        for i, label in enumerate(x_labels):
+            row = int(i / self.n_cols)
+            col = i - (row * self.n_cols)
+            main_ax = self.axes[row * 2, col]
+            main_ax.set_xlabel(label)
+            n, _, _ = main_ax.hist(
+                truth_data[i], bins=self.bins[i], **truth_hist_kwargs
+            )
+            self.truth_counts.append(n)
+        del truth_data
+
+        # prep for plotting ratios
+        self.ratio_min_maxes = [[1.0, 1.0] for _ in range(self.n_features)]
+        self.bin_centers = [0.5 * (b[1:] + b[:-1]) for b in self.bins]
+        for i, (x_min, x_max) in enumerate(x_ranges):
+            row = int(i / self.n_cols)
+            col = i - (row * self.n_cols)
+            ratio_ax = self.axes[row * 2 + 1, col]
+            ratio_ax.hlines(1, x_min, x_max, color=truth_color)
+
+    def add_comparison(self, data, label, colour):
+        model_hist_kwargs = dict(label=label, histtype="step", color=colour)
+        model_ratio_kwargs = dict(label=label, c=colour)
+        for i in range(self.n_features):
+            row = int(i / self.n_cols)
+            col = i - (row * self.n_cols)
+            main_ax = self.axes[row * 2, col]
+            n, _, _ = main_ax.hist(data[i], bins=self.bins[i], **model_hist_kwargs)
+            ratio = n / self.truth_counts[i]
+            ratio_ax = self.axes[row * 2 + 1, col]
+            ratio_ax.plot(self.bin_centers[i], ratio, **model_ratio_kwargs)
+            self.ratio_min_maxes[i][0] = min(
+                self.ratio_min_maxes[i][0], np.nanmin(ratio)
+            )
+            self.ratio_min_maxes[i][1] = max(
+                self.ratio_min_maxes[i][1], np.nanmax(ratio)
+            )
+
+    def finalise(self):
+        self.axes[-2, -1].legend()
+        for i, (y_min, y_max) in enumerate(self.ratio_min_maxes):
+            clipped_min = min(y_min, 0.0)
+            clipped_max = min(y_max, 2.0)
+            row = int(i / self.n_cols)
+            col = i - (row * self.n_cols)
+            ratio_ax = self.axes[row * 2 + 1, col]
+            ratio_ax.set_ylim(clipped_min, clipped_max)
+            ratio_ax.set_xlim(self.bins[i][0], self.bins[i][-1])
+            main_ax = self.axes[row * 2, col]
+            main_ax.set_xlim(self.bins[i][0], self.bins[i][-1])
+        self.fig.tight_layout()

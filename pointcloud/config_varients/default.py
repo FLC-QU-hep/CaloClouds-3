@@ -53,7 +53,7 @@ class Configs:
                 "clusters_per_layer",
                 "energy_per_layer",
                 ]
-        self.shower_flow_num_blocks = 4
+        self.shower_flow_num_blocks = 10
         self.shower_flow_cond_features = ["energy"]
 
         # Data

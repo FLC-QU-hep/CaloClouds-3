@@ -40,11 +40,21 @@ def test_get_to_factory(tmpdir):
 
     direction_path = showerflow_training.get_gun_direction(configs, showerflow_dir)
     assert os.path.exists(direction_path)
+    # do it again to check it is not recreated
+    time = os.path.getmtime(direction_path)
+    direction_path = showerflow_training.get_gun_direction(configs, showerflow_dir)
+    assert time == os.path.getmtime(direction_path)
+
     loaded = np.load(direction_path)
     assert loaded.shape == (n_events, 3)
 
     clusters_path = showerflow_training.get_clusters_per_layer(configs, showerflow_dir)
     assert os.path.exists(clusters_path)
+    # do it again to check it is not recreated
+    time = os.path.getmtime(clusters_path)
+    clusters_path = showerflow_training.get_clusters_per_layer(configs, showerflow_dir)
+    assert time == os.path.getmtime(clusters_path)
+
     loaded = np.load(clusters_path)
     assert loaded["clusters_per_layer"].shape == (n_events, 30)
     assert np.all(loaded["clusters_per_layer"] >= 0)
@@ -52,6 +62,10 @@ def test_get_to_factory(tmpdir):
     assert np.all(loaded["rescaled_clusters_per_layer"] >= 0)
 
     energy_path = showerflow_training.get_energy_per_layer(configs, showerflow_dir)
+    # do it again to check it is not recreated
+    time = os.path.getmtime(energy_path)
+    energy_path = showerflow_training.get_energy_per_layer(configs, showerflow_dir)
+    assert time == os.path.getmtime(energy_path)
     assert os.path.exists(energy_path)
     loaded = np.load(energy_path)
     assert loaded["energy_per_layer"].shape == (n_events, 30)
@@ -63,6 +77,13 @@ def test_get_to_factory(tmpdir):
         configs, showerflow_dir
     )
     assert os.path.exists(cog_path)
+    # do it again to check it is not recreated
+    time = os.path.getmtime(cog_path)
+    cog_path, cog_sample = showerflow_training.get_cog(
+        configs, showerflow_dir
+    )
+    assert time == os.path.getmtime(cog_path)
+
     loaded = np.load(cog_path)
     assert loaded.shape == (n_events, 3)
     assert len(cog_sample) == 3

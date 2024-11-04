@@ -85,11 +85,14 @@ class CheckpointManager(object):
 
     def save(self, model, args, score, others=None, step=None):
         ckpt = {"score": score}
+        score_part = f"{float(score):.6f}" if np.isfinite(score) else "unscored"
         if step is None:
-            fname = f"ckpt_{float(score):.6f}_.pt"
+            step_part = "None"
         else:
-            fname = f"ckpt_{float(score):.6f}_{int(step)}.pt"
+            step_part = f"{int(step)}"
             ckpt["iteration"] = step
+        fname = f"ckpt_{score_part}_{step_part}.pt"
+        path = os.path.join(self.save_dir, fname)
         ckpt["file"] = fname
 
         path = os.path.join(self.save_dir, fname)

@@ -16,9 +16,14 @@ import os
 import sys
 import time
 
-from pointcloud.config_varients import wish, wish_maxwell, caloclouds_3
+from pointcloud.config_varients import (
+    wish,
+    wish_maxwell,
+    caloclouds_3,
+    caloclouds_3_simple_shower,
+)
 from pointcloud.data.read_write import get_n_events
-from pointcloud.utils import showerflow_training
+from pointcloud.utils import showerflow_training, showerflow_utils
 from pointcloud.utils.metadata import Metadata
 from pointcloud.models.shower_flow import (
     compile_HybridTanH_model,
@@ -38,9 +43,9 @@ def main(configs, batch_size=2048, total_epochs=1_000_000_000, shuffle=True):
     }
     shower_flow_compiler = versions[configs.shower_flow_version]
 
-    cond_used = showerflow_training.get_cond_mask(configs)
+    cond_used = showerflow_utils.get_cond_mask(configs)
     cond_dim = np.sum(cond_used)
-    inputs_used = showerflow_training.get_input_mask(configs)
+    inputs_used = showerflow_utils.get_input_mask(configs)
     cut_inputs = np.where(~inputs_used)[0]
     input_dim = np.sum(inputs_used)
 
@@ -52,7 +57,7 @@ def main(configs, batch_size=2048, total_epochs=1_000_000_000, shuffle=True):
     device = torch.device(configs.device)
 
     meta = Metadata(configs)
-    model, distribution = shower_flow_compiler(
+    model, distribution, transforms = shower_flow_compiler(
         num_blocks=configs.shower_flow_num_blocks,
         num_inputs=input_dim,
         num_cond_inputs=cond_dim,
@@ -70,7 +75,7 @@ def main(configs, batch_size=2048, total_epochs=1_000_000_000, shuffle=True):
     else:
         local_batch_size = 10_000
 
-    showerflow_dir = showerflow_training.get_showerflow_dir(configs)
+    showerflow_dir = showerflow_utils.get_showerflow_dir(configs)
     print(f"Showerflow data will be saved to {showerflow_dir}")
     os.makedirs(showerflow_dir, exist_ok=True)
 
@@ -178,7 +183,7 @@ def main(configs, batch_size=2048, total_epochs=1_000_000_000, shuffle=True):
     outpath = os.path.join(showerflow_dir, prefix)
     print(f"Saving to {outpath}")
 
-    _, best_model_path, best_data_path = showerflow_training.model_save_paths(
+    _, best_model_path, best_data_path = showerflow_utils.model_save_paths(
         configs, configs.shower_flow_version, configs.shower_flow_num_blocks, cut_inputs
     )
     latest_model_path = best_model_path.replace("best", "latest")
@@ -675,6 +680,7 @@ if __name__ == "__main__":
         "wish": wish,
         "wish_maxwell": wish_maxwell,
         "caloclouds_3": caloclouds_3,
+        "caloclouds_3_simple_shower": caloclouds_3_simple_shower,
     }
     while chosen not in config_choices:
         chosen = input(f"Choose a version from {list(config_choices.keys())}:")

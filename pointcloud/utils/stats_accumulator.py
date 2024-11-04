@@ -10,7 +10,7 @@ from matplotlib import pyplot as plt
 
 from pointcloud.utils.plotting import heatmap_stack
 from pointcloud.utils.optimisers import curve_fit
-from pointcloud.utils.detector_map import split_to_layers
+from pointcloud.utils.detector_map import split_to_layers, floors_ceilings
 from pointcloud.data.dataset import dataset_class_from_config
 from pointcloud.data.read_write import read_raw_regaxes, get_n_events
 from pointcloud.configs import Configs
@@ -520,8 +520,180 @@ class StatsAccumulator:
         ax.scatter(xx, yy, zz, c=colours, alpha=alpha)
 
 
+class AlignedStatsAccumulator(StatsAccumulator):
+    def __init__(self, shift_type, *args, **kwargs):
+        arg_order = [
+            "Xmin",
+            "Xmax",
+            "Zmin",
+            "Zmax",
+            "layer_bottom",
+            "cell_thickness",
+            "incident_energy_bin_size",
+            "lateral_bin_size",
+        ]
+        for name, arg in zip(arg_order, args):
+            kwargs[name] = arg
+
+        # layers will be treated as another continuous binning
+        # we want to line up the peak/mean of the events in the layers
+        # and so they will be shifted to align them
+        if "layer_bottom" not in kwargs:
+            n_layers = 50
+            kwargs["layer_bottom"] = np.linspace(-2, 2, n_layers + 1)[:-1]
+        else:
+            n_layers = len(kwargs["layer_bottom"])
+        super().__init__(*args, **kwargs)
+
+        self.shift_type = shift_type
+        self._set_shift_function(shift_type)
+
+        # then a bit is done to keep track of the shifts
+        n_incident_bins = len(self.incident_bin_boundaries) - 1
+        self.layer_offset_bins = np.linspace(-1, 1, n_layers + 1)
+        self.layer_offset_hist = np.zeros((n_incident_bins + 2, n_layers))
+        self.layer_offset_sq_hist = np.zeros((n_incident_bins + 2, n_layers))
+        # as each event will not contribute to all layers,
+        # we need to keep track of the total number of events at each layer
+        # in each incident energy bin
+        self.total_events = np.zeros((n_incident_bins + 2, n_layers))
+
+    def _set_shift_function(self, shift_type):
+        if shift_type == "mean":
+
+            def shift(events):
+                mean_z = np.sum(events[..., 2] * events[..., 3], axis=-1) / np.sum(
+                    events[..., 3], axis=-1
+                )
+                return mean_z[:, None]
+
+        elif shift_type == "peak":
+            # TODO wrong + no need for more layers
+            def shift(events):
+                raise RuntimeError("Not properly implemented")
+
+        else:
+            raise ValueError(f"Unknown shift type {shift_type}")
+        self.get_shift = shift
+
+    def add(self, idxs, energy, events):
+        """
+        Add events to the accumulator.
+
+        Parameters
+        ----------
+        idxs: array-like (n_events,)
+            Indices of the events, to check for duplicate accumulation
+        energy: array-like (n_events,)
+            The incident energy of the events
+        events: array-like (n_events, max_n_points, 4)
+            The events themselves, in xyze format
+
+        """
+        assert len(idxs) == len(energy) == len(events)
+        if any(idx in self.accumulated_indices for idx in idxs):
+            raise ValueError("Index already accumulated")
+        self.accumulated_indices.extend(idxs)
+
+        incident_energy_bins = np.digitize(energy, self.incident_bin_boundaries)
+        event_counts = np.zeros_like(self.counts_hist[0])
+        event_energies = np.zeros_like(self.energy_hist[0])
+        event_energies_sq = np.zeros_like(self.energy_hist[0])
+
+        # calculate and apply shifts
+        shifts = self.get_shift(events)
+        for inci_bin in set(incident_energy_bins):
+            mask = incident_energy_bins == inci_bin
+            self.layer_offset_hist[inci_bin] += np.histogram(
+                shifts[mask, 0], bins=self.layer_offset_bins
+            )[0]
+            self.layer_offset_sq_hist[inci_bin] += np.histogram(
+                shifts[mask, 0] ** 2, bins=self.layer_offset_bins
+            )[0]
+        events[..., 2] -= shifts
+
+        for incident_bin, event in zip(incident_energy_bins, events):
+            # remove any padding
+            event = event[event[:, 3] > 0]
+            event_counts[:] = 0
+            event_energies[:] = 0
+            event_energies_sq[:] = 0
+            for layer_n, points_in_layer in enumerate(
+                split_to_layers(event, self.layer_bottom, self.cell_thickness)
+            ):
+                n_pts_hist, energies_hist, energies_hist_sq = self.layer_hists(
+                    points_in_layer
+                )
+                event_counts[layer_n] = n_pts_hist
+                event_energies[layer_n] = energies_hist
+                event_energies_sq[layer_n] = energies_hist_sq
+                if np.sum(n_pts_hist) > 0:
+                    self.total_events[incident_bin, layer_n] += 1
+            self.add_event(
+                incident_bin, event_counts, event_energies, event_energies_sq
+            )
+
+    @classmethod
+    def load(cls, path, varient=""):
+        """
+        Alternative constructor to load an accumulator from a file.
+
+        Parameters
+        ----------
+        path: str
+            Path to the file to load
+
+        Returns
+        -------
+        StatsAccumulator
+            The loaded accumulator
+        """
+        if not varient:
+            varient = path.split("/")[-1]
+        shift_type = "mean" if "mean" in varient.lower() else "peak"
+        return super().load(path, shift_type=shift_type)
+
+
+def filter_factory(varient):
+    """
+    Create a filter for the events,
+    which will remove some points by setting energy to 0
+
+    Parameters
+    ----------
+    varient: str
+        The varient of the filtering, should be odd or even
+
+    Returns
+    -------
+    function
+        The filter function, with the signature
+        filter_events(events, layer_bottom, cell_thickness)
+    """
+
+    if varient == "odd":
+
+        def filter_events(events, layer_bottom, cell_thickness):
+            floors, ceilings = floors_ceilings(layer_bottom, cell_thickness, 0.5)
+            for floor, ceiling in zip(floors[1::2], ceilings[1::2]):
+                mask = (events[..., 2] >= floor) & (events[..., 2] < ceiling)
+                events[mask] = 0
+
+    elif varient == "even":
+
+        def filter_events(events, layer_bottom, cell_thickness):
+            floors, ceilings = floors_ceilings(layer_bottom, cell_thickness, 0.5)
+            for floor, ceiling in zip(floors[::2], ceilings[::2]):
+                mask = (events[..., 2] >= floor) & (events[..., 2] < ceiling)
+                events[mask] = 0
+
+    else:
+        raise ValueError(f"Unknown varient {varient}, should be odd or even")
+    return filter_events
+
+
 def read_section_to(
-    config, save_to, num_sections, section_number, batch_size=100
+    config, save_to, num_sections, section_number, varient="", batch_size=100
 ):
     """
     Read a section of the dataset and save the statistics to file.
@@ -556,7 +728,22 @@ def read_section_to(
     def noop(*args, **kwargs):
         pass
 
-    acc = StatsAccumulator()
+    filter_func = noop
+
+    if not varient:
+        acc = StatsAccumulator()
+    elif "align" in varient.lower():
+        if "mean" in varient.lower():
+            acc = AlignedStatsAccumulator("mean")
+        elif "peak" in varient.lower():
+            acc = AlignedStatsAccumulator("peak")
+        if "odd" in varient.lower():
+            filter_func = filter_factory("odd")
+        elif "even" in varient.lower():
+            filter_func = filter_factory("even")
+
+    if acc is None:
+        raise ValueError(f"Unknown varient {varient}")
 
     n_events = np.sum(get_n_events(config.dataset_path, config.n_dataset_files))
     n_events_per_section = n_events // num_sections
@@ -568,6 +755,7 @@ def read_section_to(
             range(batch_start, min(batch_start + batch_size, section_end))
         )
         energy, events = read_raw_regaxes(config, pick_events)
+        filter_func(events, acc.layer_bottom, acc.cell_thickness)
         # rescaling data into unit cube
         dataset_class.normalize_xyze(events)
         acc.add(pick_events, energy, events)
@@ -581,7 +769,7 @@ def read_section_to(
     return acc
 
 
-def save_location(config, num_sections, section_number):
+def save_location(config, num_sections, section_number, varient=""):
     """
     Identify the default path for saving the statistics for a section.
     Create the directory if it does not exist.
@@ -600,6 +788,8 @@ def save_location(config, num_sections, section_number):
     if "{" in dataset_basename:
         dataset_basename = dataset_basename.format("All")
     dataset_basename = dataset_basename.replace("_all_steps", "")
+    if varient:
+        dataset_basename += f"_{varient}"
     if num_sections > 1:
         path_segments.append(dataset_basename)
         path_segments.append(f"{num_sections}_sections")
@@ -613,7 +803,7 @@ def save_location(config, num_sections, section_number):
     return os.path.join(*path_segments)
 
 
-def read_section(num_sections, section_number, config=Configs()):
+def read_section(num_sections, section_number, config=Configs(), varient=""):
     """
     Read a section of the dataset and save the statistics to file.
 
@@ -627,8 +817,8 @@ def read_section(num_sections, section_number, config=Configs()):
         The configuration object
         Optional, the default is the default configuration
     """
-    save_to = save_location(config, num_sections, section_number)
-    read_section_to(config, save_to, num_sections, section_number)
+    save_to = save_location(config, num_sections, section_number, varient)
+    read_section_to(config, save_to, num_sections, section_number, varient)
 
 
 class HighLevelStats:
@@ -856,7 +1046,7 @@ class HighLevelStats:
         ).T
         self.eigenvalue_values = np.zeros((len(self.incident_energy_bin_centers), 2))
         self.eigenvector_angles = np.zeros(len(self.incident_energy_bin_centers))
-        # need the location of eahc bin in x and z
+        # need the location of each bin in x and z
         x_bin_centers, y_bin_centers, _ = self.accumulator._get_bin_centers()
         # then make a meshgrid of the locations
         x_mesh, y_mesh = np.meshgrid(x_bin_centers, y_bin_centers)

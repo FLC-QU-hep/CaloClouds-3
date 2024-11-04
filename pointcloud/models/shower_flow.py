@@ -108,7 +108,7 @@ class HybridTanH_factory:
                 base_dist, self.transforms
             )
 
-        return modules, flow_dist
+        return modules, flow_dist, self.transforms
 
 
 def compile_HybridTanH_model(num_blocks, num_inputs, num_cond_inputs, device):
@@ -150,6 +150,8 @@ def compile_HybridTanH_model(num_blocks, num_inputs, num_cond_inputs, device):
         The trainable model that will define the transformaitons.
     flow_dist : dist.ConditionalTransformedDistribution
         The distribution created by the transformations.
+    transforms : list
+        The list of transformations that the model applies.
 
     """
     factory = HybridTanH_factory(num_inputs, num_cond_inputs, device)
@@ -171,8 +173,8 @@ def compile_HybridTanH_model(num_blocks, num_inputs, num_cond_inputs, device):
         "permutation",
     ]
 
-    model, flow_dist = factory.create(num_blocks, transform_pattern, count_bins=8)
-    return model, flow_dist
+    model, flow_dist, transforms = factory.create(num_blocks, transform_pattern, count_bins=8)
+    return model, flow_dist, transforms
 
 
 def compile_HybridTanH_alt1(num_blocks, num_inputs, num_cond_inputs, device):
@@ -195,8 +197,8 @@ def compile_HybridTanH_alt1(num_blocks, num_inputs, num_cond_inputs, device):
         "permutation",
     ]
 
-    model, flow_dist = factory.create(num_blocks, transform_pattern, count_bins=8)
-    return model, flow_dist
+    model, flow_dist, transforms = factory.create(num_blocks, transform_pattern, count_bins=8)
+    return model, flow_dist, transforms
 
 
 def compile_HybridTanH_alt2(num_blocks, num_inputs, num_cond_inputs, device):
@@ -217,8 +219,8 @@ def compile_HybridTanH_alt2(num_blocks, num_inputs, num_cond_inputs, device):
         "permutation",
     ]
 
-    model, flow_dist = factory.create(num_blocks, transform_pattern, count_bins=8)
-    return model, flow_dist
+    model, flow_dist, transforms = factory.create(num_blocks, transform_pattern, count_bins=8)
+    return model, flow_dist, transforms
 
 
 versions_dict = {

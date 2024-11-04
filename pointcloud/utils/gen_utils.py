@@ -6,6 +6,8 @@ from .metadata import Metadata
 
 from ..configs import Configs
 
+from .showerflow_utils import truescale_showerflow_output
+
 
 def get_cog(x, y, z, e):
     """
@@ -90,6 +92,7 @@ def get_shower(model, num_points, energy, cond_N, bs=1, config=Configs()):
 def is_config(config):
     return hasattr(config, "model_name")
 
+
 # for historic reasons, I don't want to mess with the
 # argument parsing of this function, but it's complex
 # so lets just make a separate function for it.
@@ -98,10 +101,19 @@ def is_config(config):
 def _shower_batch_arg_parser(*args, **kwargs):
     # read the args differently for different models
     n_required_args = 4
-    arg_values = {"model": None, "shower_flow": None, 
-                  "e_min": None, "e_max": None, "num": 2000,
-                  "bs": 32, "config": Configs(), "coef_real": None,
-                  "coef_fake": None, "n_scaling": True, "n_splines": None}
+    arg_values = {
+        "model": None,
+        "shower_flow": None,
+        "e_min": None,
+        "e_max": None,
+        "num": 2000,
+        "bs": 32,
+        "config": Configs(),
+        "coef_real": None,
+        "coef_fake": None,
+        "n_scaling": True,
+        "n_splines": None,
+    }
     arg_positions = [
         "model",
         "shower_flow",
@@ -117,22 +129,28 @@ def _shower_batch_arg_parser(*args, **kwargs):
     ]
     config_pos = arg_positions.index("config")
     if "config" in kwargs:
-        assert len(args) <= config_pos, "config given twice, once as positional, once as kwarg"
+        assert (
+            len(args) <= config_pos
+        ), "config given twice, once as positional, once as kwarg"
         config = kwargs["config"]
     elif config_pos < len(args):
         if is_config(args[config_pos]):
             config = args[config_pos]
-        elif is_config(args[config_pos-1]):
-            config = args[config_pos-1]
+        elif is_config(args[config_pos - 1]):
+            config = args[config_pos - 1]
         else:
-            raise ValueError(f"Expected a Configs object in position {config_pos} or {config_pos-1}")
+            raise ValueError(
+                f"Expected a Configs object in position {config_pos} or {config_pos-1}"
+            )
     else:
         config = Configs()
 
-    if config.model_name == "wish":
+    if config.model_name in ["wish", "fish"]:
         n_required_args -= 1
         del arg_positions[1]
-        assert "shower_flow" not in kwargs, "For model named wish, the shower_flow argument is not expected"
+        assert (
+            "shower_flow" not in kwargs
+        ), "For models wish and fish, the shower_flow argument is not expected"
 
     assert len(args) + len(kwargs) <= (
         len(arg_positions)
@@ -299,7 +317,7 @@ def gen_cond_showers_batch(
         The generated showers. The third dimension is (x, y, z, e)
 
     """
-    if config.model_name == "wish":
+    if config.model_name in ["wish", "fish"]:
         # for this model, we don't have to give a shower_flow
         if cond is None:
             cond = shower_flow
@@ -370,6 +388,7 @@ def gen_wish_inner_batch(cond_batch, destination_array, first_index, model):
     """
     Generate a batch of showers using the Wish model
     according to the given incident energies.
+    Also works on fish.
 
     Parameters
     ----------
@@ -387,26 +406,6 @@ def gen_wish_inner_batch(cond_batch, destination_array, first_index, model):
     max_points = destination_array.shape[1]
     last_index = first_index + cond_batch.size(0)
     destination_array[first_index:last_index] = model.sample(cond_batch, max_points)
-
-
-def truescale_showerflow_output(samples, config):
-    bs = samples.shape[0]
-    metadata = Metadata(config)
-    # name samples
-    num_clusters = np.clip(
-        (samples[:, 0] * metadata.n_pts_rescale).reshape(bs, 1), 1, config.max_points
-    )
-    gev_to_mev = 1000
-    energies = (samples[:, 1] * metadata.vis_eng_rescale * gev_to_mev).reshape(bs, 1)
-    # in MeV  (clip to a minimum energy of 40 MeV)
-    energies = np.clip(energies, 40, None)
-    cog_x = (samples[:, 2] * metadata.std_cog[0]) + metadata.mean_cog[0]
-    cog_y = (samples[:, 3] * metadata.std_cog[1]) + metadata.mean_cog[1]
-    # cog_z = (samples[:, 4] * metadata.std_cog[2]) + metadata.mean_cog[2]
-
-    clusters_per_layer_gen = np.clip(samples[:, 5:35], 0, 1)  # B,30
-    e_per_layer_gen = np.clip(samples[:, 35:], 0, 1)  # B,30
-    return num_clusters, energies, cog_x, cog_y, clusters_per_layer_gen, e_per_layer_gen
 
 
 def gen_v1_inner_batch(
@@ -483,6 +482,7 @@ def gen_v1_inner_batch(
         energies,
         cog_x,
         cog_y,
+        _,
         clusters_per_layer_gen,
         e_per_layer_gen,
     ) = truescale_showerflow_output(samples, config)

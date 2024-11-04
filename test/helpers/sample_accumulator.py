@@ -3,8 +3,11 @@ import numpy as np
 from pointcloud.utils import stats_accumulator
 
 
-def make(add_varients=False):
-    acc = stats_accumulator.StatsAccumulator()
+def make(add_varients=False, start_acc=None):
+    if start_acc is None:
+        acc = stats_accumulator.StatsAccumulator()
+    else:
+        acc = start_acc
     if add_varients:
         energies = [0.5, 1, 1.5]
     else:
@@ -19,13 +22,13 @@ def make(add_varients=False):
     for e, energy in enumerate(energies):
 
         def get_points_for_layer(layer_n):
-            layer_y = acc.layer_bottom[layer_n] + acc.cell_thickness / 2
+            layer_z = acc.layer_bottom[layer_n] + acc.cell_thickness / 2
             points_in_layer = np.array(
                 [
-                    [0.0, 0.0, layer_y, energy],
-                    [0.0, 0.0, layer_y, energy],
-                    [1.0, 0.0, layer_y, energy],
-                    [0.0, 1.0, layer_y, energy],
+                    [0.0, 0.0, layer_z, energy],
+                    [0.0, 0.0, layer_z, energy],
+                    [1.0, 0.0, layer_z, energy],
+                    [0.0, 1.0, layer_z, energy],
                 ]
             )
             return points_in_layer
@@ -43,3 +46,14 @@ def make(add_varients=False):
             )
             acc.add(indices, incident_mid_points, all_points)
     return acc
+
+
+def add_random(acc, n_events=100):
+    events = np.random.rand(n_events, 100, 4)
+    incident_energies = 10 + np.random.rand(n_events)*80
+    try:
+        first_index = np.max(acc.accumulated_indices) + 1
+    except ValueError:
+        first_index = 0
+    indices = list(range(first_index, first_index+n_events))
+    acc.add(indices, incident_energies, events)

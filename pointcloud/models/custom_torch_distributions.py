@@ -198,7 +198,7 @@ class RadialPlane(Distribution):
         # of the transformation from polar to cartesian coordinates
         scalar_radius = value.norm(dim=-1)
         radial_prob = self.radial.prob(scalar_radius)
-        jacoben = scalar_radius**(-1)
+        jacoben = scalar_radius ** (-1)
         jacoben[scalar_radius <= 0] = 1
         return self.normalisation * radial_prob * jacoben
 
@@ -213,3 +213,61 @@ class RadialPlane(Distribution):
 
     def entropy(self):
         raise NotImplementedError
+
+
+def to_torch1d(x):
+    """
+    Convert x to a torch tensor with at least 1 dimension.
+
+    Parameters
+    ----------
+    x : array_like or Number
+        The input to convert.
+
+    Returns
+    -------
+    torch.Tensor
+        The converted tensor.
+
+    """
+    try:
+        return torch.atleast_1d(x)
+    except TypeError:
+        x = torch.tensor(x)
+        return torch.atleast_1d(x)
+
+
+def make_tailed_exponential(core, to_tail, p_core):
+    """
+    Make a distribution whos pdf has the format;
+
+    p(x) = p * (exp(-x/core)/core) + (1-p) * (exp(-x/tail)/tail)
+        where
+    tail = core + to_tail
+
+    Parameters
+    ----------
+    core : array_like or float
+        The core of the exponential distribution.
+    to_tail : array_like or float
+        The distance from the core to the tail of
+        the exponential distribution.
+    p_core : array_like or float
+        The probability that a value is drawn from the
+        core, rather than the tail.
+
+    Returns
+    -------
+    torch.distributions.Distribution
+        The distribution.
+
+    """
+    core = to_torch1d(core)
+    to_tail = to_torch1d(to_tail)
+    p_core = to_torch1d(p_core)
+    rates = torch.vstack([1 / core, 1 / (core + to_tail)]).T
+    probs = torch.vstack([p_core, 1 - p_core]).T
+    exponential = torch.distributions.Exponential(rates)
+    mix = torch.distributions.Categorical(probs)
+    combined = torch.distributions.MixtureSameFamily(mix, exponential)
+    return combined
