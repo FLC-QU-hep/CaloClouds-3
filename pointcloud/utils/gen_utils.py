@@ -249,6 +249,7 @@ def gen_showers_batch(
 
     # TODO generalise
     cond = torch.FloatTensor(num, 1).uniform_(e_min, e_max)  # B,1
+    cond = cond.to(config.device)
     fake_showers = gen_cond_showers_batch(
         model,
         shower_flow,
@@ -373,6 +374,8 @@ def cond_batcher(cond, batch_size):
         mask = torch.argsort(cond[..., -1].squeeze())
     else:
         mask = torch.argsort(cond)
+    #change torch tensor to numpyarray
+    mask = mask.cpu().numpy()
     mask = np.atleast_1d(mask)
     cond = cond[mask]
     num = cond.size(0)
@@ -462,7 +465,7 @@ def gen_v1_inner_batch(
 
     # sample from shower flow
     samples = (
-        shower_flow.condition(cond_batch / metadata.incident_rescale)
+        shower_flow.condition(cond_batch / torch.from_numpy(metadata.incident_rescale))
         .sample(
             torch.Size(
                 [
@@ -529,7 +532,7 @@ def gen_v1_inner_batch(
         bs=bs,
         config=config,
     )
-    fake_showers = fake_showers.detach().numpy()
+    fake_showers = fake_showers.detach().cpu().numpy()
 
     # if np.isnan(fake_showers).sum() != 0:
     #       return fake_showers
@@ -554,7 +557,7 @@ def gen_v1_inner_batch(
         )
 
         fake_showers[i, :, 2][mask == 0] = 10
-        idx_dm = np.argsort(fake_showers[i, :, 1])
+        idx_dm = np.argsort(fake_showers[i, :, 2])
         fake_showers[i, :, 2][idx_dm] = z_flow
 
         fake_showers[i, :, :][z_flow == 0] = 0
@@ -577,7 +580,6 @@ def gen_v1_inner_batch(
                 / fake_showers[i, :, -1][mask].sum()
                 * e_per_layer_all[i, j]
             )
-
     length = config.max_points - fake_showers.shape[1]
     fake_showers = np.concatenate(
         (fake_showers, np.zeros((bs, length, 4))), axis=1
