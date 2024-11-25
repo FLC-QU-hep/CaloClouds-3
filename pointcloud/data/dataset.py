@@ -422,13 +422,12 @@ class PointCloudDatasetGH(PointCloudDataset):
         self.open_files = self._open_data_files(file_path, n_files)
         self.max_ds_seq_len = max_ds_seq_len
         self.index_list = self._make_index_list()
+        self._roll_axis = False  # no need to roll axis for GH dataset
         self.front_padded = self._is_front_padded()
         self.bs = bs
 
         self.quantized_pos = True  # never fuzz the GH dataset
         # therefore we don't need an offset
-
-        self._roll_axis = False  # no need to roll axis for GH dataset
 
         # avoid repeat calculation
         self._len = len(self.index_list)
