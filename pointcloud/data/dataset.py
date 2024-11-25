@@ -59,13 +59,6 @@ class PointCloudDataset(Dataset):
             single file.
         """
         self.open_files = self._open_data_files(file_path, n_files)
-        self.max_ds_seq_len = max_ds_seq_len
-        self.index_list = self._make_index_list()
-        self.front_padded = self._is_front_padded()
-        self.bs = bs
-
-        self.quantized_pos = quantized_pos
-        self.offset = 5.0883331298828125 / 6  # size of x36 granular grid
 
         event_key = self.keys_to_include["event"]
         if self.open_files[0][event_key].shape[-1] == 4:
@@ -76,6 +69,14 @@ class PointCloudDataset(Dataset):
                 self.open_files[0][event_key].shape[-2] == 4
             ), "Can't find xyze axis in data"
             self._roll_axis = True
+
+        self.max_ds_seq_len = max_ds_seq_len
+        self.index_list = self._make_index_list()
+        self.front_padded = self._is_front_padded()
+        self.bs = bs
+
+        self.quantized_pos = quantized_pos
+        self.offset = 5.0883331298828125 / 6  # size of x36 granular grid
 
         # avoid repeat calculation
         self._len = len(self.index_list)
@@ -144,8 +145,12 @@ class PointCloudDataset(Dataset):
     def _is_front_padded(self, check_file=0):
         event_key = self.keys_to_include["event"]
         try:
-            first_energies = self.open_files[check_file][event_key][:, 0, 3]
-            last_energies = self.open_files[check_file][event_key][:, -1, 3]
+            if self._roll_axis:
+                first_energies = self.open_files[check_file][event_key][:, 3, 0]
+                last_energies = self.open_files[check_file][event_key][:, 3, -1]
+            else:
+                first_energies = self.open_files[check_file][event_key][:, 0, 3]
+                last_energies = self.open_files[check_file][event_key][:, -1, 3]
         except IndexError:
             first_energies = 1
             last_energies = 1
