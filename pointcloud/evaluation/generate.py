@@ -234,6 +234,8 @@ def load_diffusion_model(
             config.device
         )
         model.load_state_dict(checkpoint["others"]["model_ema"])
+        # These numbers are for occupancy calibration, gotted from
+        # occupansy scale notebook
         coef_fake = np.array(
             [-9.02997505e-07, 2.82747963e-03, 1.01417267e00, 1.64829018e02]
         )
