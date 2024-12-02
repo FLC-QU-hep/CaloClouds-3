@@ -8,7 +8,7 @@ class Configs(wish.Configs):
 
         self.log_comet = False
         self.comet_workspace = "none"
-        self.storage_base = "/gpfs/dust/maxwell/user/"
+        self.storage_base = "/data/dust/user/"
         self.dataset_path_in_storage = True
         #self._dataset_path = 'akorol/data/calo-clouds/hdf5/high_granular_grid/train/10-90GeV_x36_grid_regular_524k_float32.hdf5'
         self._dataset_path = 'dayhallh/data/ILCsoftEvents/p22_th90_ph90_en10-100_joined/p22_th90_ph90_en10-100_seed{}_all_steps.hdf5'

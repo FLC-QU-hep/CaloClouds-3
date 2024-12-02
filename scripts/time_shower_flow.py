@@ -85,7 +85,7 @@ patterns = {
 pattern_repeats = np.arange(1, 11) * 10
 configs = Configs()
 n_cond_inputs = 4
-configs.logdir = "/gpfs/dust/maxwell/user/dayhallh/point-cloud-diffusion-logs/"
+configs.logdir = "/data/dust/user/dayhallh/point-cloud-diffusion-logs/"
 configs.dataset_path = (
     "/beegfs/desy/user/akorol/data/AngularShowers_RegularDetector/"
     "hdf5_for_CC/sim-E1261AT600AP180-180_file_{}slcio.hdf5"
