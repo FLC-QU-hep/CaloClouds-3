@@ -6,10 +6,10 @@ class Configs(default.Configs):
         super().__init__(**kwargs)
 
         self.log_comet = False
-        self.storage_base = "/gpfs/dust/maxwell/user/"
+        self.storage_base = "/data/dust/user/"
         self.latent_dim = 0  # no latent flow in new calocloud
         self.dataset_path_in_storage = False
-        self.storage_base = "/gpfs/dust/maxwell/user/"
+        self.storage_base = "/data/dust/user/"
         self._dataset_path = "/beegfs/desy/user/akorol/data/AngularShowers_RegularDetector/hdf5_for_CC/sim-E1261AT600AP180-180_file_{}slcio.hdf5"
         self.n_dataset_files = 88
         self.Acomment = (

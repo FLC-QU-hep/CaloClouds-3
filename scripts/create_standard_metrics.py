@@ -34,10 +34,10 @@ from pointcloud.evaluation.bin_standard_metrics import (
 models = {}
 log_base = "../point-cloud-diffusion-logs/"
 # log_base = "/beegfs/desy/user/dayhallh/point-cloud-diffusion-logs/"
-log_base = "/gpfs/dust/maxwell/user/dayhallh/point-cloud-diffusion-logs"
+log_base = "/data/dust/user/dayhallh/point-cloud-diffusion-logs"
 # data_base = "../point-cloud-diffusion-data/"
 # data_base = "/beegfs/desy/user/dayhallh/point-cloud-diffusion-data/"
-data_base = "/gpfs/dust/maxwell/user/dayhallh/point-cloud-diffusion-data/"
+data_base = "/data/dust/user/dayhallh/point-cloud-diffusion-data/"
 try:
     pass
 #    wish_path = os.path.join(
