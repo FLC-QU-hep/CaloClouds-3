@@ -3,7 +3,8 @@ import os
 import numpy as np
 import numpy.testing as npt
 from unittest.mock import patch
-from torch_geometric.data import Data, DataLoader
+from torch_geometric.data import Data
+from torch_geometric.loader import DataLoader
 import torch
 import tempfile
 import shutil

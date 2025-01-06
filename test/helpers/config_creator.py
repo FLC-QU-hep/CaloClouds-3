@@ -22,7 +22,6 @@ def make(module_name="default", start_from=None, my_tmpdir=None):
     config.log_comet = False
     test_dir = os.path.join(os.path.dirname(os.path.realpath(__file__)), "..")
     test_dir = os.path.abspath(test_dir)
-    config.dataset_path = os.path.join(test_dir, "mini_data_sample.hdf5")
     config.max_iters = 2
     config.device = "cpu"
     config.fit_attempts = 2
@@ -38,4 +37,6 @@ def make(module_name="default", start_from=None, my_tmpdir=None):
         shutil.copy(os.path.join(test_dir, config.model_path), config.logdir)
         # and in the uda logdir
         shutil.copy(os.path.join(test_dir, config.model_path), config.logdir_uda)
+    config.dataset_path_in_storage = False
+    config.dataset_path = os.path.join(test_dir, "mini_data_sample.hdf5")
     return config

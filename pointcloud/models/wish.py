@@ -1422,7 +1422,7 @@ class Wish(Module):
         path : str
             The path to load the model from.
         """
-        loaded = torch.load(path)
+        loaded = torch.load(path, weights_only=False)
         model = cls(loaded["config"])
         model.load_state_dict(loaded["state_dict"])
         return model

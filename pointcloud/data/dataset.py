@@ -5,7 +5,8 @@ import h5py
 from ..configs import Configs
 from ..utils.metadata import Metadata
 from ..utils.detector_map import floors_ceilings
-from ..data.read_write import get_files, events_to_local
+from .read_write import get_files, events_to_local
+from .conditioning import get_cond_features_names, padding_position
 
 
 class PointCloudDataset(Dataset):
@@ -69,6 +70,7 @@ class PointCloudDataset(Dataset):
                 self.open_files[0][event_key].shape[-2] == 4
             ), "Can't find xyze axis in data"
             self._roll_axis = True
+        self._prior_event_axes = self._get_prior_event_axes()
 
         self.max_ds_seq_len = max_ds_seq_len
         self.index_list = self._make_index_list()
@@ -134,7 +136,11 @@ class PointCloudDataset(Dataset):
             if "n_points" in dataset:
                 n_points = dataset["n_points"][:]
             else:
-                n_points = self.get_n_points(dataset[event_key])
+                if self._roll_axis:
+                    events = dataset[event_key][:]
+                    n_points = self.get_n_points(events.T)
+                else:
+                    n_points = self.get_n_points(dataset[event_key])
             n_points[n_points > self.max_ds_seq_len] = self.max_ds_seq_len
             index_list += [(n, file_idx, i) for i, n in enumerate(n_points)]
         # sort the index list by 'n_points'
@@ -142,23 +148,33 @@ class PointCloudDataset(Dataset):
         index_list = np.array(index_list, dtype=int)
         return index_list
 
+    def _get_prior_event_axes(self):
+        """
+        For each key in keys_to_include,
+        find out which axis is the length of th number of events
+        in that file.
+        Create a number of empty slices to pad out the indexing to that point.
+        We make the assumption that this is the same
+        for all files in the dataset.
+        """
+        file_0 = self.open_files[0]
+        n_events_in_file0 = file_0[self.keys_to_include["event"]].shape[0]
+        axes = {
+            name: [slice(None)]*file_0[key].shape.index(n_events_in_file0)
+            for name, key in self.keys_to_include.items()
+            if key is not None
+        }
+        return axes
+
     def _is_front_padded(self, check_file=0):
         event_key = self.keys_to_include["event"]
-        try:
-            if self._roll_axis:
-                first_energies = self.open_files[check_file][event_key][:, 3, 0]
-                last_energies = self.open_files[check_file][event_key][:, 3, -1]
-            else:
-                first_energies = self.open_files[check_file][event_key][:, 0, 3]
-                last_energies = self.open_files[check_file][event_key][:, -1, 3]
-        except IndexError:
-            first_energies = 1
-            last_energies = 1
-        if np.all(first_energies <= 0):
+        padding = padding_position(self.open_files[check_file][event_key], self._roll_axis)
+        if padding == "front":
             is_front_padded = True
-        elif np.all(last_energies <= 0):
+        elif padding == "back":
             is_front_padded = False
-        elif check_file >= len(self.open_files):
+        elif check_file >= len(self.open_files) - 1:
+            # stop before we run out of files to check
             is_front_padded = False
         else:
             is_front_padded = self._is_front_padded(check_file + 1)
@@ -224,19 +240,32 @@ class PointCloudDataset(Dataset):
             with coordinates x, y, z, and energy.
 
         """
-        if not cls.metadata.global_shower_axis_char == "y":
+        assert cls.metadata.orientation[:16] == "hdf5:xyz==local:"
+        assert cls.metadata.orientation_global[:17] == "hdf5:xyz==global:"
+        local_ori = cls.metadata.orientation[16:]
+        global_ori = cls.metadata.orientation_global[17:]
+        if global_ori[local_ori.index("x")] == "z":
+            assert global_ori[local_ori.index("y")] == "x"
+            # rotated coordinates mean local x==global z and local y==global x and local z==global y
+            Xmin = cls.metadata.Zmin_global
+            Xmax = cls.metadata.Zmax_global
+            Ymin = cls.metadata.Xmin_global
+            Ymax = cls.metadata.Xmax_global
+        elif global_ori[local_ori.index("x")] == "x":
+            assert global_ori[local_ori.index("y")] == "z"
+            Xmin = cls.metadata.Xmin_global
+            Xmax = cls.metadata.Xmax_global
+            Ymin = cls.metadata.Zmin_global
+            Ymax = cls.metadata.Zmax_global
+        else:
             raise NotImplementedError(
-                "We haven't implemented any other " " global shower directions than y"
+                f"Global orientation {global_ori} not supported for local orientation {local_ori}"
             )
         # works on the assumption that the data has been saved with
         # the physical x and z scale unaltered
-        Xmin = cls.metadata.Xmin_global
-        Xmax = cls.metadata.Xmax_global
         event[..., 0] = (
             ((event[..., 0] - Xmin) * 2) / (Xmax - Xmin)
         ) - 1  # x coordinate normalization
-        Ymin = cls.metadata.Zmin_global
-        Ymax = cls.metadata.Zmax_global
         event[..., 1] = (
             ((event[..., 1] - Ymin) * 2) / (Ymax - Ymin)
         ) - 1  # z coordinate normalization
@@ -378,16 +407,19 @@ class PointCloudDataset(Dataset):
             if name_in_batch == "points":
                 continue
 
+            padding = self._prior_event_axes[name_in_batch]
             data = np.array(
                 [
-                    self.open_files[file_n][name_on_disk][event_n]
+                    self.open_files[file_n][name_on_disk][(*padding, event_n)]
                     for n_pts, file_n, event_n in self.index_list[idxs]
                 ]
             )
+
             if name_in_batch == "event":
                 data = self._event_processing(data)
-            elif len(data.shape) == 1:
-                data = data[:, np.newaxis]
+
+            if len(data.shape) == 1:
+                data = data[..., np.newaxis]
             batch[name_in_batch] = data
 
         # special case for points as it's already been processed
@@ -419,10 +451,11 @@ class PointCloudDatasetGH(PointCloudDataset):
     keys_to_include = {"event": "events", "energy": "energy"}
 
     def __init__(self, file_path, bs=32, max_ds_seq_len=1700, n_files=0):
-        self.open_files = self._open_data_files(file_path, n_files)
-        self.max_ds_seq_len = max_ds_seq_len
-        self.index_list = self._make_index_list()
         self._roll_axis = False  # no need to roll axis for GH dataset
+        self.max_ds_seq_len = max_ds_seq_len
+        self.open_files = self._open_data_files(file_path, n_files)
+        self._prior_event_axes = self._get_prior_event_axes()
+        self.index_list = self._make_index_list()
         self.front_padded = self._is_front_padded()
         self.bs = bs
 
@@ -523,6 +556,7 @@ class CaloChallangeDataset(Dataset):
         points = self.get_n_points(event, axis=-1).reshape(-1, 1)
 
         if self.cfg.norm_cond:
+            # TODO, this is sort of duplicated from conditioning.normalise_cond_feats
             energy = np.log((energy + 1e-5) / self.cfg.min_energy) / np.log(
                 self.cfg.max_energy / self.cfg.min_energy
             )
@@ -554,7 +588,10 @@ def dataset_class_from_config(config):
 
     """
     if config.dataset == "x36_grid" or config.dataset == "clustered":
-        correct_class = PointCloudDataset
+        if "p_norm_local" in get_cond_features_names(config, "diffusion"):
+            correct_class = PointCloudAngular
+        else:
+            correct_class = PointCloudDataset
     elif config.dataset == "getting_high":
         correct_class = PointCloudDatasetGH
     elif config.dataset == "calo_challenge":

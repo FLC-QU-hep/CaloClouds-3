@@ -29,7 +29,7 @@ from pointcloud.evaluation.bin_standard_metrics import (
 def make_default_binned(xyz_limits=None):
     if xyz_limits is None:
         xyz_limits = [[-1, 1], [-1, 1], [-1, 1]]
-    layer_bottom_pos = np.linspace(-1, 1, 30)
+    layer_bottom_pos = np.linspace(*xyz_limits[2], 30)
     binned = BinnedData("test", xyz_limits, 10, layer_bottom_pos, 0.05, [0.0, 0.0])
     return binned
 
@@ -261,9 +261,11 @@ def test_get_wish_models(tmpdir):
 def test_get_caloclouds_models(tmpdir):
     # Need to get the right paths
     cfg = config_creator.make("caloclouds_3")
+    cfg.cond_features = ["energy", "points"]
+    cfg.shower_flow_cond_features = ["energy"]
     test_cm_model_path = "test/example_cm_model.pt"
     # fake the flow model
     test_model_path = str(tmpdir) + "/example_flow_model.pt"
     write_fake_flow_model(cfg, test_model_path)
-    models = get_caloclouds_models(test_cm_model_path, test_model_path)
+    models = get_caloclouds_models(test_cm_model_path, test_model_path, configs=cfg)
     assert len(models) == 1

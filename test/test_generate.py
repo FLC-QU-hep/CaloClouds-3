@@ -129,6 +129,7 @@ def test_load_diffusion_model_wish(tmpdir):
 
 def test_generate_showers(tmpdir):
     config = config_creator.make("caloclouds_3", my_tmpdir=tmpdir)
+    config.cond_features = ["energy"]
     config.shower_flow_num_blocks = 10
     config.shower_flow_cond_features = ["energy"]
     params_dict = generate.make_params_dict()
@@ -142,7 +143,7 @@ def test_generate_showers(tmpdir):
     flow_model = generate.load_flow_model(config, model_path=test_model_path)
 
     diff_model = generate.load_diffusion_model(
-        config, "cm", model_path="test/example_cm_model.pt"
+        config, "cm", model_path="test/example_cm_model_condE.pt"
     )
     showers, cond_E = generate.generate_showers(
         config, 10, 20, params_dict, flow_model, diff_model
@@ -153,6 +154,7 @@ def test_generate_showers(tmpdir):
 
 def test_write_showers(tmpdir):
     config = config_creator.make("caloclouds_3", my_tmpdir=tmpdir)
+    config.cond_features = ["energy"]
     config.shower_flow_num_blocks = 10
     config.shower_flow_cond_features = ["energy"]
     params_dict = generate.make_params_dict()
@@ -167,7 +169,7 @@ def test_write_showers(tmpdir):
     test_flow_model_path = str(tmpdir) + "/example_flow_model.pt"
     write_fake_flow_model(config, test_flow_model_path)
 
-    test_diff_model_path = "test/example_cm_model.pt"
+    test_diff_model_path = "test/example_cm_model_condE.pt"
 
     generate.write_showers(config, params_dict, test_flow_model_path, test_diff_model_path)
     # probably should check the output.... TODO

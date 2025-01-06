@@ -7,6 +7,7 @@ from .common import ConcatSquashLinear, KLDloss, reparameterize_gaussian
 from .encoders.epic_encoder_cond import EPiC_encoder_cond
 
 from ..utils.misc import get_flow_model, mean_flat
+from ..data.conditioning import get_cond_dim
 
 
 class epicVAE_nFlow_kDiffusion(Module):
@@ -28,7 +29,6 @@ class epicVAE_nFlow_kDiffusion(Module):
                 device : str, device to run the model on, 'cuda' or 'cpu'
                 latent_dim : int, 0 if not used
                 features : int, number of features per point
-                cond_features : int, number of features for conditioning
                 residual : bool, if residual connections should be used
                 dropout_rate : float, dropout rate for training
                 dropout_mode : str, location of dropout layers, either 'all' or 'mid'
@@ -42,32 +42,33 @@ class epicVAE_nFlow_kDiffusion(Module):
         super().__init__()
         self.args = args
         self.distillation = distillation
+        cond_dim = get_cond_dim(args, "diffusion")
         if args.latent_dim > 0:
             self.encoder = EPiC_encoder_cond(
                 args.latent_dim,
                 input_dim=args.features,
-                cond_features=args.cond_features,
+                cond_features=cond_dim,
             )
             self.flow = get_flow_model(args)
 
         if args.dropout_rate == 0.0:
             net = PointwiseNet_kDiffusion(
                 point_dim=args.features,
-                context_dim=args.latent_dim + args.cond_features,
+                context_dim=args.latent_dim + cond_dim,
                 residual=args.residual,
             )
         else:
             if args.dropout_mode == "all":
                 net = PointwiseNet_kDiffusion_Dropout(
                     point_dim=args.features,
-                    context_dim=args.latent_dim + args.cond_features,
+                    context_dim=args.latent_dim + cond_dim,
                     residual=args.residual,
                     dropout_rate=args.dropout_rate,
                 )
             elif args.dropout_mode == "mid":
                 net = PointwiseNet_kDiffusion_Dropout_mid(
                     point_dim=args.features,
-                    context_dim=args.latent_dim + args.cond_features,
+                    context_dim=args.latent_dim + cond_dim,
                     residual=args.residual,
                     dropout_rate=args.dropout_rate,
                 )
@@ -149,7 +150,8 @@ class epicVAE_nFlow_kDiffusion(Module):
         else:
             z = cond_feats
         # loss_diffusion = self.diffusion.get_loss(x, z)    # diffusion loss
-        data_mask = x[..., 3] > 0
+        data_mask = x[..., 3] > 1e-5  # anything with very small energy is considered padding
+
         loss_diffusion = self.diffusion.loss(
             x, noise, sigma, context=z, input_mask=data_mask
         ).mean()  # diffusion loss
@@ -349,6 +351,15 @@ class Denoiser(torch.nn.Module):
         c_skip, c_out, c_in = [
             x.unsqueeze(1) for x in self.get_scalings(sigma)
         ]  # B,1,4
+        if not (input_mask is None or input_mask.all()):
+            # we need to fill some values of the input from the rest of the input
+            changes_needed = (~input_mask).sum(1)
+            for i in torch.where(changes_needed > 0)[0]:
+                event = input_mask[i]
+                possible = torch.where(event)[0]
+                idxs = possible[torch.randint(0, len(possible), (changes_needed[i],))]
+                input[i][~event] = input[i][idxs]
+
         noised_input = input + noise * k_diffusion.utils.append_dims(sigma, input.ndim)
         model_output = self.inner_model(noised_input * c_in, sigma, **kwargs)
         target = (input - c_skip * noised_input) / c_out
@@ -359,12 +370,7 @@ class Denoiser(torch.nn.Module):
         else:
             raise ValueError("diffusion_loss must be either l1 or l2")
         # now the dimensionality is taken down to the batch size.
-        if input_mask is None:
-            mean_distance = distance.flatten(1).mean(1)
-        else:
-            # don't modify anything in place, torch needs to backpropagate through the mask
-            counts_per_batch = input_mask.sum(1)*input.shape[2]
-            mean_distance = (distance.sum(2) * input_mask).sum(1) / counts_per_batch
+        mean_distance = distance.flatten(1).mean(1)
         return mean_distance
 
     def forward(

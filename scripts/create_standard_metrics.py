@@ -5,6 +5,7 @@ Please do add any new models!
 TODO; should the binned data be stored inside the repo?
 it's very lightweight after binning...
 """
+
 import numpy as np
 import os
 
@@ -66,24 +67,44 @@ except FileNotFoundError as e:
     print(e)
 try:
     pass
-    caloclouds_path = os.path.join(
-        log_base,
-        "p22_th90_ph90_en10-100/CD_2024_08_23__16_13_16/ckpt_0.439563_30000.pt"
-        #"p22_th90_ph90_en10-100/CD_2024_08_23__16_13_16/ckpt_0.447468_870000.pt",
-    )
-    parts = [
-        f"{varient}_nb{repeats}_inputs36893488147419103231"
-        for varient in ["original", "alt1", "alt2"]
-        for repeats in [4, 10]
-    ]
-    showerflow_paths = [
-        os.path.join(data_base, f"showerFlow/ShowerFlow_{part}_best.pth")
-        for part in parts
-    ]
+    # caloclouds_path = os.path.join(
+    #    log_base,
+    #    "p22_th90_ph90_en10-100/CD_2024_08_23__16_13_16/ckpt_0.439563_30000.pt"
+    #    #"p22_th90_ph90_en10-100/CD_2024_08_23__16_13_16/ckpt_0.447468_870000.pt",
+    # )
+    # parts = [
+    #    f"{varient}_nb{repeats}_inputs36893488147419103231"
+    #    for varient in ["original", "alt1", "alt2"]
+    #    for repeats in [4, 10]
+    # ]
+    # showerflow_paths = [
+    #    os.path.join(data_base, f"showerFlow/ShowerFlow_{part}_best.pth")
+    #    for part in parts
+    # ]
+    duncan_cc = "/data/dust/user/dayhallh/duncan/gen0/ckpt_0.465886_560000.pt"
+    duncan_sf = "/data/dust/user/dayhallh/duncan/gen0/ShowerFlow_alt1_nb4_inputs36893488147419103231_best.pth"
+    remade_sf = "/data/dust/user/dayhallh/point-cloud-diffusion-data/investigation2/showerFlow/10-90GeV_x36_grid_regular_524k_float32_10k/ShowerFlow_original_nb6_inputs36893488147419103231_fnorms_best.pth"
+    remade_cc = "/data/dust/user/dayhallh/point-cloud-diffusion-logs/investigation2/CD_2024_12_11__14_32_19/ckpt_0.435745_170000.pt"
+    p22_sf = "/data/dust/user/dayhallh/point-cloud-diffusion-data/investigation2/showerFlow/p22_th90_ph90_en10-100/ShowerFlow_original_nb4_inputs36893488147419103231_fnorms_best.pth"
+    p22_cc = "/data/dust/user/dayhallh/point-cloud-diffusion-logs/investigation2/CD__p22_th90_ph90_en10-1002024_12_11__18_27_01/ckpt_0.435745_170000.pt"
+    ani_cc = "/beegfs/desy/user/akorol/logs/point-clouds/CaloClouds3_dist_50steps_2024_09_19__21_17_03/ckpt_0.000000_120000.pt"
+    rani_sf = "/data/dust/user/dayhallh/point-cloud-diffusion-data/investigation2/showerFlow/sim-E1261AT600AP180-180/ShowerFlow_original_nb4_inputs36893488147419103231_fnorms_best.pth"
+    rani_cc = "/data/dust/user/dayhallh/point-cloud-diffusion-logs/investigation2/CD_sim-E1261AT600AP180-1802024_12_13__18_41_14/ckpt_0.439318_240000.pt"
+    rani2_cc = "/data/dust/user/dayhallh/point-cloud-diffusion-logs/investigation2/CD_sim-E1261AT600AP180-1802024_12_16__19_08_57/ckpt_0.392248_380000.pt"
+    p22_2_cc = "/data/dust/user/dayhallh/point-cloud-diffusion-logs/investigation2/CD_p22_th90_ph90_en10-1002024_12_16__19_12_26/ckpt_2.646811_90000.pt"
+    p22_3_cc = "/data/dust/user/dayhallh/point-cloud-diffusion-logs/investigation2/CD_p22_th90_ph90_en10-1002024_12_18__18_35_43/ckpt_0.439290_400000.pt"
+    calochal_0_cc = "/data/dust/user/dayhallh/point-cloud-diffusion-logs/investigation2/CD_10-90GeV_x36_grid_regular_524k_float322024_12_18__18_35_14/ckpt_0.350131_2120000.pt"
+    rani3_cc = "/data/dust/user/dayhallh/point-cloud-diffusion-logs/investigation2/CD_sim-E1261AT600AP180-1802024_12_18__18_36_10/ckpt_0.465144_190000.pt"
+
+
     caloclouds = get_caloclouds_models(
-        caloclouds_paths=caloclouds_path, showerflow_paths=showerflow_paths
+        caloclouds_paths=rani2_cc, showerflow_paths=rani_sf, caloclouds_names="CaloClouds unchanged",
     )
     models.update(caloclouds)
+    #caloclouds = get_caloclouds_models(
+    #    caloclouds_paths=rani3_cc, showerflow_paths=rani_sf, caloclouds_names="CaloClouds changed loss 3",
+    #)
+    #models.update(caloclouds)
 except FileNotFoundError as e:
     print("CaloClouds models not found")
     print(e)
@@ -95,15 +116,16 @@ accum_path = os.path.join(
     log_base,
     "wish/dataset_accumulators/p22_th90_ph90_en10-1/p22_th90_ph90_en10-100_seedAll_all_steps.h5",
 )
+accum_path = None
 
 
 def main(
     configs=Configs(),
     redo_g4_data=False,
     redo_g4_acc_data=False,
-    redo_model_data=True,
-    max_g4_events=0,
-    max_model_events=0,
+    redo_model_data=False,
+    max_g4_events=10_000,
+    max_model_events=10_000,
     models=models,
     accumulator_path=accum_path,
 ):
@@ -160,8 +182,8 @@ def main(
             meta.layer_bottom_pos_hdf5, meta.cell_thickness_hdf5, 0
         )
         xyz_limits = [
+            [meta.Zmin_global, meta.Zmax_global],
             [meta.Xmin_global, meta.Xmax_global],
-            [meta.Zmax_global, meta.Zmin_global],
             [raw_floors[0], raw_ceilings[-1]],
         ]
         binned_g4 = BinnedData(
@@ -205,12 +227,16 @@ def main(
             gun_pos = np.array([0, -70, 0])
 
             if "caloclouds" in model_name.lower():  # this model unnorms itself.
+
+                cc_floors, cc_ceilings = floors_ceilings(
+                    meta.layer_bottom_pos_global, meta.cell_thickness_global, 0
+                )
                 xyz_limits = [
+                    [meta.Zmin_global, meta.Zmax_global],
                     [meta.Xmin_global, meta.Xmax_global],
-                    [meta.Zmax_global, meta.Zmin_global],
-                    [floors[0], ceilings[-1]],
+                    [cc_floors[0], cc_ceilings[-1]],
                 ]
-                layer_bottom_pos = meta.layer_bottom_pos_hdf5
+                layer_bottom_pos = meta.layer_bottom_pos_global
                 rescale_energy = 1e3
                 gun_pos = np.array([0, -60, 0])
             elif "fish" in model_name.lower():
@@ -245,7 +271,11 @@ def main(
     acc_name = "Geant 4 Accumulator"
     acc_save_path = get_path(configs, acc_name)
 
-    if redo_g4_acc_data or not os.path.exists(acc_save_path):
+    if (
+        (redo_g4_acc_data
+        or not os.path.exists(acc_save_path))
+        and accumulator_path is not None
+    ):
         print(f"Need to process {acc_name}")
 
         xyz_limits = [[-1, 1], [-1, 1], [0, 29]]

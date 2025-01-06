@@ -23,6 +23,7 @@ from pointcloud.config_varients import (
     caloclouds_3_simple_shower,
 )
 from pointcloud.data.read_write import get_n_events
+from pointcloud.data.conditioning import get_cond_dim
 from pointcloud.utils import showerflow_training, showerflow_utils
 from pointcloud.utils.metadata import Metadata
 from pointcloud.models.shower_flow import (
@@ -43,8 +44,7 @@ def main(configs, batch_size=2048, total_epochs=1_000_000_000, shuffle=True):
     }
     shower_flow_compiler = versions[configs.shower_flow_version]
 
-    cond_used = showerflow_utils.get_cond_mask(configs)
-    cond_dim = np.sum(cond_used)
+    cond_dim = get_cond_dim(configs, "showerflow")
     inputs_used = showerflow_utils.get_input_mask(configs)
     cut_inputs = np.where(~inputs_used)[0]
     input_dim = np.sum(inputs_used)
@@ -203,10 +203,10 @@ def main(configs, batch_size=2048, total_epochs=1_000_000_000, shuffle=True):
     # optimizer.load_state_dict(torch.load(outpath+f'ShowerFlow_{epoch_load}.pth')['optimizer'])
     if os.path.exists(best_model_path) and not start_over:
         model.load_state_dict(
-            torch.load(best_model_path, map_location=configs.device)["model"]
+            torch.load(best_model_path, map_location=configs.device, weights_only=False)["model"]
         )
         optimizer.load_state_dict(
-            torch.load(best_model_path, map_location=configs.device)["optimizer"]
+            torch.load(best_model_path, map_location=configs.device, weights_only=False)["optimizer"]
         )
 
         # load best_loss
@@ -238,6 +238,8 @@ def main(configs, batch_size=2048, total_epochs=1_000_000_000, shuffle=True):
     for epoch in range(epoch_start, total_epochs):
         start_idx = start_points[epoch % len(start_points)]
         dataset = make_train_ds(start_idx, start_idx + local_batch_size)
+        if len(dataset) == 0:
+            continue
         train_loader = torch.utils.data.DataLoader(
             dataset,
             batch_size=batch_size,
@@ -265,10 +267,10 @@ def main(configs, batch_size=2048, total_epochs=1_000_000_000, shuffle=True):
                 print("Weights are nan!")
                 # load recent model
                 # model.load_state_dict(torch.load(latest_model_path)["model"])
-                model.load_state_dict(torch.load(best_model_path)["model"])
+                model.load_state_dict(torch.load(best_model_path, weights_only=False)["model"])
                 optimizer = optim.Adam(model.parameters(), lr=lr)
                 # optimizer.load_state_dict(torch.load(latest_model_path)['optimizer'])
-                optimizer.load_state_dict(torch.load(best_model_path)["optimizer"])
+                optimizer.load_state_dict(torch.load(best_model_path, weights_only=False)["optimizer"])
                 # change the seed so we don't get back to the same nan
                 torch.manual_seed(time.time())
                 # print(f'model from {epoch-3} epoch reloaded')
@@ -320,8 +322,8 @@ def main(configs, batch_size=2048, total_epochs=1_000_000_000, shuffle=True):
     # We will load this in order to generate some evaluation plots.
     # Setting the seed makes sure the evaluation plots are reproducable.
     # load best checkpoint
-    model.load_state_dict(torch.load(best_model_path)["model"])
-    optimizer.load_state_dict(torch.load(best_model_path)["optimizer"])
+    model.load_state_dict(torch.load(best_model_path, weights_only=False)["model"])
+    optimizer.load_state_dict(torch.load(best_model_path, weights_only=False)["optimizer"])
 
     model.eval()
     print("model loaded")

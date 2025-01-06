@@ -1,6 +1,7 @@
 """
 Utility functions extracted from the training scripts
 """
+
 from comet_ml import Experiment
 
 import torch
@@ -9,8 +10,10 @@ from torch.utils.data import DataLoader
 import k_diffusion
 import time
 import os
+import warnings
 
 
+from ..data.naming import dataset_name_from_path
 from ..data.dataset import dataset_class_from_config
 from .misc import get_new_log_dir, CheckpointManager
 from ..models.common import get_linear_scheduler
@@ -36,9 +39,10 @@ def get_comet_experiment(config, start_time):
 
 
 def get_ckp_mgr(config, start_time):
+    dataset_name = dataset_name_from_path(config.dataset_path)
     log_dir = get_new_log_dir(
         config.logdir,
-        prefix=config.name,
+        prefix=config.name + dataset_name,
         postfix="_" + config.tag if config.tag is not None else "",
         start_time=start_time,
     )
@@ -72,7 +76,8 @@ def get_optimiser_schedular(config, model):
     # Consistency Model was trained with Rectified Adam,
     # in k-diffusion AdamW is used, in EDM normal Adam
     optimiser_class = {"Adam": torch.optim.Adam, "RAdam": torch.optim.RAdam}.get(
-            config.optimizer, None)
+        config.optimizer, None
+    )
     if optimiser_class is None:
         raise NotImplementedError(f"Optimizer {config.optimizer} not implemented")
 
@@ -97,7 +102,7 @@ def get_optimiser_schedular(config, model):
 
     optimizer = optimiser_class(
         model_parameters, lr=config.lr, weight_decay=config.weight_decay
-        )
+    )
     scheduler = get_linear_scheduler(
         optimizer,
         start_epoch=config.sched_start_epoch,
@@ -109,7 +114,7 @@ def get_optimiser_schedular(config, model):
     if needs_flow:
         optimizer_flow = optimiser_class(
             flow_parameters, lr=config.lr, weight_decay=config.weight_decay
-            )
+        )
 
         scheduler_flow = get_linear_scheduler(
             optimizer_flow,
@@ -135,7 +140,7 @@ def get_pretrained(config, model):
         config.end_lr = 1e-5
 
         checkpoint = torch.load(
-            config.uda_model_path, map_location=torch.device(config.device)
+            config.uda_model_path, map_location=torch.device(config.device), weights_only=False
         )  # caloclouds for uda
         model.load_state_dict(
             checkpoint["others"]["model_ema"], strict=False

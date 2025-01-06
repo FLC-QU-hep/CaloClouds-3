@@ -1,26 +1,24 @@
 import numpy as np
 import torch
 import os
+import warnings
 
 from pointcloud.config_varients.wish import Configs
 from pointcloud.config_varients.wish_maxwell import Configs as MaxwellConfigs
 
 from pointcloud.utils.metadata import Metadata
 from pointcloud.utils.detector_map import floors_ceilings
-from pointcloud.data.read_write import read_raw_regaxes
+from pointcloud.data.conditioning import read_raw_regaxes_withcond, get_cond_dim
+from pointcloud.utils import showerflow_utils
 from pointcloud.models.wish import Wish
 from pointcloud.models.fish import Fish
-from pointcloud.models.shower_flow import (
-    compile_HybridTanH_model,
-    compile_HybridTanH_alt1,
-    compile_HybridTanH_alt2,
-)
+from pointcloud.models.shower_flow import versions_dict
 from pointcloud.models.load import get_model_class
 from pointcloud.utils.gen_utils import gen_cond_showers_batch
 
 
 from pointcloud.config_varients.wish import Configs as WishConfigs
-from pointcloud.config_varients.caloclouds_3 import Configs as CaloClouds3Configs
+from pointcloud.configs import Configs
 
 
 def try_mkdir(dir_name):
@@ -73,6 +71,7 @@ class BinnedData:
         layer_bottom_pos,
         cell_thickness,
         gun_xyz_pos,
+        hard_check=True,
     ):
         """Construct a BinnedData object.
 
@@ -95,6 +94,13 @@ class BinnedData:
             The x, y and z positions of the gun, in the coordinates the data is
             given in. The data is shifted so that the gun is at the origin.
         """
+        self.hard_check = hard_check
+        try:
+            self.sanity_layer_box(layer_bottom_pos, xyz_limits)
+        except AssertionError as e:
+            if hard_check:
+                raise
+            warnings.warn(f"Layer box sanity check failed: {e}")
         self.name = name
         self.xyz_limits = xyz_limits
         self.energy_scale = energy_scale
@@ -141,6 +147,19 @@ class BinnedData:
         )
         self.add_hist("mean energy [MeV]", "radius [mm]", 0, 500, 32)
         self.add_hist("mean energy [MeV]", "layers", 1, 30, 30)
+
+        self.max_sample_events = 10
+        self.sample_events = []
+
+    @staticmethod
+    def sanity_layer_box(layer_bottom_pos, xyz_limits):
+        z_range = xyz_limits[2][1] - xyz_limits[2][0]
+        assert (
+            abs(layer_bottom_pos[0] - xyz_limits[2][0]) < z_range / 100
+        ), f"{layer_bottom_pos[0]=} not close to {xyz_limits[2][0]=}"
+        assert (
+            abs(layer_bottom_pos[-1] - xyz_limits[2][1]) < z_range / 10
+        ), f"{layer_bottom_pos[-1]=} not close to {xyz_limits[2][1]=}"
 
     def get_gunshift(self):
         """
@@ -352,8 +371,24 @@ class BinnedData:
         events : np.array (n_showers, n_points, 4)
             The events to add to the histograms.
         """
+        if len(self.sample_events) < self.max_sample_events:
+            from_batch = list(
+                events[: (self.max_sample_events - len(self.sample_events))]
+            )
+            self.sample_events.extend(from_batch)
+
         self.box_cut(events)
         mask = events[:, :, 3] > 0
+        # sanity check 1
+        if len(events) > 4 and not np.any(mask):
+            error_message = (
+                f"Box cut removed all points from {len(events)} showers, \n"
+                f" - box cut had {self.xyz_limits=}"
+            )
+            if self.hard_check:
+                raise ValueError(error_message)
+            warnings.warn(error_message)
+
         raw_zs = events[:, :, 2][mask]
 
         rescaled = self.rescaled_events(events)
@@ -381,6 +416,53 @@ class BinnedData:
                     / energy_per_shower
                 )
                 self.counts[7 + i] += np.histogram(cog, self.bins[7 + i])[0]
+        if len(events) < 4:
+            return  # no point checking with too few events.
+
+        # sanity check 2
+        percent_populated = np.fromiter(
+            (np.sum([b > 0 for b in c]) / len(c) for c in self.counts[:10]), float
+        )
+        if np.sum(percent_populated > 0.01) > 5:
+            return
+        error_message = "Some parameters don't seem to fit in hitogram range;\n"
+        for i, percent in enumerate(percent_populated):
+            if percent > 0.5:
+                continue
+            error_message += f"{self.y_labels[i]} v.s. {self.x_labels[i]}: {percent:.0%} percent populated\n"
+            bin_min = np.min(self.bins[i])
+            bin_max = np.max(self.bins[i])
+            if i in [2, 3]:
+                bin_min = np.min(self.layer_bins)
+                bin_max = np.max(self.layer_bins)
+            error_message += f"Bin range: {bin_min:.2f} to {bin_max:.2f}\t"
+            data = {
+                0: radius,
+                1: radius,
+                2: raw_zs,
+                3: raw_zs,
+                4: energy,
+                5: hits_per_shower,
+                6: energy_per_shower,
+                7: np.sum((gun_shifted[:, :, 0] * gun_shifted[:, :, 3]), axis=1)
+                / energy_per_shower,
+                8: np.sum((gun_shifted[:, :, 1] * gun_shifted[:, :, 3]), axis=1)
+                / energy_per_shower,
+                9: np.sum((gun_shifted[:, :, 2] * gun_shifted[:, :, 3]), axis=1)
+                / energy_per_shower,
+            }.get(i)
+            if len(data):
+                error_message += (
+                    f"Data range: {np.nanmin(data):.2f} to {np.nanmax(data):.2f}, \n"
+                )
+            else:
+                error_message += "No data to show range, \n"
+        error_message += (
+            "change construction arguments of BinnedData, or check input data."
+        )
+        if self.hard_check:
+            raise ValueError(error_message)
+        warnings.warn(error_message)
 
     def __str__(self):
         text = ""
@@ -428,6 +510,7 @@ class BinnedData:
             to_save[name] = getattr(self, name)
         for i, counts in enumerate(self.counts):
             to_save[f"counts_{i}"] = counts
+        to_save["sample_events"] = np.array(self.sample_events)
         np.savez(path, **to_save)
 
     @classmethod
@@ -448,6 +531,8 @@ class BinnedData:
         """
         saved = np.load(path, allow_pickle=True)
         args = {name: saved[name] for name in cls.arg_names}
+        # don't hard check when loading, the data exists already
+        args["hard_check"] = False
         this = cls(**args)
         for i in range(len(this)):
             try:
@@ -455,6 +540,10 @@ class BinnedData:
             except KeyError:
                 print(f"No saved data for counts {i}")
         this.recompute_mean_energies()
+        try:
+            this.sample_events = saved["sample_events"]
+        except KeyError:
+            print("No saved sample events")
         return this
 
 
@@ -477,7 +566,7 @@ def sample_g4(configs, binned, n_events):
 
     for b, start in enumerate(batch_starts):
         print(f"{b/n_batches:.1%}", end="\r", flush=True)
-        energy, events = read_raw_regaxes(
+        cond, events = read_raw_regaxes_withcond(
             configs, pick_events=slice(start, start + batch_len)
         )
         binned.add_events(events)
@@ -507,8 +596,8 @@ def sample_model(configs, binned, n_events, model, shower_flow=None):
 
     Returns
     -------
-    energy : np.array (n_events,)
-        The incident energy of the particle gun of each event.
+    cond : np.array (n_events, C)
+        The incident conditioning of the particle gun of each event.
     events : np.array (n_events, n_points, 4)
         The events produced by the model
         with the last axis being [x, y, z, energy].
@@ -525,19 +614,19 @@ def sample_model(configs, binned, n_events, model, shower_flow=None):
 
     for b, start in enumerate(batch_starts):
         print(f"{b/n_batches:.1%}", end="\r", flush=True)
-        energy, _ = read_raw_regaxes(
-            configs, pick_events=slice(start, start + batch_len)
+        cond, _ = read_raw_regaxes_withcond(
+            configs,
+            pick_events=slice(start, start + batch_len),
+            for_model=["showerflow", "diffusion"],
         )
-        energy = torch.Tensor(energy.reshape(-1, 1))
-        # events = model.sample(energy, configs.max_points)
         events = gen_cond_showers_batch(
-            model, shower_flow, energy, bs=batch_len, config=configs
+            model, shower_flow, cond, bs=batch_len, config=configs
         )
         binned.add_events(events)
     print()
     print("Done")
     binned.recompute_mean_energies()
-    return energy, events
+    return cond, events
 
 
 def sample_accumulator(configs, binned, acc, n_events):
@@ -707,6 +796,7 @@ def get_caloclouds_models(
     device="cpu",
     caloclouds_names="CaloClouds3",
     showerflow_names="",
+    configs=None,
 ):
     """
     Gather a set of models for evaluation. Currently just one.
@@ -727,6 +817,9 @@ def get_caloclouds_models(
     showerflow_names: list of str, optional
         The names of the models, by default empty
         or if multiple paths are given, the filenames will be used
+    configs : Configs, optional
+        The configuration used to create the models, by default
+        the files global configs is used.
 
     Returns
     -------
@@ -736,9 +829,9 @@ def get_caloclouds_models(
         configuration used to create the model.
     """
     models = {}
-    configs = CaloClouds3Configs()
+    if configs is None:
+        configs = Configs()
     configs.device = device
-    model = get_model_class(configs)(configs).to(device)
 
     if isinstance(caloclouds_paths, str):
         caloclouds_paths = [caloclouds_paths]
@@ -750,44 +843,40 @@ def get_caloclouds_models(
         showerflow_names = [showerflow_names]
     elif isinstance(showerflow_names, str):
         showerflow_names = filenames_to_labels(showerflow_paths)
-    versions = {
-        "original": compile_HybridTanH_model,
-        "alt1": compile_HybridTanH_alt1,
-        "alt2": compile_HybridTanH_alt2,
-    }
 
     for calocloud_name, calocloud_path in zip(caloclouds_names, caloclouds_paths):
         for showerflow_name, showerflow_path in zip(showerflow_names, showerflow_paths):
-            if not showerflow_name:
-                version = versions["original"]
-            else:
-                for name, version in versions.items():
-                    if name in showerflow_name:
-                        break
+            model = get_model_class(configs)(configs).to(device)
+            print(calocloud_path)
             model.load_state_dict(
-                torch.load(calocloud_path, map_location=device)["state_dict"]
-            )
-            if "_nb" in showerflow_name:
-                num_blocks = showerflow_name.split("_nb")[1].split("_")[0]
-                num_blocks = int(num_blocks)
-            else:
-                num_blocks = 10
-            flow_model, flow_dist, _ = version(
-                num_blocks=num_blocks, num_inputs=65, num_cond_inputs=1, device=device
+                torch.load(calocloud_path, map_location=device, weights_only=False)["state_dict"]
             )
             try:
-                flow_model.load_state_dict(
-                    torch.load(showerflow_path, map_location=device)["model"]
+                showerflow_configs = showerflow_utils.configs_from_showerflow_path(
+                    configs, showerflow_path
                 )
-            except Exception as e:
-                print(f"Failed to load {showerflow_path}", flush=True)
-                print(f"version: {version}, num_blocks: {num_blocks}", flush=True)
-                raise e
+            except AssertionError:
+                warnings.warn(
+                    f"Couldn't create configs from {showerflow_path}, using input configs"
+                )
+                showerflow_configs = configs
+            input_mask = showerflow_utils.get_input_mask(showerflow_configs)
+            version = versions_dict[showerflow_configs.shower_flow_version]
+            flow_model, flow_dist, _ = version(
+                num_blocks=showerflow_configs.shower_flow_num_blocks,
+                num_inputs=np.sum(input_mask),
+                num_cond_inputs=get_cond_dim(showerflow_configs, "showerflow"),
+                device=device,
+            )
+            print(showerflow_path)
+            flow_model.load_state_dict(
+                torch.load(showerflow_path, map_location=device, weights_only=False)["model"]
+            )
             name = (
                 f"{calocloud_name}-{showerflow_name}"
                 if showerflow_name
                 else calocloud_name
             )
-            models[name] = (model, flow_dist, configs)
+            models[name] = (model, flow_dist, showerflow_configs)
 
     return models

@@ -74,6 +74,8 @@ def test_yield_g4_showers():
 def test_shower_generator_factory(tmpdir):
     # Need to test the g4 version
     config = config_creator.make()
+    config.cond_features = 1
+    config.shower_flow_cond_features = 1
     param_dict = generate_for_metrics.make_params_dict("g4")
     param_dict["g4_data_path"] = "test/mini_data_sample.hdf5"
     shower_generator = generate_for_metrics.shower_generator_factory(config, param_dict)
@@ -89,7 +91,7 @@ def test_shower_generator_factory(tmpdir):
     param_dict = generate_for_metrics.make_params_dict("cm")
     param_dict["n_events"] = 10
     param_dict["batch_size"] = 2
-    param_dict["diffusion_model_path"] = "test/example_cm_model.pt"
+    param_dict["diffusion_model_path"] = "test/example_cm_model_condE.pt"
     test_model_path = str(tmpdir) + "/example_flow_model.pt"
     write_fake_flow_model(config, test_model_path)
     param_dict["flow_model_path"] = test_model_path

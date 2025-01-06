@@ -31,8 +31,8 @@ def time_pattern(factory, pattern, count_bins, cond, pattern_repeats):
         for r, repeats in reversed(list(enumerate(pattern_repeats))):
             # for r, repeats in enumerate(pattern_repeats):
             _, flow_dist = factory.create(repeats, pattern, count_bins=count_bins)
-            for i, incident_energy in enumerate(cond):
-                dist = flow_dist.condition(incident_energy)
+            for i, this_cond in enumerate(cond):
+                dist = flow_dist.condition(this_cond)
                 t0 = time.time()
                 dist.sample(sample_size)
                 t1 = time.time()
@@ -60,8 +60,8 @@ def time_saved(models, cond):
         first = True
         for q in range(repeats):
             print(f"{(big_tick + q)/ticks:.0%}", end="\r")
-            for i, incident_energy in enumerate(cond):
-                dist = flow_dist.condition(incident_energy)
+            for i, this_cond in enumerate(cond):
+                dist = flow_dist.condition(this_cond)
                 t0 = time.time()
                 dist.sample(sample_size)
                 t1 = time.time()
@@ -130,7 +130,7 @@ def model_loader(configs, model_path):
         num_cond_inputs=cond_dim,
         device=device,
     )  # num_cond_inputs
-    model.load_state_dict(torch.load(model_path)["model"])
+    model.load_state_dict(torch.load(model_path, weights_only=False)["model"])
     return distribution
 
 

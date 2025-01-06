@@ -5,8 +5,13 @@ from ..models.load import get_model_class
 from ..config_varients.wish import Configs
 from ..utils.gen_utils import get_shower
 from ..utils.metadata import Metadata
-from ..data.read_write import read_raw_regaxes
+from ..data.conditioning import read_raw_regaxes_withcond
 from ..utils.detector_map import floors_ceilings
+from ..data.dataset import (
+    PointCloudDataset,
+    PointCloudAngular,
+    PointCloudDatasetUnordered,
+)
 
 
 def events_to_hits_per_layer(events, config):
@@ -21,7 +26,7 @@ def events_to_hits_per_layer(events, config):
         The last dimension is (x, y, z, e).
     config : pointcloud.configs.Configs
         The configuration object.
-    
+
     Returns
     -------
     hits_per_layer : np.array (bs, num_layers)
@@ -30,11 +35,11 @@ def events_to_hits_per_layer(events, config):
     """
     meta = Metadata(config)
     floors, ceilings = floors_ceilings(
-        meta.layer_bottom_pos_raw, meta.cell_thickness_raw
+        meta.layer_bottom_pos_hdf5, meta.cell_thickness_hdf5
     )
     mask = events[:, :, 3] > 0
     hits = [
-        ((events[:, :, 1] < c) & (events[:, :, 1] > f) & mask).sum(axis=1)
+        ((events[:, :, 2] < c) & (events[:, :, 2] > f) & mask).sum(axis=1)
         for f, c in zip(floors, ceilings)
     ]
     hits_per_layer = np.vstack(hits).T
@@ -42,11 +47,10 @@ def events_to_hits_per_layer(events, config):
     return hits_per_layer
 
 
-
 def gen_raw_caloclouds(
     model,
     hits_per_layer,
-    cond_E_batch,
+    cond,
     config,
 ):
     """
@@ -59,8 +63,8 @@ def gen_raw_caloclouds(
         The model to generate showers from.
     hits_per_layer : np.array (bs, num_layers)
         Number of hits per layer in the events.
-    cond_E_batch : np.array (bs, 1)
-        The incident energies of the showers.
+    cond: np.array (bs, C)
+        The conditioning of the showers in this batch.
     config : pointcloud.configs.Configs
         The configuration object.
 
@@ -69,17 +73,13 @@ def gen_raw_caloclouds(
     points : np.array (bs, max_points, 4)
         The generated showers. The third dimension is (x, y, z, e)
     """
-    bs = cond_E_batch.size(0)
+    bs = cond.size(0)
     max_num_clusters = hits_per_layer.sum(axis=1).max()
-    cond_N = (
-        torch.Tensor(hits_per_layer.sum(axis=1)).to(config.device).unsqueeze(-1)
-    )
 
     fake_showers = get_shower(
         model,
         max_num_clusters,
-        cond_E_batch,
-        cond_N,
+        cond,
         bs=bs,
         config=config,
     )
@@ -87,7 +87,7 @@ def gen_raw_caloclouds(
     return points
 
 
-def process_events(model_path, configs, n_events):
+def process_events(model_path, configs, n_events, dataloader=None, n_files=0):
     """
     Run caloclouds using hits per layer drawn from G4 events.
 
@@ -107,33 +107,54 @@ def process_events(model_path, configs, n_events):
     points : np.array (n_events, max_points, 4)
         The generated showers. The third dimension is (x, y, z, e)
     """
-    model = get_model_class(configs)(configs).to(configs.device)
-    model.load_state_dict(
-        torch.load(model_path, map_location=configs.device)["state_dict"]
-    )
-
+    batch_len = 100
     meta = Metadata(configs)
-    n_layers = len(meta.layer_bottom_pos_raw)
+    if dataloader is None:
+        assert model_path.endswith(".pt")
+        model = get_model_class(configs)(configs).to(configs.device)
+        model.load_state_dict(
+            torch.load(model_path, map_location=configs.device, weights_only=False)["state_dict"]
+        )
+    else:
+        assert not model_path.endswith(".pt")
+        i = 0
+        dataloader_class = {
+            "PointCloudDataset": PointCloudDataset,
+            "PointCloudAngular": PointCloudAngular,
+            "PointCloudDatasetUnordered": PointCloudDatasetUnordered,
+        }.get(dataloader)
+        dataloader_class.metadata = meta
+        dataloader = dataloader_class(model_path, bs=batch_len, n_files=n_files)
+
+    n_layers = len(meta.layer_bottom_pos_hdf5)
 
     hits_per_layer = np.zeros((n_events, n_layers), dtype=int)
     max_points = 10_000
     points = np.zeros((n_events, max_points, 4), dtype=float)
 
-    batch_len = 100
     batch_starts = np.arange(0, n_events, batch_len)
     n_batches = np.ceil(n_events / batch_len)
 
     for b, start in enumerate(batch_starts):
         print(f"{b/n_batches:.1%}", end="\r", flush=True)
-        energy, events = read_raw_regaxes(
-            configs, pick_events=slice(start, start + batch_len)
+        cond, events = read_raw_regaxes_withcond(
+            configs,
+            pick_events=slice(start, start + batch_len),
+            for_model="diffusion",
         )
-        cond_E_batch = torch.Tensor(energy).to(configs.device).unsqueeze(-1)
+        cond = torch.Tensor(cond).to(configs.device)
+        if len(cond.shape) == 1:
+            cond = cond.unsqueeze(-1)
+
         hits_per_layer_batch = events_to_hits_per_layer(events, configs)
         hits_per_layer[start : start + batch_len] = hits_per_layer_batch
-        points_batch = gen_raw_caloclouds(
-            model, hits_per_layer_batch, cond_E_batch, configs
-        )
+        if dataloader is None:
+            points_batch = gen_raw_caloclouds(
+                model, hits_per_layer_batch, cond, configs
+            )
+        else:
+            points_batch = dataloader[i]["event"]
+            i += 1
         pnts_found = points_batch.shape[1]
         points[start : start + batch_len, :pnts_found] = points_batch[:, :max_points]
     return hits_per_layer, points

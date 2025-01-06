@@ -1,7 +1,7 @@
 import torch
 import torch.nn.functional as F
 from torch import nn
-import torch.nn.utils.weight_norm as weight_norm
+from torch.nn.utils.parametrizations import weight_norm
 
 
 ######################################

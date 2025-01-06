@@ -1,9 +1,13 @@
 import os
 import numpy as np
 import copy
+import warnings
+import itertools
 
+from pointcloud.data.naming import dataset_name_from_path
 from pointcloud.models.shower_flow import versions_dict
 from .metadata import Metadata
+from ..data.conditioning import get_cond_features_names
 
 
 def get_data_dir(configs, last_resort="/home/{}/Data/"):
@@ -22,14 +26,7 @@ def get_data_dir(configs, last_resort="/home/{}/Data/"):
 def get_showerflow_dir(configs):
     dataset_path = configs.dataset_path
     base_path = get_data_dir(configs)
-    dataset_name_key = ".".join(os.path.basename(dataset_path).split(".")[:-1])
-    if "{" in dataset_name_key:
-        dataset_name_key = dataset_name_key.split("{")[0]
-    if "seed" in dataset_name_key:
-        dataset_name_key = dataset_name_key.split("seed")[0]
-    if "file" in dataset_name_key:
-        dataset_name_key = dataset_name_key.split("file")[0]
-    dataset_name_key = dataset_name_key.strip("_")
+    dataset_name_key = dataset_name_from_path(dataset_path)
 
     showerflow_dir = os.path.join(base_path, "showerFlow", dataset_name_key)
     return showerflow_dir
@@ -62,10 +59,9 @@ def model_save_paths(configs, version, num_blocks, cut_inputs):
 def get_cond_mask(configs):
     max_cond_inputs = 4
     inputs_used = np.zeros(max_cond_inputs, dtype=bool)
-    if "energy" in configs.shower_flow_cond_features:
-        inputs_used[0] = True
-    if "p_norm_local" in configs.shower_flow_cond_features:
-        inputs_used[1:] = True
+    names = get_cond_features_names(configs, "showerflow")
+    inputs_used[0] = "energy" in names
+    inputs_used[1:] = "p_norm_local" in names
     return inputs_used
 
 
@@ -86,6 +82,28 @@ def get_input_mask(configs):
     return inputs_used
 
 
+def input_mask_to_list(input_mask):
+    max_input_dims = 65
+    assert len(input_mask) == max_input_dims
+    inputs = []
+    if input_mask[0]:
+        inputs.append("total_clusters")
+    if input_mask[1]:
+        inputs.append("total_energy")
+    for i, c in enumerate("xyz"):
+        if input_mask[2 + i]:
+            inputs.append(f"cog_{c}")
+    if np.all(input_mask[5:35]):
+        inputs.append("clusters_per_layer")
+    elif np.any(input_mask[5:35]):
+        raise NotImplementedError("Cannot handle partial layer inputs")
+    if np.all(input_mask[35:]):
+        inputs.append("energy_per_layer")
+    elif np.any(input_mask[35:]):
+        raise NotImplementedError("Cannot handle partial layer inputs")
+    return inputs
+
+
 def existing_models(configs):
     saved_models = {}
     saved_models["versions"] = []
@@ -97,32 +115,128 @@ def existing_models(configs):
     saved_models["cond_features"] = []
     saved_models["fixed_input_norms"] = []
 
-    for version in versions_dict:
-        for nb in range(1, 100):
-            for ci in ["", "01", "014", "01234"]:
-                name, model_path, data_path = model_save_paths(configs, version, nb, ci)
-                fixed_input_norms = getattr(
-                    configs, "shower_flow_fixed_input_norms", False
-                )
-                if not os.path.exists(model_path):
-                    # print(f"Skipping {name}")
-                    continue
-                saved_models["paths"].append(model_path)
-                saved_models["names"].append(name)
-                saved_models["versions"].append(version)
-                saved_models["num_blocks"].append(nb)
-                saved_models["cut_inputs"].append(ci)
-                saved_models["cond_features"].append(configs.shower_flow_cond_features)
-                saved_models["fixed_input_norms"].append(fixed_input_norms)
-                with open(data_path, "r") as f:
-                    text = f.read().split()
-                    saved_models["best_loss"].append(float(text[0]))
-                if nb == 4:
-                    print(f"{name} has best loss {saved_models['best_loss'][-1]}")
+    combinations = itertools.product(
+        versions_dict.keys(), range(1, 100), ["", "01", "014", "01234"]
+    )
+
+    for version, nb, ci in combinations:
+        name, model_path, data_path = model_save_paths(configs, version, nb, ci)
+        fixed_input_norms = getattr(configs, "shower_flow_fixed_input_norms", False)
+        if not os.path.exists(model_path):
+            continue
+        cond_feature_names = get_cond_features_names(configs, "showerflow")
+        saved_models["paths"].append(model_path)
+        saved_models["names"].append(name)
+        saved_models["versions"].append(version)
+        saved_models["num_blocks"].append(nb)
+        saved_models["cut_inputs"].append(ci)
+        saved_models["cond_features"].append(cond_feature_names)
+        saved_models["fixed_input_norms"].append(fixed_input_norms)
+        with open(data_path, "r") as f:
+            text = f.read().split()
+            saved_models["best_loss"].append(float(text[0]))
+        if nb == 4:
+            print(f"{name} has best loss {saved_models['best_loss'][-1]}")
     names = saved_models["names"]
     print(f"Found {len(names)} saved models")
+    return saved_models
+
+
+def models_at_paths(cond_features, check_paths):
+    saved_models = {}
+    saved_models["versions"] = []
+    saved_models["names"] = []
+    saved_models["num_blocks"] = []
+    saved_models["cut_inputs"] = []
+    saved_models["best_loss"] = []
+    saved_models["paths"] = []
+    saved_models["cond_features"] = []
+    saved_models["fixed_input_norms"] = []
+
+    for model_path in check_paths:
+        if isinstance(model_path, str):
+            name = os.path.basename(model_path).split("ShowerFlow_")[1].split(".pth")[0]
+            data_path = model_path.replace(".pth", "_data.txt")
+        else:
+            assert len(model_path) == 3
+            name, model_path, data_path = model_path
+
+        if not os.path.exists(model_path):
+            warnings.warn(
+                f"Path {model_path} given to showerflow_utils.models_at_paths but does not exist"
+            )
+        version, nb, ci, _, fixed_input_norms = config_params_from_showerflow_path(
+            model_path
+        )
+        saved_models["paths"].append(model_path)
+        saved_models["names"].append(name)
+        saved_models["versions"].append(version)
+        saved_models["num_blocks"].append(nb)
+        saved_models["cut_inputs"].append(ci)
+        saved_models["cond_features"].append(cond_features)
+        saved_models["fixed_input_norms"].append(fixed_input_norms)
+        if not os.path.exists(data_path):
+            warnings.warn(f"Data path {data_path} does not exist")
+            saved_models["best_loss"].append(np.nan)
+        else:
+            with open(data_path, "r") as f:
+                text = f.read().split()
+                saved_models["best_loss"].append(float(text[0]))
 
     return saved_models
+
+
+def config_params_from_showerflow_path(showerflow_path):
+    # otherwise, we can guess from the path
+    base_name = os.path.basename(showerflow_path)
+    assert base_name.startswith(
+        "ShowerFlow_"
+    ), f"Base name of path {showerflow_path} does not start with 'ShowerFlow_'"
+    # we can reverse engineer the path
+    parts = base_name.split(".pth")[0].split("_")
+    version = parts[1]
+    num_blocks = int(next(part[2:] for part in parts if part.startswith("nb")))
+    inputs_used_as_base10 = int(
+        next(part[6:] for part in parts if part.startswith("inputs"))
+    )
+    inputs_used_mask = [x == "1" for x in f"{inputs_used_as_base10:b}"]
+    inputs = input_mask_to_list(inputs_used_mask)
+    fixed_input_norms = "fnorms" in parts
+    cut_inputs = "".join([str(i) for i in range(5) if not inputs_used_mask[i]])
+    return version, num_blocks, cut_inputs, inputs, fixed_input_norms
+
+
+def configs_from_showerflow_path(configs, showerflow_path):
+    # get existing models
+    saved_models = existing_models(configs)
+    # check if the path is in the list
+    if showerflow_path in saved_models["paths"]:
+        idx = saved_models["paths"].index(showerflow_path)
+        configs = construct_configs(configs, saved_models, idx)
+        return configs
+    # try just the base name
+    base_name = os.path.basename(showerflow_path)
+    found_base_names = [os.path.basename(p) for p in saved_models["paths"]]
+    if found_base_names.count(base_name) == 1:  # unique match
+        idx = found_base_names.index(base_name)
+        configs = construct_configs(configs, saved_models, idx)
+        return configs
+
+    warnings.warn(
+        f"Did not generate the path {showerflow_path} when looking for existing models."
+        " This may indicate there is something unusual about the path."
+        " Deducing the configs by processing the file name."
+    )
+    version, num_blocks, cut_inputs, inputs, fixed_input_norms = (
+        config_params_from_showerflow_path(showerflow_path)
+    )
+    # otherwise, we can guess from the path
+    configs = copy.deepcopy(configs)
+    configs.shower_flow_version = version
+    configs.shower_flow_num_blocks = num_blocks
+    configs.shower_flow_inputs = inputs
+    configs.shower_flow_fixed_input_norms = fixed_input_norms
+    return configs
 
 
 def construct_configs(config_base, saved_models, idx):

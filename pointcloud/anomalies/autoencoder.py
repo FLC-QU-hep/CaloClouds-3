@@ -34,7 +34,7 @@ class GraphAutoencoder(nn.Module):
         As the save files contain the input and hidden dimensions, we can
         load the model without needing to specify them
         """
-        state_dict = torch.load(path)
+        state_dict = torch.load(path, weights_only=False)
         model = cls(state_dict["input_dim"], state_dict["hidden_dim"])
         del state_dict["input_dim"]
         del state_dict["hidden_dim"]

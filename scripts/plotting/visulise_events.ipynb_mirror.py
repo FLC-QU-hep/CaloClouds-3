@@ -5,19 +5,16 @@
 # 
 # Viewing events produced by the model is mostly a sanity check.
 # 
-# While looking at the G4 data a common need is to check for anomalous data. This is done with the help pf functions in `pointcloud.utils.clean_data`.
-# 
 # ## Start with imports and configs
 import numpy as np
+import torch
 import matplotlib.pyplot as plt
-from mpl_toolkits.mplot3d import Axes3D
 
-from pointcloud.config_varients.wish import Configs
-from pointcloud.config_varients.wish_maxwell import Configs as MaxwellConfigs
-from pointcloud.config_varients.default import Configs as DefaultConfigs
+from pointcloud.config_varients.bug_dip import Configs
 
 from pointcloud.data.read_write import read_raw_regaxes, get_n_events
-#from pointcloud.utils.clean_data import mask_showerless
+from pointcloud.utils.gen_utils import gen_cond_showers_batch
+from pointcloud.evaluation.bin_standard_metrics import sample_model, get_caloclouds_models
 
 import os
 
@@ -27,14 +24,19 @@ def try_mkdir(dir_name):
     except FileExistsError:
         pass
 
-
-from visulise_data import plot_data_iteration
-#%matplotlib widget
+%matplotlib widget
 
 
-%run visulise_data.py
-configs = MaxwellConfigs()
-defaults = DefaultConfigs()
+#%run visulise_data.py
+configs = Configs()
+
+
+try:
+    configs.device = "cuda"
+    incident_energies = torch.linspace(0.1, 1.0, 5)[:, None].to(configs.device)
+except Exception as e:
+    configs.device = "cpu"
+    incident_energies = torch.linspace(0.1, 1.0, 5)[:, None].to(configs.device)
 configs.poly_degree = 1
 #configs.dataset_path_in_storage = False
 #configs.dataset_path = "../../../point-cloud-diffusion-data/even_batch_10k.h5"
@@ -43,13 +45,16 @@ configs.poly_degree = 1
 #configs.dataset_path_in_storage = True
 #configs._dataset_path = defaults._dataset_path
 # Grab some random events and plot one with a function from elsewhere.
-energies, events = read_raw_regaxes(configs, list(range(0, 1000)))
-print((energies.shape, events.shape))
-plot_data_iteration(events, energies, event_n=5)
+# ## Custom plot function
+# 
+# We actually need fixed axes lengths to compare data easly.
+# Because all our data has different scales on, it's easier to have a plot function that lets us rescale on the fly.
+# 
+# Also define a way to plot the output of a model at specified incident energy.
 
 
 
-def plot_event(event_n, energy_in, use_event, energy_scale=1, x_scale=1):
+def plot_event(event_n, energy_in, use_event, energy_scale=1, x_scale=1, ax=None, flat=False):
     energy = use_event[:, 3]
     mask = energy>0
     n_points = sum(mask)
@@ -57,79 +62,93 @@ def plot_event(event_n, energy_in, use_event, energy_scale=1, x_scale=1):
     xs = use_event[mask, 0] * x_scale
     ys = use_event[mask, 1] * x_scale
     zs = use_event[mask, 2] 
-    fig = plt.figure()
-    ax = fig.add_subplot(111, projection='3d')
-    ax.scatter(xs, ys, zs, c=energy, s=energy, cmap='viridis')
+    if ax is None:
+        fig = plt.figure()
+        if flat:
+            ax = fig.add_subplot(111)
+        else:
+            ax = fig.add_subplot(111, projection='3d')
+    if flat:   
+        ax.scatter(ys, zs, c=np.log(energy), s=energy, cmap='viridis')
+    else:
+        ax.scatter(xs, ys, zs, c=np.log(energy), s=energy, cmap='viridis')
+        ax.set_zlabel('z')
     ax.set_xlabel('x')
     ax.set_ylabel('y')
-    ax.set_zlabel('z')
-    ax.set_xlim(-150, 150)
-    ax.set_ylim(-150, 150)
+    #ax.set_xlim(-150, 150)
+    #ax.set_ylim(-150, 150)
     # write a title
     observed_energy = energy.sum()
-    ax.set_title(f'Evt: {event_n}, $n_{{pts}}$: {n_points}, $E_{{in}}$: {energy_in:.2f}, $E_{{vis}}$: {observed_energy:.2f}')
-    
-def plot_model(energy_in, model):
+    ax.set_title(f'Evt: {event_n}, $n_{{pts}}$: {n_points},\n $E_{{in}}$: {energy_in:.2f}, $E_{{vis}}$: {observed_energy:.2f}')
+
+def plot_wish_model(energy_in, model, ax=None, flat=False):
     xs, ys, zs, es = model.inference(energy_in)
     event = np.empty((len(xs), 4))
     event[:, 0] = xs
     event[:, 1] = ys
     event[:, 2] = zs
     event[:, 3] = es
-    plot_event("Modeled", energy_in, event, energy_scale=1., x_scale=150)
+    plot_event("Modeled", energy_in, event, energy_scale=1., x_scale=150, ax=ax, flat=flat)
 
 # ### G4
 # 
 # Quickly plot a few G4 events. Shows some expected behavior.
 # high anomaly
-#for event_n in [0, 2, 15, 98]:
-for event_n in [ 24,   0, 189,   5,  33,   3,  22, 298, 877,  23 ]:
-    # make a 3d plot of the x, y, z points in the events array
+fig = plt.figure(figsize=(15, 5))
+use_events = [0, 2, 189]
+energies, events = read_raw_regaxes(configs, use_events)
+for i, event_n in enumerate(use_events):
+    ax = fig.add_subplot(131+i, projection='3d')
     
-    energy_in = energies[event_n]
-    use_event = events[event_n]
-    plot_event(event_n, energy_in, use_event, energy_scale=1000)
+    energy_in = energies[i]
+    use_event = events[i]
+    plot_event(event_n, energy_in, use_event, energy_scale=1000, ax=ax)
 
 # ### Wish
 # 
 # Plot those same energies from the model.
 from pointcloud.models.wish import Wish, load_wish_from_accumulator
 
+if False:
+    #wish_path = "../../../point-cloud-diffusion-logs/wish/dataset_accumulators/10-90GeV_x36_grid_regular_524k_float32/wish_from_10.pt"
+    wish_path = "../../../point-cloud-diffusion-logs/wish/dataset_accumulators/p22_th90_ph90_en10-1/wish_poly1.pt"
+    accumulator_path = "../../../point-cloud-diffusion-logs/wish/dataset_accumulators/p22_th90_ph90_en10-100_accumulator.h5"
+    # acaccumulator_path = "../../../point-cloud-diffusion-logs/wish/dataset_accumulators/10-90GeV_x36_grid_regular_524k_float32/from_10_0p25.h5"
+    
+    configs.fit_attempts = 3
+    wish_model = Wish(configs)
+    #wish_model = load_wish_from_accumulator(accumulator_path)
+    #wish_model.save(wish_path)
+    wish_model = Wish.load(wish_path)
+    
+    fig = plt.figure(figsize=(15, 5))
+    for i, e in enumerate([10, 50, 90]):
+        ax = fig.add_subplot(131+i, projection='3d')
+        plot_wish_model(e, wish_model, ax=ax)
+caloclouds = "/data/dust/user/dayhallh/duncan/gen0/ckpt_0.465886_560000.pt"
+showerflow = "/data/dust/user/dayhallh/duncan/gen0/ShowerFlow_alt1_nb4_inputs36893488147419103231_best.pth"
+new_caloclouds = "/data/dust/user/dayhallh/point-cloud-diffusion-logs/investigation2/CD_2024_12_11__14_32_19/ckpt_0.435745_170000.pt"
+new_showerflow = "/data/dust/user/dayhallh/point-cloud-diffusion-data/investigation2/showerFlow/10-90GeV_x36_grid_regular_524k_float32_10k/ShowerFlow_original_nb6_inputs36893488147419103231_fnorms_best.pth"
+cond = torch.tensor([10, 50, 90])[None, :].T
 
-#wish_path = "../../../point-cloud-diffusion-logs/wish/dataset_accumulators/10-90GeV_x36_grid_regular_524k_float32/wish_from_10.pt"
-wish_path = "../../../point-cloud-diffusion-logs/wish/dataset_accumulators/p22_th90_ph90_en10-1/wish_poly1.pt"
-accumulator_path = "../../../point-cloud-diffusion-logs/wish/dataset_accumulators/p22_th90_ph90_en10-100_accumulator.h5"
-# acaccumulator_path = "../../../point-cloud-diffusion-logs/wish/dataset_accumulators/10-90GeV_x36_grid_regular_524k_float32/from_10_0p25.h5"
+for sf in ["new", "gen0"]:
+    sf_path = showerflow if sf == "gen0" else new_showerflow
+    for cc in ["new", "gen0"]:
+        cc_path = caloclouds if cc == "gen0" else new_caloclouds
+
+        cc_model, dist, showerflow_configs = get_caloclouds_models(caloclouds_paths=cc_path, showerflow_paths=sf_path, configs=configs)["CaloClouds3"]
+        batch = gen_cond_showers_batch(cc_model, dist, cond, config=showerflow_configs)
 
 
-wish_model = Wish(configs)
-#wish_model = load_wish_from_accumulator(accumulator_path)
-#wish_model.save(wish_path)
-wish_model = Wish.load(wish_path)
 
-for e in [10, 30, 50, 90]:
-    plot_model(e, wish_model)
-# ## Find anomaly limits
-# 
-# Trying to create a range of images that would allow finding the limits of when the data becomes non-showers.
-# # MIP peak
-# 
-# Quick look at the energy spectrum, investigating the MIP peak.
-energies, events = read_raw_regaxes(configs, total_size=2000)
-energies = events[:, :, 3].flatten()
-mask = energies>0
-log_x = True
-n_bins = 50
-if log_x:
-    bins = np.logspace(np.log10(0.05), np.log10(1.), n_bins)
-else:
-    bins = n_bins
-mip_max = 0.25
-mip_energies = energies<mip_max * mask
-non_mip_energies = energies>mip_max * mask
-plt.hist(energies[mask], bins=bins)
-plt.hist(energies[mip_energies], bins=bins)
-if log_x:
-    plt.semilogx()
-plt.semilogy()
+        fig = plt.figure(figsize=(15, 10))
+        for i, e in enumerate(cond.detach().flatten()):
+            ax = fig.add_subplot(231+i, projection='3d')
+            plot_event(f"{cc=}, {sf=}", e, batch[i], ax=ax)
+        for i, e in enumerate(cond.detach().flatten()):
+            ax = fig.add_subplot(234+i)
+            plot_event(f"{cc=}, {sf=}", e, batch[i], ax=ax, flat=True)
+
+
+
 

@@ -2,6 +2,8 @@ import numpy as np
 import torch
 from tqdm import tqdm
 
+from .utils.conditioning import get_cond_feature_names
+
 
 def get_cog(x, y, z, e):
     return (
@@ -85,6 +87,17 @@ def invers_transform_points(n_points):
 
 # batch inference
 def gen_showers_batch(model, shower_flow, e_min, e_max, config, num=2000, bs=32):
+    if (get_cond_feature_names(config)[0] != ["energy"]) or (
+            get_cond_feature_names(config)[1] not in ["n_points", "points"]):
+        raise NotImplementedError(
+            "Currently only energy and points conditioning in diffusion "
+            "is supported for batch generation"
+        )
+    if get_cond_feature_names(config, model="showerflow") != ["energy"]:
+        raise NotImplementedError(
+            "Currently only energy conditioning in showerflow "
+            "is supported for batch generation"
+        )
     output = {}
 
     leyer_pos = np.arange(-0.98, 1, 0.0444)
