@@ -11,6 +11,8 @@ from pointcloud.data.read_write import get_n_events, read_raw_regaxes
 from pointcloud.utils.detector_map import floors_ceilings
 from pointcloud.utils.gen_utils import get_cog as cog_from_kinematics
 
+from ..data.conditioning import get_cond_features_names
+
 
 def get_incident_npts_visible(
     configs, showerflow_dir, redo=False, local_batch_size=10_000
@@ -105,13 +107,20 @@ def get_gun_direction(configs, showerflow_dir, redo=False, local_batch_size=10_0
         print("Recalculating gun direction", flush=True)
         n_events = np.sum(get_n_events(configs.dataset_path, configs.n_dataset_files))
         gun_direction = np.zeros((n_events, 3))
-        for start_idx in range(0, n_events, local_batch_size):
-            print(f"{start_idx/n_events:.0%}", end="\r")
-            my_slice = slice(start_idx, start_idx + local_batch_size)
-            per_event_batch, _ = read_raw_regaxes(
-                configs, pick_events=my_slice, per_event_cols=["p_norm_local"]
+        try:
+            for start_idx in range(0, n_events, local_batch_size):
+                print(f"{start_idx/n_events:.0%}", end="\r")
+                my_slice = slice(start_idx, start_idx + local_batch_size)
+                per_event_batch, _ = read_raw_regaxes(
+                    configs, pick_events=my_slice, per_event_cols=["p_norm_local"]
+                )
+                gun_direction[my_slice] = per_event_batch
+        except KeyError:
+            print(
+                "This file doesn't record p_norm_local - likely a fixed gun direction"
             )
-            gun_direction[my_slice] = per_event_batch
+            print("The gun will be assumed to always point in the z direction")
+            gun_direction[:, 2] = 1
         np.save(
             direction_path,
             gun_direction,
@@ -354,6 +363,11 @@ def train_ds_function_factory(
         clusters_per_layer_norm = 1.0
         energy_per_layer_norm = 1.0
 
+    condition_energy = "energy" in get_cond_features_names(configs, "showerflow")
+    condition_direction = "p_norm_local" in get_cond_features_names(
+        configs, "showerflow"
+    )
+
     def make_train_ds(start_idx, end_idx):
         my_slice = slice(start_idx, end_idx)
         # mem-map the files to avoid loading all data
@@ -361,11 +375,11 @@ def train_ds_function_factory(
 
         # for conditioning
         output = []
-        if "energy" in configs.shower_flow_cond_features:
+        if condition_energy:
             energy = torch.tensor(pointE["energy"][my_slice]) / meta.incident_rescale
             energy = energy.view(-1, 1).to(device).float()
             output.append(energy)
-        if "p_norm_local" in configs.shower_flow_cond_features:
+        if condition_direction:
             assert direction_path is not None
             direction = torch.tensor(np.load(direction_path, mmap_mode="r")[my_slice])
             direction = direction.to(device).float()

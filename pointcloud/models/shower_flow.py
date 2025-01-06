@@ -173,7 +173,9 @@ def compile_HybridTanH_model(num_blocks, num_inputs, num_cond_inputs, device):
         "permutation",
     ]
 
-    model, flow_dist, transforms = factory.create(num_blocks, transform_pattern, count_bins=8)
+    model, flow_dist, transforms = factory.create(
+        num_blocks, transform_pattern, count_bins=8
+    )
     return model, flow_dist, transforms
 
 
@@ -197,7 +199,9 @@ def compile_HybridTanH_alt1(num_blocks, num_inputs, num_cond_inputs, device):
         "permutation",
     ]
 
-    model, flow_dist, transforms = factory.create(num_blocks, transform_pattern, count_bins=8)
+    model, flow_dist, transforms = factory.create(
+        num_blocks, transform_pattern, count_bins=8
+    )
     return model, flow_dist, transforms
 
 
@@ -219,7 +223,9 @@ def compile_HybridTanH_alt2(num_blocks, num_inputs, num_cond_inputs, device):
         "permutation",
     ]
 
-    model, flow_dist, transforms = factory.create(num_blocks, transform_pattern, count_bins=8)
+    model, flow_dist, transforms = factory.create(
+        num_blocks, transform_pattern, count_bins=8
+    )
     return model, flow_dist, transforms
 
 
@@ -228,4 +234,3 @@ versions_dict = {
     "alt1": compile_HybridTanH_alt1,
     "alt2": compile_HybridTanH_alt2,
 }
-

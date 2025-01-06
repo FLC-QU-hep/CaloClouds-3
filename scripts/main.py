@@ -1,6 +1,7 @@
 # in the public repo this is training.py
 # this trains the teacher model
 import os
+import sys
 import torch
 from torch.nn.utils import clip_grad_norm_
 
@@ -15,6 +16,13 @@ from pointcloud.utils.training import (
     get_sample_density,
     get_optimiser_schedular,
     get_pretrained,
+)
+from pointcloud.data.conditioning import get_cond_feats, normalise_cond_feats
+from pointcloud.config_varients import (
+    wish,
+    wish_maxwell,
+    caloclouds_3,
+    caloclouds_3_simple_shower,
 )
 from pointcloud.configs import Configs
 
@@ -81,8 +89,6 @@ def main(config=Configs()):
     def train(batch, it):
         # Load data
         x = batch["event"][0].float().to(config.device)  # B, N, 4
-        e = batch["energy"][0].float().to(config.device)  # B, 1
-        n = batch["points"][0].float().to(config.device)  # B, 1
 
         # Reset grad and model state
         optimizer.zero_grad()
@@ -109,10 +115,8 @@ def main(config=Configs()):
             scheduler.step()
 
         elif config.model_name == "AllCond_epicVAE_nFlow_PointDiff":
-            if config.norm_cond:
-                e = e / 100 * 2 - 1  # assumse max incident energy: 100 GeV
-                n = n / config.max_points * 2 - 1
-            cond_feats = torch.cat([e, n], -1)  # B, 2
+            cond_feats = get_cond_feats(config, batch, "diffusion")
+            cond_feats = normalise_cond_feats(cond_feats, config, "diffusion")
             if config.log_comet:
                 loss, loss_flow = model.get_loss(
                     x,
@@ -133,36 +137,24 @@ def main(config=Configs()):
                 )
 
         elif config.model_name == "epicVAE_nFlow_kDiffusion":
-            if config.norm_cond:
-                e = e / 100 * 2 - 1  # assumse max incident energy: 100 GeV
-                n = n / config.max_points * 2 - 1
-            cond_feats = torch.cat([e, n], -1)  # B, 2
+            cond_feats = get_cond_feats(config, batch, "diffusion")
+            cond_feats = normalise_cond_feats(config, cond_feats, "diffusion")
 
             noise = torch.randn_like(x)  # noise for forward diffusion
             sigma = sample_density([x.shape[0]], device=x.device)  # time steps
 
-            if config.log_comet:
-                loss, loss_flow = model.get_loss(
-                    x,
-                    noise,
-                    sigma,
-                    cond_feats,
-                    kl_weight=config.kl_weight,
-                    writer=experiment,
-                    it=it,
-                    kld_min=config.kld_min,
-                )
-            else:
-                loss, loss_flow = model.get_loss(
-                    x,
-                    noise,
-                    sigma,
-                    cond_feats,
-                    kl_weight=config.kl_weight,
-                    writer=None,
-                    it=it,
-                    kld_min=config.kld_min,
-                )
+            writer = experiment if config.log_comet else None
+
+            loss, loss_flow = model.get_loss(
+                x,
+                noise,
+                sigma,
+                cond_feats,
+                kl_weight=config.kl_weight,
+                writer=experiment,
+                it=it,
+                kld_min=config.kld_min,
+            )
 
             # Backward and optimize
             loss.backward()
@@ -258,4 +250,23 @@ def main(config=Configs()):
 
 
 if __name__ == "__main__":
-    main(Configs())
+    chosen = None
+    if len(sys.argv) > 1:
+        chosen = sys.argv[1].strip()
+
+    config_choices = {
+        "wish": wish,
+        "wish_maxwell": wish_maxwell,
+        "caloclouds_3": caloclouds_3,
+        "caloclouds_3_simple_shower": caloclouds_3_simple_shower,
+    }
+    while chosen not in config_choices:
+        chosen = input(f"Choose a version from {list(config_choices.keys())}:")
+        if chosen not in config_choices:
+            print("Invalid choice")
+
+    configs_kwargs = {
+        a.split("=")[0].strip(): a.split("=")[1].strip() for a in sys.argv[2:]
+    }
+    configs = config_choices[chosen].Configs(**configs_kwargs)
+    main(configs)

@@ -4,17 +4,21 @@
 # This notebook will run Caloclouds using inputs from G4 data rather than showerflow.
 # Minimal post processing is done before opening the plots.
 from pointcloud.evaluation import caloclouds_raw
-from pointcloud.config_varients import wish, caloclouds_3
+from pointcloud.config_varients import wish_maxwell, caloclouds_3_simple_shower, bug_dip
 from matplotlib import pyplot as plt
 import numpy as np
 import os
-wish_configs = wish.Configs()
-configs = caloclouds_3.Configs()
+wish_configs = wish_maxwell.Configs()
+configs = caloclouds_3_simple_shower.Configs()
 configs.device = 'cpu'
 configs.logdir = wish_configs.logdir
 configs.storage_base = wish_configs.storage_base
+configs.cond_features = 4
+configs.cond_features_names = ["energy", "p_norm_local"]
+configs.shower_flow_cond_features = configs.cond_features_names
+
 #configs._dataset_path = wish_configs._dataset_path
-configs.dataset_path = "/home/dayhallh/Data/fake_increments_10.npz"
+#configs.dataset_path = "/home/dayhallh/Data/fake_increments_10.npz"
 
 raw_samples_dir = os.path.join(configs.logdir, "caloclouds_raw_samples")
 if not os.path.exists(raw_samples_dir):
@@ -29,20 +33,25 @@ def sample_save_name(model_name, n_points):
 redo_data = False
 varients = {}
 
-model_path = "../../../point-cloud-diffusion-logs/p22_th90_ph90_en10-100/CD_2024_07_23__11_59_44/ckpt_0.342419_1540000.pt"
-varients[model_path] = (wish_configs.dataset_path, 10_000, None, None)
-model_path = "../../../point-cloud-diffusion-logs/p22_th90_ph90_en10-100/CD_2024_08_23__16_13_16/ckpt_0.442988_10000.pt"
-varients[model_path] = (wish_configs.dataset_path, 1000, None, None)
-model_path = "../../../point-cloud-diffusion-logs/wish/CD_2024_08_23__13_39_15/ckpt_28.587090_30000.pt"
-varients[model_path] = ("/home/dayhallh/Data/fake_increments_10.npz", 1000, None, None)
-model_path = "../../../point-cloud-diffusion-logs/wish/CD_2024_08_23__14_43_56/ckpt_14.732546_10000.pt"
-varients[model_path] = ("/home/dayhallh/Data/fake_increments_10_to0.npz", 1000, None, None)
+model_path = "/data/dust/user/dayhallh/point-cloud-diffusion-logs/p22_th90_ph90_en10-100/CD_2024_07_23__11_59_44/ckpt_0.342419_1540000.pt"
+varients["old ghenry"] = (model_path, wish_configs.dataset_path, 1000, None, None)
+model_path = "/data/dust/user/dayhallh/point-cloud-diffusion-logs/investigation2/CD__p22_th90_ph90_en10-1002024_12_11__18_27_01/ckpt_0.487173_140000.pt"
+varients["redone ghenry"] = (model_path, wish_configs.dataset_path, 1000, None, None)
+model_path = "/data/dust/user/dayhallh/point-cloud-diffusion-logs/investigation2/CD_sim-E1261AT600AP180-1802024_12_16__19_08_57/ckpt_0.392248_380000.pt"
+varients["redone sim"] = (model_path, configs.dataset_path, 1000, None, None)
+#model_path = "/data/dust/user/akorol/maxwell.merged/logs/point-clouds-angular/CD_ClusteredDS_Pretrained2024_03_27__00_23_43/ckpt_0.000000_1130000.pt"
+#varients["new Anatolii"] = (model_path, configs.dataset_path, 1000, None, None)
+#model_path = "/data/dust/user/dayhallh/point-cloud-diffusion-logs/wish/CD_2024_08_23__13_39_15/ckpt_28.587090_30000.pt"
+#varients[model_path] = ("/home/dayhallh/Data/fake_increments_10.npz", 1000, None, None)
+#model_path = "/data/dust/user/dayhallh/point-cloud-diffusion-logs/wish/CD_2024_08_23__14_43_56/ckpt_14.732546_10000.pt"
+#varients[model_path] = ("/home/dayhallh/Data/fake_increments_10_to0.npz", 1000, None, None)
 
 
-for model_path in varients:
+for name in varients:
     print(model_path)
-    configs.dataset_path = varients[model_path][0]
-    n_events = varients[model_path][1]
+    model_path = varients[name][0]
+    configs.dataset_path = varients[name][1]
+    n_events = varients[name][2]
     file_name = sample_save_name(model_path, n_events)
     print(file_name)
     if os.path.exists(file_name) and not redo_data:
@@ -50,21 +59,28 @@ for model_path in varients:
         loaded = np.load(file_name)
         hits_per_layer = loaded["hits_per_layer"]
         points = loaded["points"]
-        varients[model_path] = (configs.dataset_path, n_events, points, hits_per_layer)
+        varients[name] = (model_path, configs.dataset_path, n_events, points, hits_per_layer)
     else:
         print("Redoing data")
         hits_per_layer, points = caloclouds_raw.process_events(model_path, configs, n_events)
-        varients[model_path] = (configs.dataset_path, n_events, points, hits_per_layer)
+        varients[name] = (model_path, configs.dataset_path, n_events, points, hits_per_layer)
+        np.savez(file_name, hits_per_layer=hits_per_layer, points=points)
+n_events = 1000
+n_files = 10
+dataloaders = ["PointCloudDatasetUnordered", "PointCloudDataset", "PointCloudAngular"]
+for dataloader in dataloaders:
+    hits_per_layer, points = caloclouds_raw.process_events(configs.dataset_path, configs, n_events, "PointCloudDatasetUnordered", n_files)
+    varients[dataloader] = (dataloader, configs.dataset_path, n_events, points, hits_per_layer)
 # make a mask that removes leading and trailing zeros
 
-tails_mask = {model_path: np.ones(varients[model_path][2].shape[:-1], dtype=bool) for model_path in varients}
-for model_path in varients:
-    points = varients[model_path][2]
-    mask = tails_mask[model_path]
+tails_mask = {title: np.ones(varients[title][3].shape[:-1], dtype=bool) for title in varients}
+for title in varients:
+    points = varients[title][3]
+    mask = tails_mask[title]
     for r, event in enumerate(points):
         print(f"{r/n_events:.1%}", end='\r')
-        leading_zeros = next(i for i, p in enumerate(event[:, 3]) if p!=0)
-        trailing_zeros = next(i for i, p in enumerate(event[::-1, 3]) if p!=0)
+        leading_zeros = next((i for i, p in enumerate(event[:, 3]) if p!=0), 0)
+        trailing_zeros = next((i for i, p in enumerate(event[::-1, 3]) if p!=0), 0)
         mask[r, :leading_zeros] = False
         if trailing_zeros:
             mask[r, -trailing_zeros:] = False
@@ -72,11 +88,12 @@ for model_path in varients:
         
     
 
-titles = ["Real data", "Retrained real data", "Fake data, point energy > 0.1", "Fake data, point energy > 0"]
-for title, model_path in zip(titles, varients):
-    dataset_path, n_events, points, hits_per_layer = varients[model_path]
-    fig, ax = plt.subplots()
-    
+
+for title in varients:
+    model_path, dataset_path, n_events, points, hits_per_layer = varients[title]
+    fig, axes = plt.subplots(1, 2, figsize=(12, 4))
+
+    ax = axes[0]
     # plot the input
     sum_hist_per_layer = np.sum(hits_per_layer, axis=0)
     x_min, x_max = -1, 1
@@ -84,44 +101,40 @@ for title, model_path in zip(titles, varients):
     layer_xs = 0.5*(layer_bins[1:] + layer_bins[:-1])
     ax.hist(layer_xs, weights=sum_hist_per_layer, bins=layer_bins, label="input", color="grey")
     
+    found_zs = points[:, :, 2].flatten()
+    ax.hist(found_zs, histtype='step', label="caloclouds unmasked", bins=layer_bins)
+    
     # plot the frequencies using a simple mask that removes any negative energies
     found_es = points[:, :, 3].flatten()
-    found_ys = points[:, :, 1].flatten()
-    masked_ys = found_ys[found_es>0]
-    ax.hist(masked_ys, histtype='step', label="caloclouds simple mask", bins=layer_bins)
+    masked_zs = found_zs[found_es>0]
+    ax.hist(masked_zs, histtype='step', label="caloclouds simple mask", bins=layer_bins)
     
     # plot the frequncies, masking by removing only training zeros
-    flat_mask = tails_mask[model_path].flatten()
-    ax.hist(found_ys[flat_mask], histtype='step', label="caloclouds head/tail mask", bins=layer_bins)
+    flat_mask = tails_mask[title].flatten()
+    ax.hist(found_zs[flat_mask], histtype='step', label="caloclouds head/tail mask", bins=layer_bins)
     ax.legend()
-    ax.set_xlabel("y direction")
+    ax.set_xlabel("shower direction")
     ax.set_ylabel("frequency")
     ax.set_title(title)
+    #ax.semilogy()
+    #ax.set_ylim(1e3, 1e6) ax = axes[0]
+    # plot the input
+    ax = axes[1]
+    found_xs = points[:, :, 0].flatten()
+    ax.hist(found_xs, histtype='step', label="caloclouds unmasked", bins=layer_bins)
+    
+    # plot the frequencies using a simple mask that removes any negative energies
+    masked_xs = found_xs[found_es>0]
+    ax.hist(masked_xs, histtype='step', label="caloclouds simple mask", bins=layer_bins)
+    
+    # plot the frequncies, masking by removing only training zeros
+    ax.hist(found_xs[flat_mask], histtype='step', label="caloclouds head/tail mask", bins=layer_bins)
+    ax.legend()
+    ax.set_xlabel("x direction")
+    ax.set_ylabel("frequency")
+    ax.set_title(title)
+    #ax.semilogy()
+    #ax.set_ylim(1e3, 1e6)
 
 
-fig, ax1 = plt.subplots(1, 1, figsize=(6, 5))
-
-model_path = "../../../point-cloud-diffusion-logs/p22_th90_ph90_en10-100/CD_2024_07_23__11_59_44/ckpt_0.342419_1540000.pt"
-#model_path = "../../../point-cloud-diffusion-logs/p22_th90_ph90_en10-100/CD_2024_08_21__16_20_29/ckpt_0.508328_320000.pt"
-rd_points = varients[model_path][2]
-event_0 = rd_points[0]
-mask = tails_mask[model_path][0]
-xs = event_0[:, 0][mask]
-ys = event_0[:, 1][mask]
-size=5
-ax1.scatter(xs, ys, label="With internal 0s", s=size)
-mask = event_0[:, 3] >= 0
-xs = event_0[:, 0][mask]
-ys = event_0[:, 1][mask]
-ax1.scatter(xs, ys, alpha=0.5, s=size, label="Cut all 0s")
-ax1.legend()
-ax1.set_title("Event 0, raw showerflow output")
-mask = tails_mask[model_path]
-energies = rd_points[:, :, 3][mask]
-energies2 = rd_points[:, :, 3][rd_points[:, :, 3]>0]
-bins = np.logspace(np.log10(0.00000001), np.log10(100), 50)
-bins[0] = -10
-plt.hist(energies, bins=bins)
-plt.hist(energies2, bins=bins)
-plt.loglog()
 

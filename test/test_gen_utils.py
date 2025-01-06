@@ -3,10 +3,11 @@ Test the gen_utils (generator utilities) module.
 """
 import numpy as np
 import torch
+import copy
 from numpy import testing as npt
 from pointcloud.utils import gen_utils, metadata
 
-from pointcloud.models import wish
+from pointcloud.models.load import get_model_class, Wish, epicVAE_nFlow_kDiffusion
 from pointcloud.evaluation import generate
 from pointcloud.models.shower_flow import compile_HybridTanH_model
 from pointcloud.utils.stats_accumulator import HighLevelStats
@@ -39,13 +40,13 @@ def test_get_cog():
 
 def test_cond_batcher():
     # don't choke on empty input
-    for batch in gen_utils.cond_batcher(torch.ones(0), 1):
+    for batch in gen_utils.cond_batcher(1, torch.ones(0)):
         pass
     # sort the input
     data = torch.tensor([[3, 7], [1, 2], [5, 8], [4, 6]])
     expected = np.array([[[1, 2], [4, 6]], [[3, 7], [5, 8]]])
-    for i, batch in enumerate(gen_utils.cond_batcher(data, 2)):
-        npt.assert_allclose(batch, expected[i])
+    for i, batch in enumerate(gen_utils.cond_batcher(2, data)):
+        npt.assert_allclose(batch['diffusion'], expected[i])
 
 
 class TestGenMethods:
@@ -60,7 +61,8 @@ class TestGenMethods:
         """
         # make ourselves a simple model
         configs = config_creator.make("wish")
-        wish_model = wish.Wish(configs)
+        configs.cond_features = 1
+        wish_model = get_model_class(configs)(configs)
 
         # give it some reasonable parameters
         acc = sample_accumulator.make(add_varients=True)
@@ -73,31 +75,49 @@ class TestGenMethods:
 
         # now make a caloclouds/showerflow model
         configs = config_creator.make()
-        params_dict = generate.make_params_dict()
-        # make it short for testing
-        params_dict["n_events"] = 10
-        params_dict["batch_size"] = 2
+        configs.cond_features = 1
+        configs.shower_flow_cond_features = 1
 
         # fake the flow model
         flow, distribution, transforms = compile_HybridTanH_model(
             num_blocks=configs.shower_flow_num_blocks,
             num_inputs=65,
-            num_cond_inputs=1,
+            num_cond_inputs=configs.shower_flow_cond_features,
+            device=configs.device,
+        )
+
+        diff_model = get_model_class(configs)(configs)
+
+        cls.configs.append(configs)
+        cls.models.append((diff_model, distribution))
+        cls.model_names["diffusion"] = 1
+
+        # try with 2 cond features. Not in the list of models, because requires different input
+        configs = config_creator.make()
+        configs.cond_features = 2
+        configs.shower_flow_cond_features = 2
+
+        flow, distribution, transforms = compile_HybridTanH_model(
+            num_blocks=configs.shower_flow_num_blocks,
+            num_inputs=65,
+            num_cond_inputs=configs.shower_flow_cond_features,
             device=configs.device,
         )
 
         diff_model, coef_real, coef_fake, n_splines = generate.load_diffusion_model(
             configs, "cm", model_path="test/example_cm_model.pt"
         )
-
-        cls.configs.append(configs)
-        cls.models.append((diff_model, distribution))
-        cls.model_names["diffusion"] = 1
+        cls.two_cond_flow = (diff_model, distribution)
 
     @classmethod
     def teardown_class(cls):
         cls.configs.clear()
         cls.models.clear()
+
+    def test_model_classes(self):
+        assert isinstance(self.models[self.model_names["wish"]][0], Wish)
+        assert isinstance(self.models[self.model_names["diffusion"]][0], epicVAE_nFlow_kDiffusion)
+        assert isinstance(self.two_cond_flow[0], epicVAE_nFlow_kDiffusion)
 
     def test_get_shower(self):
         num_points = 100
@@ -106,7 +126,9 @@ class TestGenMethods:
         cond_N = 50
         model = self.models[self.model_names["diffusion"]][0]
         for bs in [0, 1, 2]:
-            found = gen_utils.get_shower(model, num_points, energy, cond_N, bs)
+            found = gen_utils.get_shower(model, num_points, energy, bs=bs)
+            assert found.shape == (bs, num_points, 4)
+            found = gen_utils.get_shower(self.two_cond_flow[0], num_points, energy, cond_N, bs=bs)
             assert found.shape == (bs, num_points, 4)
             # there is actually nothing at this stage to prevet the model
             # from producing unphysical values. It's a raw diffusion model.
@@ -137,7 +159,7 @@ class TestGenMethods:
         model = self.models[self.model_names["wish"]][0]
         config = self.configs[self.model_names["wish"]]
         destination_array = np.zeros((10, config.max_points, 4))
-        cond = (torch.arange(1, 3).reshape(-1, 1) * 10).float()
+        cond = {"diffusion": (torch.arange(1, 3).reshape(-1, 1) * 10).float()}
         first_index = 2
         gen_utils.gen_wish_inner_batch(
             cond, destination_array, first_index, model
@@ -151,7 +173,7 @@ class TestGenMethods:
         config = self.configs[self.model_names["diffusion"]]
         destination_array = np.zeros((10, config.max_points, 4))
         first_index = 2
-        cond = (torch.arange(1, 3).reshape(-1, 1) * 10).float()
+        cond = {"diffusion": (torch.arange(1, 3).reshape(-1, 1) * 10).float()}
         gen_utils.gen_v1_inner_batch(
             cond, destination_array, first_index, model, shower_flow, config
         )

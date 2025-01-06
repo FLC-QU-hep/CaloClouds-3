@@ -8,7 +8,8 @@ import datetime
 import torch.nn as nn
 import torch.optim as optim
 import torch
-from torch_geometric.data import Data, Dataset, DataLoader
+from torch_geometric.data import Data, Dataset
+from torch_geometric.loader import DataLoader
 
 from . import autoencoder
 from ..configs import Configs

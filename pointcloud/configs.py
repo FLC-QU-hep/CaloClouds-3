@@ -1,1 +1,1 @@
-config_varients/wish_maxwell.py
+config_varients/default.py

@@ -6,6 +6,7 @@ import time
 from nflows import transforms, distributions, flows
 import torch.nn as nn
 from typing import Callable
+from ..data.conditioning import get_cond_dim
 
 THOUSAND = 1000
 MILLION = 1000000
@@ -107,18 +108,18 @@ class CheckpointManager(object):
         idx = self.get_best_ckpt_idx()
         if idx is None:
             raise IOError("No checkpoints found.")
-        ckpt = torch.load(os.path.join(self.save_dir, self.ckpts[idx]["file"]))
+        ckpt = torch.load(os.path.join(self.save_dir, self.ckpts[idx]["file"]), weights_only=False)
         return ckpt
 
     def load_latest(self):
         idx = self.get_latest_ckpt_idx()
         if idx is None:
             raise IOError("No checkpoints found.")
-        ckpt = torch.load(os.path.join(self.save_dir, self.ckpts[idx]["file"]))
+        ckpt = torch.load(os.path.join(self.save_dir, self.ckpts[idx]["file"]), weights_only=False)
         return ckpt
 
     def load_selected(self, file):
-        ckpt = torch.load(os.path.join(self.save_dir, file))
+        ckpt = torch.load(os.path.join(self.save_dir, file), weights_only=False)
         return ckpt
 
 
@@ -163,7 +164,7 @@ def get_flow_model(cfg):
 def get_maf_spline_flow(cfg):
     params_flow = {
         "features": cfg.latent_dim,
-        "context_features": cfg.cond_features,  # condtioning features
+        "context_features": get_cond_dim(cfg, "diffusion"),
         "hidden_features": cfg.flow_hidden_dims,
         "num_blocks": cfg.flow_layers,
         "activation": nn.LeakyReLU(),
@@ -191,7 +192,7 @@ def get_maf_spline_flow(cfg):
 def get_coupling_spline_flow(cfg):
     params_subnet = {
         "hidden_features": cfg.flow_hidden_dims,
-        "context_features": cfg.cond_features,
+        "context_features": get_cond_dim(cfg, "diffusion"),
         "num_layers": cfg.flow_layers,
         "activation": nn.LeakyReLU,
         "dropout_probability": 0.0,
@@ -201,7 +202,7 @@ def get_coupling_spline_flow(cfg):
         "tails": cfg.tails,
         "tail_bound": cfg.tail_bound,
         "transform_net_create_fn": subnet,
-        "mask": torch.range(0, cfg.latent_dim - 1) < cfg.latent_dim // 2,
+        "mask": torch.arange(0, cfg.latent_dim) < cfg.latent_dim // 2,
     }
     # Define an invertible transformation.
     t_list = []

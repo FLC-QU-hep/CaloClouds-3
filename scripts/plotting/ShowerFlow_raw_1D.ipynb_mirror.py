@@ -7,13 +7,15 @@ import torch
 import os
 
 from pointcloud.config_varients import wish, caloclouds_3
+from pointcloud.configs import Configs
 from pointcloud.models import shower_flow, fish_flow
 from pointcloud.utils import stats_accumulator, metadata, showerflow_utils, showerflow_training
 
-configs = caloclouds_3.Configs()
-configs.dataset_path = "/beegfs/desy/user/akorol/data/AngularShowers_RegularDetector/"\
-"hdf5_for_CC/sim-E1261AT600AP180-180_file_{}slcio.hdf5"
-configs.n_dataset_files = 88
+configs = Configs()
+#configs.dataset_path = "/beegfs/desy/user/akorol/data/AngularShowers_RegularDetector/"\
+#"hdf5_for_CC/sim-E1261AT600AP180-180_file_{}slcio.hdf5"
+
+#configs.n_dataset_files = 88
 meta = metadata.Metadata(configs)
 
 
@@ -41,8 +43,10 @@ except Exception as e:
 # 
 # Start by using the functions designed to train showerflow to draw these distributions from the dataset.
 
-data_dir = os.path.realpath(os.path.join(configs.logdir.split("point-cloud-diffusion-logs")[0], "point-cloud-diffusion-data"))
-showerflow_dir = os.path.join(data_dir, "showerFlow/sim-E1261AT600AP180-180")
+#data_dir = os.path.realpath(os.path.join(configs.logdir.split("point-cloud-diffusion-logs")[0], "point-cloud-diffusion-data"))
+#showerflow_dir = os.path.join(data_dir, "showerFlow/sim-E1261AT600AP180-180")
+data_dir = "/data/dust/user/dayhallh/duncan/gen0"
+showerflow_dir = data_dir
 print(f"Showerflow dir is {showerflow_dir}")
 assert os.path.exists(showerflow_dir)
 pointsE_path = showerflow_training.get_incident_npts_visible(configs, showerflow_dir)
@@ -57,13 +61,14 @@ total_cond = np.sum(cond_mask)
 n_distributions = 65
 bins = np.tile(np.linspace(0., 0.1, n_bins+1), (n_distributions, 1))
 log_x_01 = False
+clusters_energy_cap = 0.2
 if log_x_01:
-    bins[0] = np.logspace(np.log10(0.05), np.log10(1.5), n_bins+1)
-    bins[1] = np.logspace(np.log10(0.05), np.log10(1.5), n_bins+1)
+    bins[0] = np.logspace(np.log10(0.05), np.log10(clusters_energy_cap), n_bins+1)
+    bins[1] = np.logspace(np.log10(0.05), np.log10(clusters_energy_cap), n_bins+1)
 else:
-    bins[0] = np.linspace(0., 1.5, n_bins+1)
-    bins[1] = np.linspace(0., 1.5, n_bins+1)
-cog_extent = 2
+    bins[0] = np.linspace(0., clusters_energy_cap, n_bins+1)
+    bins[1] = np.linspace(0., clusters_energy_cap, n_bins+1)
+cog_extent = 10
 bins[2] = np.linspace(-cog_extent, cog_extent, n_bins+1)
 bins[3] = np.linspace(-cog_extent, cog_extent, n_bins+1)
 bins[4] = np.linspace(-cog_extent, cog_extent, n_bins+1)
@@ -208,8 +213,10 @@ fig.tight_layout()
 # 
 # That done, we can draw the same values from the models, and plot them alongside.
 from pointcloud.utils import showerflow_utils
-
-saved_models = showerflow_utils.existing_models(configs)
+configs.shower_flow_data_dir = showerflow_dir
+saved_models = showerflow_utils.models_at_paths(configs.shower_flow_cond_features,
+                                                ["/data/dust/user/dayhallh/duncan/gen0/ShowerFlow_alt1_nb4_inputs36893488147419103231_best.pth",
+                                                 "/data/dust/user/dayhallh/point-cloud-diffusion-data/investigation2/showerFlow/p22_th90_ph90_en10-100/ShowerFlow_original_nb4_inputs36893488147419103231_fnorms_best.pth"])
 default_input_mask = showerflow_utils.get_input_mask(configs)
 max_n_inputs = len(default_input_mask)
 
@@ -218,15 +225,15 @@ n_cond_features = np.sum(cond_feature_mask)
 
 def get_distributions(saved_models):
     distributions = []
-    for i, version in enumerate(saved_models["version"]):
+    for i, version in enumerate(saved_models["versions"]):
         constructor = shower_flow.versions_dict[version]
         num_inputs = max_n_inputs - len(saved_models["cut_inputs"][i])
-        model, dist = constructor(
+        model, dist, transforms = constructor(
             num_blocks = saved_models["num_blocks"][i],
             num_inputs = num_inputs,
             num_cond_inputs = n_cond_features,
             device = configs.device)
-        loaded_checkpoint = torch.load(saved_models["path"][i], map_location=configs.device)
+        loaded_checkpoint = torch.load(saved_models["paths"][i], map_location=configs.device)
         model.load_state_dict(loaded_checkpoint["model"])
         distributions.append(dist)
     return distributions
@@ -318,7 +325,6 @@ plot_ratios(ratio_axes, all_distributions[worst_dist_idx], **dataset_kws)
 
 fig.tight_layout()
 plt.savefig("with_worst.png")
-saved_models["path"]
 
 dataset_kws = {'color': 'gray', 'label': 'G4'}
 fig, axes, ratio_axes = plot_distributions(dataset_distributions, **dataset_kws)

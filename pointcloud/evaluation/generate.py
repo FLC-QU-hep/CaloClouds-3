@@ -9,6 +9,7 @@ import time
 from ..configs import Configs
 from ..utils import gen_utils, showerflow_utils
 from ..data.read_write import regularise_event_axes
+from ..data.conditioning import get_cond_features_names, get_cond_dim
 
 from ..models import epicVAE_nflows_kDiffusion as mdls
 from ..models import allCond_epicVAE_nflow_PointDiff as mdls2
@@ -86,8 +87,6 @@ def load_flow_model(
         return None, None
 
     version = config.shower_flow_version
-    cond_used = showerflow_utils.get_cond_mask(config)
-    cond_dim = np.sum(cond_used)
     inputs_used = showerflow_utils.get_input_mask(config)
     input_dim = np.sum(inputs_used)
 
@@ -97,21 +96,10 @@ def load_flow_model(
         # Nhits etc add them on as inputs rather than
         # adding 30 e layers
         num_inputs=input_dim,
-        num_cond_inputs=cond_dim,
+        num_cond_inputs=get_cond_dim(config, "showerflow"),
         device=config.device,
     )  # num_cond_inputs
-    # checkpoint = torch.load('/beegfs/desy/user/akorol'
-    #                         '/chekpoints/ECFlow/EFlow+CFlow_138.pth')
-    # checkpoint = torch.load('/beegfs/desy/user/buhmae'
-    #                         '/6_PointCloudDiffusion/shower_flow/'
-    #                         '220706_cog_ShowerFlow_350.pth')
-    # checkpoint = torch.load('/beegfs/desy/user/buhmae'
-    #                         '/6_PointCloudDiffusion/shower_flow/'
-    #                         '220707_cog_ShowerFlow_500.pth')  # max 730
-    # checkpoint = torch.load('/beegfs/desy/user/buhmae'
-    #                         '/6_PointCloudDiffusion/shower_flow/'
-    #                         '220713_cog_e_layer_ShowerFlow_best.pth')
-    checkpoint = torch.load(model_path, map_location=config.device)
+    checkpoint = torch.load(model_path, map_location=config.device, weights_only=False)
     flow.load_state_dict(checkpoint["model"])
     flow.eval().to(config.device)
     return flow, distribution, transforms
@@ -295,6 +283,15 @@ def generate_showers(
         The energy of the incident particle that conditions the showers.
 
     """
+    # TODO generalise
+    if get_cond_features_names(config, "diffusion") != ["energy"]:
+        raise NotImplementedError(
+            "Currently only energy conditioning is supported for batch generation"
+        )
+    if get_cond_features_names(config, "showerflow") != ["energy"]:
+        raise NotImplementedError(
+            "Currently only energy conditioning is supported for batch generation"
+        )
     # unpack params
     flow, distribution, transforms = flow_model
     model, coef_real, coef_fake, n_splines = diffusion_model

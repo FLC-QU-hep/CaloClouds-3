@@ -6,6 +6,7 @@ import os
 from tqdm import tqdm
 import h5py
 import numpy as np
+import warnings
 from matplotlib import pyplot as plt
 
 from pointcloud.utils.plotting import heatmap_stack
@@ -1399,10 +1400,11 @@ class RadialView:
             to_fit = radial_function
 
         if np.any(errors == 0):
-            print(
-                "Some errors are zero, "
+            message = (
+                "stats_accumulator.RadialView; Some errors are zero, "
                 "adding a small value to avoid division by zero"
             )
+            warnings.warn(message)
             errors[errors == 0] = 1e-10
 
         popt, pcov = curve_fit(

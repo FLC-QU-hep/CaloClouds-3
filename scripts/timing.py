@@ -9,6 +9,7 @@ import time
 from pointcloud.configs import Configs
 from pointcloud.utils import gen_utils
 
+from pointcloud.data.conditioning import get_cond_dim
 
 from pointcloud.models.shower_flow import compile_HybridTanH_model
 import pointcloud.models.epicVAE_nflows_kDiffusion as mdls
@@ -80,12 +81,13 @@ def main(cfg, min_e, max_e, num, bs, iterations):
     flow, distribution = compile_HybridTanH_model(
         num_blocks,
         num_inputs=65,
-        num_cond_inputs=1,
+        num_cond_inputs=get_cond_dim(cfg, "showerflow"),
         device=cfg.device,
     )  # num_cond_inputs
     checkpoint = torch.load(
         "/beegfs/desy/user/buhmae/6_PointCloudDiffusion/shower_flow/220714_cog_e_layer_ShowerFlow_best.pth",
         map_location=torch.device(cfg.device),
+        weights_only=False,
     )  # trained about 350 epochs
 
     # checkpoint = torch.load('/beegfs/desy/user/akorol/logs/220714_cog_e_layer_ShowerFlow_best.pth', map_location=torch.device(cfg.device))   # trained about 350 epochs
@@ -101,7 +103,9 @@ def main(cfg, min_e, max_e, num, bs, iterations):
         cfg.latent_dim = 256
         model = mdls2.AllCond_epicVAE_nFlow_PointDiff(cfg).to(cfg.device)
         checkpoint = torch.load(
-            cfg.logdir + "/" + cfg.model_path, map_location=torch.device(cfg.device)
+            cfg.logdir + "/" + cfg.model_path,
+            map_location=torch.device(cfg.device),
+            weights_only=False,
         )  # max 1200000
         model.load_state_dict(checkpoint["state_dict"])
         coef_real = np.array(
@@ -113,13 +117,13 @@ def main(cfg, min_e, max_e, num, bs, iterations):
 
     elif caloclouds == "edm":
         # caloclouds EDM
-        # # # baseline with lat_dim = 0, max_iter 10M, lr=1e-4 fixed, 
+        # # # baseline with lat_dim = 0, max_iter 10M, lr=1e-4 fixed,
         # dropout_rate=0.0, ema_power=2/3 (long training)            USING THIS TRAINING
         cfg.dropout_rate = 0.0
         cfg.latent_dim = 0
         cfg.residual = False
         checkpoint = torch.load(
-            cfg.logdir + "/" + cfg.model_path, map_location=torch.device(cfg.device)
+            cfg.logdir + "/" + cfg.model_path, map_location=torch.device(cfg.device), weights_only=False
         )  # max 1200000
         model = mdls.epicVAE_nFlow_kDiffusion(cfg).to(cfg.device)
         model.load_state_dict(checkpoint["others"]["model_ema"])
@@ -138,7 +142,7 @@ def main(cfg, min_e, max_e, num, bs, iterations):
         cfg.latent_dim = 0
         cfg.residual = False
         checkpoint = torch.load(
-            cfg.logdir + "/" + cfg.model_path, map_location=torch.device(cfg.device)
+            cfg.logdir + "/" + cfg.model_path, map_location=torch.device(cfg.device), weights_only=False
         )  # max 1200000
         model = mdls.epicVAE_nFlow_kDiffusion(cfg, distillation=True).to(cfg.device)
         model.load_state_dict(checkpoint["others"]["model_ema"])

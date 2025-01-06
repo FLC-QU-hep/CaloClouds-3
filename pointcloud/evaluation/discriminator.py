@@ -10,6 +10,7 @@ from torch import nn
 from matplotlib import pyplot as plt
 
 from ..data import read_write
+from ..data.conditioning import read_raw_regaxes_withcond, normalise_cond_feats
 from ..utils import showerflow_training, showerflow_utils, gen_utils
 from ..utils.metadata import Metadata
 from ..models import shower_flow
@@ -169,7 +170,7 @@ class Discriminator(nn.Module):
 
     @classmethod
     def load(cls, file_path):
-        loaded = torch.load(file_path)
+        loaded = torch.load(file_path, weights_only=False)
         model = cls(**loaded["init_args"])
         model.sequential.load_state_dict(loaded["state_dict"])
         return model
@@ -435,7 +436,7 @@ class Training:
         save_path = os.path.join(
             self.state_dict["generator_data_folder"], f"{self.label}.pt"
         )
-        loaded = torch.load(save_path)
+        loaded = torch.load(save_path, weights_only=False)
         assert loaded["g4_data_folder"] == self.state_dict["g4_data_folder"]
         assert (
             loaded["generator_data_folder"] == self.state_dict["generator_data_folder"]
@@ -455,7 +456,7 @@ class Training:
     @classmethod
     def load(cls, file_path):
         label = ".".join(os.path.basename(file_path).split(".")[:-1])
-        state_dict = torch.load(file_path)
+        state_dict = torch.load(file_path, weights_only=False)
         training = cls(
             label,
             state_dict["g4_data_folder"],
@@ -463,7 +464,7 @@ class Training:
             state_dict["descriminator_params"],
             state_dict["feature_mask"],
         )
-        training.state_dict = torch.load(file_path)
+        training.state_dict = torch.load(file_path, weights_only=False)
         return training
 
     @property
@@ -683,16 +684,15 @@ def create_showerflow_data_files(configs, model_path, redo=False):
         for j in range(start, end, local_batch_size):
             print(f"{j/total_events:.0%}", end="\r")
             batch_end = min(j + local_batch_size, end)
-            cond, _ = read_write.read_raw_regaxes(
+            cond, _ = read_raw_regaxes_withcond(
                 configs,
                 slice(j, batch_end),
-                per_event_cols=configs.shower_flow_cond_features,
+                for_model="showerflow",
             )
             del _
             if len(cond.shape) == 1:
                 cond = cond[:, None]
-            if "energy" in configs.shower_flow_cond_features:
-                cond[:, 0] /= metadata.incident_rescale
+            cond = normalise_cond_feats(configs, cond, for_model="showerflow")
             batch = conditioned_sample(configs, distribution, cond)
             features.append(batch)
         features = np.concatenate(features, axis=0)

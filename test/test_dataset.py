@@ -274,10 +274,10 @@ class TestPointCloudDataset(AbsDatasetTest):
         npt.assert_array_equal(found, TestData.points1)
 
     def test_normalize_xyze(self):
-        xmin = dataset.PointCloudDataset.metadata.Xmin_global
-        xmax = dataset.PointCloudDataset.metadata.Xmax_global
-        ymin = dataset.PointCloudDataset.metadata.Zmin_global
-        ymax = dataset.PointCloudDataset.metadata.Zmax_global
+        xmin = dataset.PointCloudDataset.metadata.Zmin_global
+        xmax = dataset.PointCloudDataset.metadata.Zmax_global
+        ymin = dataset.PointCloudDataset.metadata.Xmin_global
+        ymax = dataset.PointCloudDataset.metadata.Xmax_global
         zmin = dataset.PointCloudDataset.metadata.layer_bottom_pos_hdf5[0]
         zmax = (
             dataset.PointCloudDataset.metadata.layer_bottom_pos_hdf5[-1]
@@ -440,10 +440,10 @@ class TestCaloChallangeDataset(AbsDatasetTest):
         npt.assert_array_equal(found, TestData.points1)
 
     def test_normalize_xyze(self):
-        xmin = dataset.PointCloudDataset.metadata.Xmin_global
-        xmax = dataset.PointCloudDataset.metadata.Xmax_global
-        ymin = dataset.PointCloudDataset.metadata.Zmin_global
-        ymax = dataset.PointCloudDataset.metadata.Zmax_global
+        xmin = dataset.PointCloudDataset.metadata.Zmin_global
+        xmax = dataset.PointCloudDataset.metadata.Zmax_global
+        ymin = dataset.PointCloudDataset.metadata.Xmin_global
+        ymax = dataset.PointCloudDataset.metadata.Xmax_global
         zmin = dataset.PointCloudDataset.metadata.layer_bottom_pos_hdf5[0]
         zmax = (
             dataset.PointCloudDataset.metadata.layer_bottom_pos_hdf5[-1]

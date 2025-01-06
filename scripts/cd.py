@@ -9,6 +9,7 @@ from torch.nn.utils import clip_grad_norm_
 import time
 
 from pointcloud.data.dataset import PointCloudDataset, PointCloudDatasetGH
+from pointcloud.data.conditioning import get_cond_feats, normalise_cond_feats
 from pointcloud.utils.misc import seed_all, get_new_log_dir, CheckpointManager
 from pointcloud.utils.training import get_comet_experiment, get_ckp_mgr, get_dataloader
 from pointcloud.models.epicVAE_nflows_kDiffusion import epicVAE_nFlow_kDiffusion
@@ -25,7 +26,7 @@ def get_models(config):
     )
 
     # load model
-    checkpoint = torch.load(os.path.join(config.logdir, config.model_path))
+    checkpoint = torch.load(os.path.join(config.logdir, config.model_path), weights_only=False)
     if config.use_ema_trainer:
         model.load_state_dict(checkpoint["others"]["model_ema"])
         model_ema_target.load_state_dict(checkpoint["others"]["model_ema"])
@@ -113,19 +114,17 @@ def main(config=Configs()):
 
     # Train
     def train(batch, it):
+
         # Load data
         x = batch["event"][0].float().to(config.device)  # B, N, 4
-        e = batch["energy"][0].float().to(config.device)  # B, 1
-        n = batch["points"][0].float().to(config.device)  # B, 1
         # Reset grad
         optimizer.zero_grad()
         model.zero_grad()
 
-        # get condition features
-        if config.norm_cond:
-            e = e / 100 * 2 - 1  # assumse max incident energy: 100 GeV
-            n = n / config.max_points * 2 - 1
-        cond_feats = torch.cat([e, n], -1)  # B, 2
+        cond_feats = get_cond_feats(config, batch, "diffusion")
+        cond_feats = normalise_cond_feats(config, cond_feats, "diffusion")
+        cond_feats = torch.tensor(cond_feats).to(config.device).float()
+
 
         # noise = torch.randn_like(x)    # noise for forward diffusion
         # sigma = sample_density([x.shape[0]], device=x.device)  # time steps
