@@ -1,3 +1,4 @@
+import warnings
 import torch
 import h5py
 from functools import lru_cache
@@ -108,12 +109,24 @@ def normalise_cond_feats(config, cond_feats, for_model):
         Has attribute `max_points`, the maximum number of points in a cloud.
         Can have attributes `cond_features` and/or `shower_flow_cond_features`.
         The `cond_features` attribute may be an int or a list of strings.
+    cond_feats : torch.Tensor
+        The values of the conditioning features for the model, as one
+        continuos tensor.
+    for_model : str
+        Either "diffusion" or "showerflow".
 
+    Returns
+    -------
+    cond_feats : torch.Tensor
+        Conditioned features, if changes where required, the tensor has been
+        coppied.
     """
     if config.norm_cond:
         cond_feats = cond_feats.clone()
         meta = Metadata(config)
         names = get_cond_features_names(config, for_model)
+        if "points" in names:
+            names[names.index("points")] = "n_points"
         lengths = [feature_lengths[k] for k in names]
         start_positions = [sum(lengths[:i]) for i in range(len(lengths))]
         if "energy" in names:
@@ -121,7 +134,7 @@ def normalise_cond_feats(config, cond_feats, for_model):
             if for_model == "showerflow":
                 cond_feats[:, idx] /= torch.tensor(meta.incident_rescale)
             else:
-                cond_feats[:, idx] /= 100 * 2 - 1
+                cond_feats[:, idx] = (cond_feats[:, idx] / 100) * 2 - 1
         if "n_points" in names:
             idx = start_positions[names.index("n_points")]
             n = cond_feats[:, idx]
@@ -130,7 +143,7 @@ def normalise_cond_feats(config, cond_feats, for_model):
                     config.max_points / config.min_points
                 )
             else:
-                n /= config.max_points * 2 - 1
+                n = (n / config.max_points) * 2 - 1
             cond_feats[:, idx] = n
     return cond_feats
 
@@ -177,16 +190,16 @@ def padding_position(events, roll_axis=False):
             first_energies = events[:, 0, 3]
             last_energies = events[:, -1, 3]
     except IndexError:
-        first_energies = 1
-        last_energies = 1
-    start_zeros = (first_energies <= 0).sum()
-    end_zeros = (last_energies <= 0).sum()
-    if start_zeros > end_zeros:
-        padding = "front"
-    elif start_zeros < end_zeros:
-        padding = "back"
-    else:
         padding = "unknown"
+    else:
+        start_zeros = (first_energies <= 0).sum()
+        end_zeros = (last_energies <= 0).sum()
+        if start_zeros > end_zeros:
+            padding = "front"
+        elif start_zeros < end_zeros:
+            padding = "back"
+        else:
+            padding = "unknown"
     return padding
 
 
@@ -195,15 +208,35 @@ def calculate_n_points_from_events(events, padding="unknown"):
     Calculate the number of points in the event.
     Assumes we don't have a rolled axis, i.e. the last axis is xyze
     and the second to last is the points.
+
+    Parameters
+    ----------
+    events : numpy.ndarray
+        The events data, with the last axis being xyze.
+    padding : str
+        The padding position, either "front", "back" or "unknown".
+
+    Returns
+    -------
+    n_points : numpy.ndarray
+        The number of points
     """
+    if len(events) == 0:
+        return events[..., :1]
     if padding == "unknown":
         padding = padding_position(events)
         if padding == "unknown":
             raise ValueError("Cannot determine padding position")
+    padded_length = events.shape[-2]
     if padding == "front":
-        n_points = (events[..., 3] > 0).argmin(-1)[..., None]
+        # index of the first non-zero energy from the front
+        n_points = (events[..., 3] > 0).argmax(-1)[..., None] + 1
+        # anywhere the first energy is non-zero, the number of points is the padded length
+        n_points[events[..., 0, 3] > 0] = padded_length
     else:
-        n_points = (events[..., 3] > 0).argmax(-1)[..., None]
+        # index of the first non-zero energy from the back
+        padding_len = (events[..., ::-1, 3] > 0).argmax(-1)[..., None]
+        n_points = padded_length - padding_len
     return n_points
 
 
@@ -221,27 +254,37 @@ def read_raw_regaxes_withcond(
     else:
         cond_names_per_model = [get_cond_features_names(config, m) for m in for_model]
         cond_names = list(set(sum(cond_names_per_model, [])))
+    # don't have numpy imported here, so manual cumsum
+    starts = [0]
+    for name in cond_names:
+        starts.append(starts[-1] + feature_lengths[name])
+    # decide if number of points per event is wanted
     requires_points = next(
         (i for i, name in enumerate(cond_names) if name in ["n_points", "points"]), -1
     )
+    readable_conds = cond_names[:]
     if requires_points >= 0:
         n_points_name = has_n_points(get_files(config.dataset_path, 1)[0])
         if n_points_name:
-            cond_names[requires_points] = n_points_name
+            readable_conds[requires_points] = n_points_name
         else:  # we can't read it, so remove it for now
-            cond_names.pop(requires_points)
-    else:  # if the we don't need points, we don't need to know if it's there
-        n_points_name = True
-    cond, events = read_raw_regaxes(config, pick_events, total_size, cond_names)
+            readable_conds.pop(requires_points)
+    cond, events = read_raw_regaxes(config, pick_events, total_size, readable_conds)
     cond = torch.tensor(cond)
-    if not n_points_name:
+    if requires_points >= 0 and not n_points_name:
         if len(cond.shape) == 1:
             cond = cond[:, None]
-        n_points = torch.tensor(calculate_n_points_from_events(events))
+        # If there is padding in the config, use that.
+        known_padding = getattr(config, "event_padding_position", "unknown")
+        n_points = torch.tensor(calculate_n_points_from_events(events, known_padding))
         # we need to insert the n_points into the cond tensor
         cond = torch.cat(
             [cond[:, :requires_points], n_points, cond[:, requires_points:]], -1
         )
+    if starts[-1] > 1:
+        # if there are 0 events, but multiple conditions,
+        # this ensures the indexing works
+        cond = cond.reshape(-1, starts[-1])
     if len(for_model) == 1:
         return cond, events
     if len(cond_names) == 1:
@@ -249,16 +292,15 @@ def read_raw_regaxes_withcond(
         conds = {model_name: cond for model_name in for_model}
         return conds, events
     conds = {}
-    # don't have numpy imported here, so manual cumsum
-    starts = [0]
-    for name in cond_names[:-1]:
-        starts.append(starts[-1] + feature_lengths[name])
     for model_name, names in zip(for_model, cond_names_per_model):
         indices = []
         for cond_name in names:
             start = starts[cond_names.index(cond_name)]
             indices += [start + i for i in range(feature_lengths[cond_name])]
-        conds[model_name] = cond[:, indices]
+        if len(indices) > 1:
+            conds[model_name] = cond[:, indices]
+        else:
+            conds[model_name] = cond[:, indices[0]]
     return conds, events
 
 
