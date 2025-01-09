@@ -1,4 +1,5 @@
 from torch.utils.data import Dataset
+import warnings
 import numpy as np
 import h5py
 
@@ -62,14 +63,17 @@ class PointCloudDataset(Dataset):
         self.open_files = self._open_data_files(file_path, n_files)
 
         event_key = self.keys_to_include["event"]
-        if self.open_files[0][event_key].shape[-1] == 4:
-            # no moves needed.
-            self._roll_axis = False
+        self._roll_axis = False
+        for open_file in self.open_files:
+            shape = open_file[event_key].shape
+            if shape[-1] == 4 and shape[-2] != 4:
+                # no moves needed.
+                break
+            elif shape[-1] != 4 and shape[-2] == 4:
+                self._roll_axis = True
+                break
         else:
-            assert (
-                self.open_files[0][event_key].shape[-2] == 4
-            ), "Can't find xyze axis in data"
-            self._roll_axis = True
+            warnings.warn("Can't find xyze axis in data on disk, assuming it's the last axis")
         self._prior_event_axes = self._get_prior_event_axes()
 
         self.max_ds_seq_len = max_ds_seq_len
@@ -137,8 +141,8 @@ class PointCloudDataset(Dataset):
                 n_points = dataset["n_points"][:]
             else:
                 if self._roll_axis:
-                    events = dataset[event_key][:]
-                    n_points = self.get_n_points(events.T)
+                    events = np.moveaxis(dataset[event_key], -1, -2)
+                    n_points = self.get_n_points(events)
                 else:
                     n_points = self.get_n_points(dataset[event_key])
             n_points[n_points > self.max_ds_seq_len] = self.max_ds_seq_len

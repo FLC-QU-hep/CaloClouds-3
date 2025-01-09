@@ -81,26 +81,6 @@ try:
     #    os.path.join(data_base, f"showerFlow/ShowerFlow_{part}_best.pth")
     #    for part in parts
     # ]
-    duncan_cc = "/data/dust/user/dayhallh/duncan/gen0/ckpt_0.465886_560000.pt"
-    duncan_sf = "/data/dust/user/dayhallh/duncan/gen0/ShowerFlow_alt1_nb4_inputs36893488147419103231_best.pth"
-    remade_sf = "/data/dust/user/dayhallh/point-cloud-diffusion-data/investigation2/showerFlow/10-90GeV_x36_grid_regular_524k_float32_10k/ShowerFlow_original_nb6_inputs36893488147419103231_fnorms_best.pth"
-    remade_cc = "/data/dust/user/dayhallh/point-cloud-diffusion-logs/investigation2/CD_2024_12_11__14_32_19/ckpt_0.435745_170000.pt"
-    p22_sf = "/data/dust/user/dayhallh/point-cloud-diffusion-data/investigation2/showerFlow/p22_th90_ph90_en10-100/ShowerFlow_original_nb4_inputs36893488147419103231_fnorms_best.pth"
-    p22_cc = "/data/dust/user/dayhallh/point-cloud-diffusion-logs/investigation2/CD__p22_th90_ph90_en10-1002024_12_11__18_27_01/ckpt_0.435745_170000.pt"
-    ani_cc = "/beegfs/desy/user/akorol/logs/point-clouds/CaloClouds3_dist_50steps_2024_09_19__21_17_03/ckpt_0.000000_120000.pt"
-    rani_sf = "/data/dust/user/dayhallh/point-cloud-diffusion-data/investigation2/showerFlow/sim-E1261AT600AP180-180/ShowerFlow_original_nb4_inputs36893488147419103231_fnorms_best.pth"
-    rani_cc = "/data/dust/user/dayhallh/point-cloud-diffusion-logs/investigation2/CD_sim-E1261AT600AP180-1802024_12_13__18_41_14/ckpt_0.439318_240000.pt"
-    rani2_cc = "/data/dust/user/dayhallh/point-cloud-diffusion-logs/investigation2/CD_sim-E1261AT600AP180-1802024_12_16__19_08_57/ckpt_0.392248_380000.pt"
-    p22_2_cc = "/data/dust/user/dayhallh/point-cloud-diffusion-logs/investigation2/CD_p22_th90_ph90_en10-1002024_12_16__19_12_26/ckpt_2.646811_90000.pt"
-    p22_3_cc = "/data/dust/user/dayhallh/point-cloud-diffusion-logs/investigation2/CD_p22_th90_ph90_en10-1002024_12_18__18_35_43/ckpt_0.439290_400000.pt"
-    calochal_0_cc = "/data/dust/user/dayhallh/point-cloud-diffusion-logs/investigation2/CD_10-90GeV_x36_grid_regular_524k_float322024_12_18__18_35_14/ckpt_0.350131_2120000.pt"
-    rani3_cc = "/data/dust/user/dayhallh/point-cloud-diffusion-logs/investigation2/CD_sim-E1261AT600AP180-1802024_12_18__18_36_10/ckpt_0.465144_190000.pt"
-
-
-    caloclouds = get_caloclouds_models(
-        caloclouds_paths=rani2_cc, showerflow_paths=rani_sf, caloclouds_names="CaloClouds unchanged",
-    )
-    models.update(caloclouds)
     #caloclouds = get_caloclouds_models(
     #    caloclouds_paths=rani3_cc, showerflow_paths=rani_sf, caloclouds_names="CaloClouds changed loss 3",
     #)
