@@ -200,6 +200,10 @@ def config_params_from_showerflow_path(showerflow_path):
         next(part[6:] for part in parts if part.startswith("inputs"))
     )
     inputs_used_mask = [x == "1" for x in f"{inputs_used_as_base10:b}"]
+    max_input_dims = 65
+    if len(inputs_used_mask) < max_input_dims:
+        # pad at the start
+        inputs_used_mask = np.pad(inputs_used_mask, (max_input_dims - len(inputs_used_mask), 0))
     inputs = input_mask_to_list(inputs_used_mask)
     fixed_input_norms = "fnorms" in parts
     cut_inputs = "".join([str(i) for i in range(5) if not inputs_used_mask[i]])

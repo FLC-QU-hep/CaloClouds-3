@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH --time 3:00:00
+#SBATCH --time 5-00:00:00
 #SBATCH --nodes 1
 #SBATCH --partition maxgpu
 #SBATCH --job-name Showerflow
@@ -27,5 +27,5 @@ calchal=\
 "/10-90GeV_x36_grid_regular_524k_float32.hdf5"
 
 
-python3 scripts/ShowerFlow.py bug_dip dataset_path=$calchal \
-    n_dataset_files=1 shower_flow_version=original shower_flow_num_blocks=4
+python3 scripts/ShowerFlow.py caloclouds_3 dataset_path=$anatolli_data \
+    n_dataset_files=88 shower_flow_version=original shower_flow_num_blocks=10
