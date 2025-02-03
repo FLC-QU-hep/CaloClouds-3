@@ -8,6 +8,7 @@ from ..configs import Configs
 
 from .showerflow_utils import truescale_showerflow_output
 from ..data.conditioning import get_cond_features_names, normalise_cond_feats
+from ..utils import precision
 
 
 def get_cog(x, y, z, e):
@@ -81,23 +82,26 @@ def get_shower(model, num_points, cond_feats, cond_N=None, bs=1, config=Configs(
     """
     Get a shower from the diffusion model.
     """
+    model_example_param = next(model.parameters())
     try:
         n_conds = len(cond_feats)
     except TypeError:
-        cond_feats = torch.tensor([cond_feats] * bs).float().reshape(bs, 1)
+        cond_feats = torch.tensor([cond_feats] * bs).reshape(bs, 1)
     else:
-        cond_feats = torch.atleast_2d(torch.tensor(cond_feats).float()).reshape(
-            n_conds, -1
-        )
+        cond_feats = torch.atleast_2d(torch.tensor(cond_feats)).reshape(n_conds, -1)
+    cond_feats = cond_feats.to(
+        model_example_param.device, dtype=model_example_param.dtype
+    )
     if cond_N is not None:
         try:
             n_conds = len(cond_N)
         except TypeError:
-            cond_N = torch.tensor([cond_N] * bs).float().reshape(bs, 1)
+            cond_N = torch.tensor([cond_N] * bs).reshape(bs, 1)
         else:
-            cond_N = torch.atleast_2d(torch.tensor(cond_N).float()).reshape(n_conds, -1)
+            cond_N = torch.atleast_2d(torch.tensor(cond_N)).reshape(n_conds, -1)
         if len(cond_N.shape) == 1:
             cond_N = cond_N[:, None]
+        cond_N = cond_N.to(model_example_param.device, dtype=model_example_param.dtype)
         cond_feats = torch.cat([cond_feats, cond_N], dim=1)
     fake_shower = model.sample(cond_feats, num_points, config)
     return fake_shower
@@ -350,8 +354,9 @@ def gen_cond_showers_batch(
     """
     if config.model_name in ["wish", "fish"]:
         # for this model, we don't have to give a shower_flow
+        dtype = precision.get(config.model_name, config)
         if cond is None:
-            cond = torch.tensor(shower_flow).to(config.device).float()
+            cond = torch.tensor(shower_flow).to(config.device, dtype=dtype)
         kw_args = {
             "model": model,
         }
@@ -374,14 +379,19 @@ def gen_cond_showers_batch(
             "n_splines": n_splines,
         }
     seperate_showerflow_cond = isinstance(cond, dict)
+    showerflow_dtype = precision.get("showerflow", config)
+    diffusion_dtype = precision.get("diffusion", config)
     if seperate_showerflow_cond:
         # it's a seperate showerflow cond
-        showerflow_cond = torch.tensor(cond["showerflow"]).to(config.device).float()
-        cond = torch.tensor(cond["diffusion"]).to(config.device).float()
+        showerflow_cond = torch.tensor(cond["showerflow"]).to(
+            config.device, dtype=showerflow_dtype
+        )
+        cond = torch.tensor(cond["diffusion"]).to(config.device, dtype=diffusion_dtype)
     else:
         # give showerflow the same cond as the diffusion model
-        cond = torch.tensor(cond).to(config.device).float()
-        showerflow_cond = cond
+        diffusion_dtype = precision.get("diffusion", config)
+        cond = torch.tensor(cond).to(config.device, dtype=diffusion_dtype)
+        showerflow_cond = cond.to(config.device, dtype=showerflow_dtype)
     num = cond.shape[0]
     fake_showers = np.empty((num, config.max_points, 4))
     for i, cond_batch in enumerate(cond_batcher(bs, cond, showerflow_cond)):
@@ -618,9 +628,9 @@ def gen_v1_inner_batch(
         fake_showers[i, :, :][mask == 0] = 0
 
         # fake_showers[:, :, -1] = abs(fake_showers[:, :, -1])
-        fake_showers[fake_showers[:, :, -1] <= 0] = (
-            0  # setting events with negative energy to zero
-        )
+        fake_showers[
+            fake_showers[:, :, -1] <= 0
+        ] = 0  # setting events with negative energy to zero
         # fake_showers[:, :, -1] = (
         #     fake_showers[:, :, -1]
         #     / fake_showers[:, :, -1].sum(axis=1).reshape(bs, 1)

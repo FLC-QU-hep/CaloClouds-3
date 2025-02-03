@@ -3,7 +3,7 @@
 import os
 import numpy as np
 import torch
-from pointcloud.config_varients import caloclouds_3_simple_shower, caloclouds_3, wish, default
+from pointcloud.config_varients import caloclouds_3_simple_shower
 from pointcloud.evaluation import discriminator
 from pointcloud.utils import showerflow_training, showerflow_utils
 from pointcloud.utils.metadata import Metadata
@@ -11,8 +11,7 @@ from pointcloud.utils.plotting import RatioPlots, nice_hex
 from matplotlib import pyplot as plt
 
 
-default_configs = default.Configs()
-configs = caloclouds_3.Configs()
+configs = caloclouds_3_simple_shower.Configs()
 if torch.cuda.is_available():
     configs.device = "cuda"
 else:
@@ -21,6 +20,7 @@ if os.path.exists(os.path.dirname(configs.dataset_path)):
     print(f"Found dataset at {configs.dataset_path}")
     
 # Get the generator models we will be comparing with, and check their data has been generated.
+discriminator.create_g4_data_files(configs)
 existing_list = []
 for fnorm in [True, False]:
     configs.shower_flow_fixed_input_norms = fnorm
@@ -33,15 +33,16 @@ existing_models = {
 }
 existing_models["configs"] = []
 
-for i, name in enumerate(existing_models["names"]):
+for i, path in enumerate(existing_models["paths"]):
     model_configs = showerflow_utils.construct_configs(configs, existing_models, i)
+    discriminator.create_showerflow_data_files(model_configs, path)
     existing_models["configs"].append(model_configs)
 
 print(f"Total models found: {len(existing_models['names'])}")
         
-existing_models.keys()
 
-table = [['', 'versions', 'num_blocks', 'cut_inputs', 'fixed_input_norms', 'train_base', 'best_loss']]
+#table = [['', 'versions', 'num_blocks', 'cut_inputs', 'fixed_input_norms', 'train_base', 'best_loss']]
+table = [['', 'versions', 'num_blocks', 'cut_inputs', 'fixed_input_norms', 'best_loss']]
 col_width = 15
 n_models = len(existing_models['paths'])
 for i in range(n_models):
@@ -55,16 +56,22 @@ for row in table:
         line += col
     print(line)
     
+existing_models.keys()
 # ## data fetching
 # 
 # The same libraries as were used to train the discriminator make it easy to get Wasserstein distances.
 g4_data_folder = discriminator.locate_g4_data(configs)
+print(f"g4 data in {g4_data_folder}")
 def gen_training(model_idx, settings="settings12"):
     model_name = existing_models["names"][model_idx]
     model_configs = existing_models["configs"][model_idx]
     model_path = existing_models["paths"][model_idx]
     model_data_folder = discriminator.locate_model_data(model_configs, model_path)
     feature_mask = discriminator.feature_masks[settings]
+    if not os.path.exists(g4_data_folder):
+        os.makedirs(g4_data_folder)
+    if not os.path.exists(model_data_folder):
+        os.makedirs(model_data_folder)
     training = discriminator.Training(settings, g4_data_folder, model_data_folder, discriminator.descriminator_params[settings], feature_mask)
     return model_name, training
 
@@ -139,6 +146,39 @@ if redo:
     existing_models["Wasserstein_distances"] = distances_1d
     np.savez(save_name, **existing_models)
     redo = False
+print(existing_models.keys())
+save_name = os.path.join(showerflow_utils.get_showerflow_dir(configs), "sliced_wasserstein.npz")
+working = list(range(len(existing_models["names"])))
+n_working = len(working)
+if os.path.exists(save_name):
+    loaded = np.load(save_name)
+    distances = loaded["sliced_wasserstein_distances"]
+else:
+    import ot
+    
+    g4_test = training._test_dataset.g4_features
+    n_events = 10000
+    truth_data = g4_test[:n_events]
+    n_projections = 1000
+    n_seeds = 10
+    distances = np.empty((n_working, n_seeds))
+    for i, w in enumerate(working):
+        print(f"{i/n_working:.1%}", end="\r")
+        try:
+            name, training = gen_training(w)
+        except Exception as e:
+            print()
+            print(e)
+            print()
+            
+        gen_test = training._test_dataset.generator_features
+        gen_data = gen_test[:n_events]
+        for seed in range(n_seeds):
+            distances[i, seed] = ot.sliced_wasserstein_distance(truth_data, gen_data, n_projections=n_projections, seed=seed)
+
+    existing_models["sliced_wasserstein_distances"] = distances
+    np.savez(save_name, **existing_models)
+del aucs
 fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(15, 8))
 cmap = plt.cm.tab10
 heights = np.linspace(np.min(distances), np.max(distances), n_working)
@@ -152,6 +192,8 @@ except Exception:
     for i in range(n_models):
         print(f"{i/n_models}", end="\r")             
         name, training = gen_training(i)
+        import ipdb
+        ipdb.set_trace()
         training.reload()
         labels, predictions = training.predict_test()
         auc = metrics.roc_auc_score(labels, predictions)
@@ -240,38 +282,6 @@ plt.ylabel("Distance")
 plt.title('Sliced Wasserstein Distance with 95% confidence interval')
 plt.show()
 
-print(existing_models.keys())
-save_name = os.path.join(showerflow_utils.get_showerflow_dir(configs), "sliced_wasserstein.npz")
-working = list(range(len(existing_models["names"])))
-n_working = len(working)
-if os.path.exists(save_name):
-    loaded = np.load(save_name)
-    distances = loaded["sliced_wasserstein_distances"]
-else:
-    import ot
-    
-    g4_test = training._test_dataset.g4_features
-    n_events = 10000
-    truth_data = g4_test[:n_events]
-    n_projections = 1000
-    n_seeds = 10
-    distances = np.empty((n_working, n_seeds))
-    for i, w in enumerate(working):
-        print(f"{i/n_working:.1%}", end="\r")
-        try:
-            name, training = gen_training(w)
-        except Exception as e:
-            print()
-            print(e)
-            print()
-            
-        gen_test = training._test_dataset.generator_features
-        gen_data = gen_test[:n_events]
-        for seed in range(n_seeds):
-            distances[i, seed] = ot.sliced_wasserstein_distance(truth_data, gen_data, n_projections=n_projections, seed=seed)
-
-    existing_models["sliced_wasserstein_distances"] = distances
-    np.savez(save_name, **existing_models)
 fig, ax = plt.subplots(figsize=(10, 8))
 cmap = plt.cm.tab10
 heights = np.linspace(np.min(distances), np.max(distances), n_working)

@@ -2,7 +2,7 @@ import warnings
 import torch
 import h5py
 from functools import lru_cache
-from ..utils.metadata import Metadata
+from ..utils.metadata import Metadata, precision
 from .read_write import read_raw_regaxes, get_files
 
 
@@ -88,8 +88,9 @@ def get_cond_feats(config, batch, for_model):
         names[names.index("n_points")] = "points"
     elif "n_points" in batch and "points" in names:
         names[names.index("points")] = "n_points"
-    cond_feats = [batch[k][0].float().to(config.device) for k in names]
-    cond_feats = torch.cat(cond_feats, -1).to(config.device).float()  # B, C
+    dtype = precision.get("diffusion", config)
+    cond_feats = [batch[k][0].to(config.device, dtype=dtype) for k in names]
+    cond_feats = torch.cat(cond_feats, -1).to(config.device, dtype=dtype)  # B, C
     return cond_feats
 
 

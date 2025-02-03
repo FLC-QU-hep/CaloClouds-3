@@ -6,16 +6,16 @@ from matplotlib import pyplot as plt
 import torch
 import os
 
-from pointcloud.config_varients import wish, caloclouds_3
-from pointcloud.configs import Configs
+from pointcloud.config_varients import wish, caloclouds_3, caloclouds_3_simple_shower, default
 from pointcloud.models import shower_flow, fish_flow
 from pointcloud.utils import stats_accumulator, metadata, showerflow_utils, showerflow_training
 
-configs = Configs()
-#configs.dataset_path = "/beegfs/desy/user/akorol/data/AngularShowers_RegularDetector/"\
-#"hdf5_for_CC/sim-E1261AT600AP180-180_file_{}slcio.hdf5"
-
-#configs.n_dataset_files = 88
+configs = caloclouds_3.Configs()
+configs.storage_base = "/data/dust/user/dayhallh/"
+configs.logdir = "/data/dust/user/dayhallh/point-cloud-diffusion-logs/"
+configs.dataset_path_in_storage = False
+configs.dataset_path = caloclouds_3_simple_shower.Configs().dataset_path
+configs.n_dataset_files = 88
 meta = metadata.Metadata(configs)
 
 
@@ -26,7 +26,8 @@ except Exception as e:
     configs.device = "cpu"
     incident_energies = torch.linspace(0.1, 1.0, 5)[:, None].to(configs.device)
 
-
+print(configs.dataset_path)
+print(configs.shower_flow_cond_features)
 # There are 65 values to each draw from the original ShowerFlow;
 # 
 # - 0. Total observed clusters / `meta.n_pts_rescale`
@@ -43,10 +44,8 @@ except Exception as e:
 # 
 # Start by using the functions designed to train showerflow to draw these distributions from the dataset.
 
-#data_dir = os.path.realpath(os.path.join(configs.logdir.split("point-cloud-diffusion-logs")[0], "point-cloud-diffusion-data"))
-#showerflow_dir = os.path.join(data_dir, "showerFlow/sim-E1261AT600AP180-180")
-data_dir = "/data/dust/user/dayhallh/duncan/gen0"
-showerflow_dir = data_dir
+data_dir = os.path.realpath(os.path.join(configs.logdir.split("point-cloud-diffusion-logs")[0], "point-cloud-diffusion-data"))
+showerflow_dir = os.path.join(data_dir, "showerFlow/sim-E1261AT600AP180-180")
 print(f"Showerflow dir is {showerflow_dir}")
 assert os.path.exists(showerflow_dir)
 pointsE_path = showerflow_training.get_incident_npts_visible(configs, showerflow_dir)
@@ -113,8 +112,7 @@ if "energy_per_layer" in configs.shower_flow_inputs:
     idx_reached += 30
 else:
     energy_per_layer_slice = None
-
-dataset_cond = []
+dataset_cond = []  # Will be the full 65 element array
 for batch_n, start in enumerate(starts):
     print(f"{batch_n/n_batches:.0%}", end='\r')
     data_matrix = make_train_ds(start, start + local_batch_size)
@@ -205,33 +203,42 @@ def plot_distributions(dists, axes=None, hist_kws=None, line_kws=None, **gen_kws
     axes[4].legend()
     return fig, axes, ratio_axes
     
-
 dataset_kws = {'color': 'gray', 'label': 'G4'}
 fig, axes, ratio_axes = plot_distributions(dataset_distributions, **dataset_kws)
 fig.tight_layout()
 # ## Model varients
 # 
 # That done, we can draw the same values from the models, and plot them alongside.
+saved_models_1 = showerflow_utils.existing_models(caloclouds_3.Configs())
+saved_models_2 = showerflow_utils.existing_models(caloclouds_3_simple_shower.Configs())
+saved_models = {**saved_models_1, **saved_models_2}
+core_models
 from pointcloud.utils import showerflow_utils
+from pointcloud.data.conditioning import feature_lengths
 configs.shower_flow_data_dir = showerflow_dir
-saved_models = showerflow_utils.models_at_paths(configs.shower_flow_cond_features,
-                                                ["/data/dust/user/dayhallh/duncan/gen0/ShowerFlow_alt1_nb4_inputs36893488147419103231_best.pth",
-                                                 "/data/dust/user/dayhallh/point-cloud-diffusion-data/investigation2/showerFlow/p22_th90_ph90_en10-100/ShowerFlow_original_nb4_inputs36893488147419103231_fnorms_best.pth"])
+
+import ipdb
+if True:
+    core_models = showerflow_utils.models_at_paths(["energy", "p_norm_local"],
+    ["/data/dust/user/dayhallh/point-cloud-diffusion-data/showerFlow/sim-E1261AT600AP180-180/ShowerFlow_original_nb10_inputs36893488147419103231_best.pth",
+     "/data/dust/user/dayhallh/point-cloud-diffusion-data/showerFlow/sim-E1261AT600AP180-180/ShowerFlow_alt1_nb4_inputs8070450532247928831_fnorms_best.pth",
+    ])
+    
+
 default_input_mask = showerflow_utils.get_input_mask(configs)
 max_n_inputs = len(default_input_mask)
 
-cond_feature_mask = showerflow_utils.get_cond_mask(configs)
-n_cond_features = np.sum(cond_feature_mask)
 
 def get_distributions(saved_models):
     distributions = []
     for i, version in enumerate(saved_models["versions"]):
         constructor = shower_flow.versions_dict[version]
         num_inputs = max_n_inputs - len(saved_models["cut_inputs"][i])
+        num_cond_inputs = sum([feature_lengths[f] for f in saved_models['cond_features'][i]])
         model, dist, transforms = constructor(
             num_blocks = saved_models["num_blocks"][i],
             num_inputs = num_inputs,
-            num_cond_inputs = n_cond_features,
+            num_cond_inputs = num_cond_inputs,
             device = configs.device)
         loaded_checkpoint = torch.load(saved_models["paths"][i], map_location=configs.device)
         model.load_state_dict(loaded_checkpoint["model"])
@@ -259,11 +266,11 @@ def model_distributions(model):
 
 
 try:
-    distributions[i]
+    assert len(core_distributions) == len(core_models["versions"])
     
-    print(f"Already loaded {len(distributions)}")
+    print(f"Already loaded {len(core_distributions)}")
 except Exception:
-    distributions = get_distributions(saved_models)
+    distributions = get_distributions(core_models)
 saved_models['best_loss'] = np.array(saved_models['best_loss'])
 all_inputs_mask = [i for i, x in enumerate(saved_models['cut_inputs']) if not x]
 best_3 = np.array(all_inputs_mask)[np.argsort(saved_models['best_loss'][all_inputs_mask])[:3]]
@@ -277,10 +284,7 @@ try:
 except Exception:
     all_distributions = []
     for i, dist in enumerate(distributions):
-        try:
-            all_distributions.append(model_distributions(dist))
-        except RuntimeError:
-            print(saved_models["names"][i])
+        all_distributions.append(model_distributions(dist))
 
 worst_dist_idx = all_inputs_mask[np.argmax(saved_models['best_loss'][all_inputs_mask])]
 y_mins = 0.5*np.ones(7)
@@ -304,6 +308,7 @@ def plot_ratios(ratio_axes, distribution, **dataset_kws):
         y_maxes[i] = max(min(np.nanmin(ratio), 3), y_maxes[i])
         ratio_axes[i].set_ylim((y_mins[i], y_maxes[i]))
     
+len(all_distributions)
 
 dataset_kws = {'color': 'gray', 'label': 'G4'}
 fig, axes, ratio_axes = plot_distributions(dataset_distributions, **dataset_kws)
@@ -348,70 +353,3 @@ for ax in axes:
 
 fig.tight_layout()
 plt.savefig("with_worst_logy.png")
-model_names = [["original_nb4", "original_nb10"], ["alt1_nb4", "alt1_nb10"], ["original_nb4", "alt1_nb4", "alt2_nb4"]]
-try:
-    print(len(model_dists))
-except Exception:
-    model_dists = {}
-for group in model_names:
-    for name in group:
-        if name in model_dists:
-            continue
-        print(name)
-        idx = saved_models["names"].index(name)
-        if idx in best_3:
-            dist = best_distributions[list(best_3).index(idx)]
-        else:
-            dist = model_distributions(distributions[idx])
-        model_dists[name] = dist
-
-    
-for name_group in model_names:
-    idxs = [saved_models["names"].index(n) for n in name_group]
-    dataset_kws = {'color': 'gray', 'label': 'G4'}
-    fig, axes, ratio_axes = plot_distributions(dataset_distributions, **dataset_kws)
-    from pointcloud.utils.plotting import nice_hex
-    dataset_hist_kws = {'histtype': 'step', 'lw': 3}
-    line_styles = ['-', '--', ':', '-.']
-    for i, model_i in enumerate(idxs):
-        name = name_group[i]
-        dist_here = model_dists[name]
-        label = f"{saved_models['names'][model_i]}, {saved_models['best_loss'][model_i]:.1f}"
-        dataset_kws = {'color': nice_hex[4][(i*2+1)%5], 'label': label, 'ls':line_styles[i%4]}
-        plot_distributions(dist_here, axes=axes, hist_kws=dataset_hist_kws, **dataset_kws)
-        plot_ratios(ratio_axes, dist_here, **dataset_kws)
-
-
-
-    fig.tight_layout()
-    plt.savefig('.vs.'.join(name_group) + ".png")
-
-
-
-    
-for name_group in model_names:
-    idxs = [saved_models["names"].index(n) for n in name_group]
-    dataset_kws = {'color': 'gray', 'label': 'G4'}
-    fig, axes, ratio_axes = plot_distributions(dataset_distributions, **dataset_kws)
-    from pointcloud.utils.plotting import nice_hex
-    dataset_hist_kws = {'histtype': 'step', 'lw': 3}
-    line_styles = ['-', '--', ':', '-.']
-    for i, model_i in enumerate(idxs):
-        name = name_group[i]
-        dist_here = model_dists[name]
-        label = f"{saved_models['names'][model_i]}, {saved_models['best_loss'][model_i]:.1f}"
-        dataset_kws = {'color': nice_hex[4][(i*2+1)%5], 'label': label, 'ls':line_styles[i%4]}
-        plot_distributions(dist_here, axes=axes, hist_kws=dataset_hist_kws, **dataset_kws)
-        plot_ratios(ratio_axes, dist_here, **dataset_kws)
-
-    for ax in axes:
-        ax.semilogy()
-
-    fig.tight_layout()
-    plt.savefig('.vs.'.join(name_group) + ".png")
-
-
-all_distributions
-
-
-
