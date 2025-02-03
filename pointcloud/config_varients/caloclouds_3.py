@@ -19,7 +19,7 @@ class Configs(default.Configs):
         )
 
         self.workers = 5
-        self.max_points = 6_000
+        self.max_points = 30_000
 
         self.shower_flow_cond_features = ["energy", "p_norm_local"]
         self.shower_flow_fixed_input_norms = False
