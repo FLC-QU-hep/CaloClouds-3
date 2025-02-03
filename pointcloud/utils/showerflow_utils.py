@@ -50,6 +50,10 @@ def model_save_paths(configs, version, num_blocks, cut_inputs):
         name_base += "_fnorms"
         nice_name += "_fnorms"
 
+    if getattr(configs, "shower_flow_train_base", False):
+        name_base += "_tbase"
+        nice_name += "_tbase"
+
     showerflow_precision = precision.get("showerflow", configs)
     default_showerflow_precision = precision.get("showerflow")
     if showerflow_precision != default_showerflow_precision:

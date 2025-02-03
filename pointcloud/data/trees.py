@@ -58,9 +58,10 @@ class Tree:
 
         """
         self.max_skips = max_skips
+        self.dtype = dtype
+        self.np_dtype = np.dtype(str(dtype).split('.')[1].split("'", 1)[0])
         self._setup_layers(event_as_layers)
         self._setup_root(root_xy)
-        self.dtype = dtype
         for _ in self.occupied_layers[2:]:
             self._assign_next_layer()
 
@@ -74,7 +75,7 @@ class Tree:
         event_as_layers : list of np.ndarray (n_points, 4)
             The event data split into layers. Format is x, y, z, energy.
         """
-        root_point = np.array([[0, 0, 0, 1]], dtype=self.dtype)
+        root_point = np.array([[0, 0, 0, 1]], dtype=self.np_dtype)
         self._event_as_layers = [root_point] + event_as_layers
         self._layer_masks = [layer[:, 3] > 0 for layer in self._event_as_layers]
         self.n_layers = len(self._event_as_layers)
@@ -83,8 +84,8 @@ class Tree:
         self.occupied_layers = np.where(n_points_in_layer)[0]
         cumulative_points_in_layer = np.cumsum(n_points_in_layer)
         # store the xy positions of the points
-        self.xy = np.zeros((self.total_points, 2), dtype=self.dtype)
-        self.energy = np.zeros(self.total_points, dtype=self.dtype)
+        self.xy = np.zeros((self.total_points, 2), dtype=self.np_dtype)
+        self.energy = np.zeros(self.total_points, dtype=self.np_dtype)
         for layer_n, layer in enumerate(self._event_as_layers[1:], 1):
             layer_slice = slice(
                 cumulative_points_in_layer[layer_n - 1],
@@ -101,7 +102,7 @@ class Tree:
         # 2 columns, one for the parent, one for the child
         # each point asside from the root must have exactly one parent,
         # points in the first layer all have the root parent
-        self.edges = -np.ones((self.total_points - 1, 2), dtype=self.dtype)
+        self.edges = -np.ones((self.total_points - 1, 2), dtype=np.int32)
 
     def _setup_root(self, root_xy):
         """
@@ -115,7 +116,7 @@ class Tree:
         self.energy[0] = 1.
         self.xy[0] = root_xy
         self._event_as_layers[0][0] = np.array(
-            [[root_xy[0], root_xy[1], 0, 1]], dtype=self.dtype
+            [[root_xy[0], root_xy[1], 0, 1]], dtype=self.np_dtype
         )
         # every point in layer one has the root as parent
         if len(self.occupied_layers) == 1:

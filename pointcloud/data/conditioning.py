@@ -2,7 +2,8 @@ import warnings
 import torch
 import h5py
 from functools import lru_cache
-from ..utils.metadata import Metadata, precision
+from ..utils.metadata import Metadata
+from ..utils import precision
 from .read_write import read_raw_regaxes, get_files
 
 
