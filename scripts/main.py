@@ -9,7 +9,6 @@ import k_diffusion
 import time
 
 from pointcloud.utils.misc import seed_all
-from pointcloud.utils import precision
 from pointcloud.utils.training import (
     get_comet_experiment,
     get_ckp_mgr,
@@ -86,11 +85,10 @@ def main(config=Configs()):
     if not hasattr(config, "kl_weight"):
         config.kl_weight = "unset"
 
-    dtype = precision.get("diffusion", config)
     # Train, validate and test
     def train(batch, it):
         # Load data
-        x = batch["event"][0].to(config.device, dtype=dtype)
+        x = batch["event"][0].to(config.device)
 
         # Reset grad and model state
         optimizer.zero_grad()
@@ -143,7 +141,7 @@ def main(config=Configs()):
             cond_feats = normalise_cond_feats(config, cond_feats, "diffusion")
 
             noise = torch.randn_like(x)  # noise for forward diffusion
-            sigma = sample_density([x.shape[0]], device=x.device, dtype=dtype)
+            sigma = sample_density([x.shape[0]], device=x.device)
 
             writer = experiment if config.log_comet else None
 
