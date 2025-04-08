@@ -8,7 +8,6 @@ from pointcloud.data.naming import dataset_name_from_path
 from pointcloud.models.shower_flow import versions_dict
 from .metadata import Metadata
 from ..data.conditioning import get_cond_features_names
-from ..utils import precision
 
 
 def get_data_dir(configs, last_resort="/home/{}/Data/"):
@@ -43,7 +42,6 @@ def model_save_paths(configs, version, num_blocks, cut_inputs):
             inputs_used[i] = False
     inputs_used_as_binary = "".join(["1" if i else "0" for i in inputs_used])
     inputs_used_as_base10 = int(inputs_used_as_binary, 2)
-
     name_base = f"ShowerFlow_{version}_nb{num_blocks}_inputs{inputs_used_as_base10}"
     nice_name = f"{version}_nb{num_blocks}"
     if getattr(configs, "shower_flow_fixed_input_norms", False):
@@ -63,18 +61,12 @@ def model_save_paths(configs, version, num_blocks, cut_inputs):
         name_base += f"_wd{wd_string}"
         nice_name += f"_wd{wd_string}"
 
-    showerflow_precision = precision.get("showerflow", configs)
-    default_showerflow_precision = precision.get("showerflow")
-    if showerflow_precision != default_showerflow_precision:
-        precision_str = str(showerflow_precision).split(".")[1]
-        name_base += f"_prec{precision_str}"
-        nice_name += f"_prec{precision_str}"
-
     best_model_path = os.path.join(showerflow_dir, f"{name_base}_best.pth")
     best_data_path = os.path.join(showerflow_dir, f"{name_base}_best_data.txt")
 
     if cut_inputs:
         nice_name += f"_wo{cut_inputs}"
+
     return nice_name, best_model_path, best_data_path
 
 

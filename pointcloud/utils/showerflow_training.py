@@ -10,7 +10,6 @@ from pointcloud.utils.metadata import Metadata
 from pointcloud.data.read_write import get_n_events, read_raw_regaxes
 from pointcloud.utils.detector_map import floors_ceilings
 from pointcloud.utils.gen_utils import get_cog as cog_from_kinematics
-from pointcloud.utils import precision
 
 from ..data.conditioning import get_cond_features_names
 
@@ -351,7 +350,6 @@ def train_ds_function_factory(
     """
     meta = Metadata(configs)
     device = configs.device
-    dtype = precision.get("showerflow", configs)
 
     if getattr(configs, "shower_flow_fixed_input_norms", False):
         clusters_per_layer_key = "clusters_per_layer"
@@ -379,12 +377,12 @@ def train_ds_function_factory(
         output = []
         if condition_energy:
             energy = torch.tensor(pointE["energy"][my_slice]) / meta.incident_rescale
-            energy = energy.view(-1, 1).to(device, dtype=dtype)
+            energy = energy.view(-1, 1).to(device).float()
             output.append(energy)
         if condition_direction:
             assert direction_path is not None
             direction = torch.tensor(np.load(direction_path, mmap_mode="r")[my_slice])
-            direction = direction.to(device, dtype=dtype)
+            direction = direction.to(device).float()
             output.append(direction)
 
         # for predicted values
@@ -392,13 +390,13 @@ def train_ds_function_factory(
             num_points = (
                 torch.tensor(pointE["num_points"][my_slice]) / meta.n_pts_rescale
             )
-            num_points = num_points.view(-1, 1).to(device, dtype=dtype)
+            num_points = num_points.view(-1, 1).to(device).float()
             output.append(num_points)
         if "total_energy" in configs.shower_flow_inputs:
             visible_energy = (
                 torch.tensor(pointE["visible_energy"][my_slice]) / meta.vis_eng_rescale
             )
-            visible_energy = visible_energy.view(-1, 1).to(device, dtype=dtype)
+            visible_energy = visible_energy.view(-1, 1).to(device).float()
             output.append(visible_energy)
 
         normed_cog = np.load(cog_path, mmap_mode="r")[my_slice].copy()
@@ -406,15 +404,15 @@ def train_ds_function_factory(
 
         if "cog_x" in configs.shower_flow_inputs:
             cog_x = torch.tensor(normed_cog[:, 0])
-            cog_x = cog_x.view(-1, 1).to(device, dtype=dtype)
+            cog_x = cog_x.view(-1, 1).to(device).float()
             output.append(cog_x)
         if "cog_y" in configs.shower_flow_inputs:
             cog_y = torch.tensor(normed_cog[:, 1])
-            cog_y = cog_y.view(-1, 1).to(device, dtype=dtype)
+            cog_y = cog_y.view(-1, 1).to(device).float()
             output.append(cog_y)
         if "cog_z" in configs.shower_flow_inputs:
             cog_z = torch.tensor(normed_cog[:, 2])
-            cog_z = cog_z.view(-1, 1).to(device, dtype=dtype)
+            cog_z = cog_z.view(-1, 1).to(device).float()
             output.append(cog_z)
 
         if "clusters_per_layer" in configs.shower_flow_inputs:

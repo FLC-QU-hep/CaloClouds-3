@@ -22,12 +22,16 @@ if os.path.exists(os.path.dirname(configs.dataset_path)):
 # Get the generator models we will be comparing with, and check their data has been generated.
 discriminator.create_g4_data_files(configs)
 existing_list = []
-for fnorm in [True, False]:
-    configs.shower_flow_fixed_input_norms = fnorm
-    for tbase in [True, False]:
-        configs.shower_flow_train_base = tbase
-        found_here = showerflow_utils.existing_models(configs)
-        existing_list.append(showerflow_utils.existing_models(configs))
+for weight_decay in [0., 0.0001, 0.1]:
+    configs.shower_flow_weight_decay = weight_decay
+    for dhist in [True, False]:
+        configs.shower_flow_detailed_history = dhist
+        for fnorm in [True, False]:
+            configs.shower_flow_fixed_input_norms = fnorm
+            for tbase in [True, False]:
+                configs.shower_flow_train_base = tbase
+                found_here = showerflow_utils.existing_models(configs)
+                existing_list.append(showerflow_utils.existing_models(configs))
 existing_models = {
     key: sum([model[key] for model in existing_list], []) for key in existing_list[0]
 }
@@ -45,7 +49,7 @@ print(f"Total models found: {len(existing_models['names'])}")
         
 
 #table = [['', 'versions', 'num_blocks', 'cut_inputs', 'fixed_input_norms', 'train_base', 'best_loss']]
-table = [['', 'versions', 'num_blocks', 'cut_inputs', 'fixed_input_norms', 'best_loss']]
+table = [['', 'versions', 'num_blocks', 'cut_inputs', 'fixed_input_norms', 'best_loss', 'weight_decay']]
 col_width = 15
 n_models = len(existing_models['paths'])
 for i in range(n_models):
@@ -108,7 +112,6 @@ if os.path.exists(save_name):
 else:
     redo = True
     distances_1d = [np.zeros(n_cogs+n_pnts_layers+n_es_layers) for _ in existing_models["paths"]]
-name
 
 total_ticks = n_cogs*n_models
 if cogs and redo:
@@ -155,7 +158,6 @@ if n_es_layers and redo:
                 distances_1d[i][ei] = distance
             except Exception:
                 pass
-redo = True
 if redo:
     existing_models["Wasserstein_distances"] = distances_1d
     np.savez(save_name, **existing_models)
@@ -192,7 +194,6 @@ else:
 
     existing_models["sliced_wasserstein_distances"] = distances
     np.savez(save_name, **existing_models)
-working
 fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(15, 8))
 cmap = plt.cm.tab10
 heights = np.linspace(np.min(distances), np.max(distances), n_working)
@@ -233,19 +234,21 @@ except Exception:
 for i, w in enumerate(working):
     print(f"{i/n_models}", end="\r")
     name = existing_models["names"][i].split("_wo")[0]
+    if name == "original_nb10_fnorms_dhist":
+        continue
     distance = np.mean(distances[i])
     distance_err = np.std(distances[i])              
     auc = aucs[i]
     if auc is None:
         continue
     c = cmap(i/n_models)
-    mean_distance = np.mean(distances_1d[i])
-    max_distance = np.max(distances_1d[i])
+    mean_distance = np.mean(distances_1d[w])
+    max_distance = np.max(distances_1d[w])
     ax1.text(auc, mean_distance-0.02, name,
              rotation=-20, rotation_mode='anchor',
              color=c, size=8
             )
-    n_blocks = existing_models["num_blocks"][i]
+    n_blocks = existing_models["num_blocks"][w]
     ax1.scatter([auc,], [mean_distance,], s=n_blocks, alpha=0.4,
              c=c)
     ax2.text(auc, max_distance-0.2, name,
@@ -315,12 +318,15 @@ plt.ylabel("Distance")
 plt.title('Sliced Wasserstein Distance with 95% confidence interval')
 plt.show()
 
+len(working)
 fig, ax = plt.subplots(figsize=(10, 8))
 cmap = plt.cm.tab10
 heights = np.linspace(np.min(distances), np.max(distances), n_working)
 
 for i, w in enumerate(working):
     name = existing_models["names"][w].split("_wo")[0]
+    if name == "original_nb10_fnorms_dhist":
+        continue
     distance = np.mean(distances[i])
     distance_err = np.std(distances[i])
     loss = existing_models["best_loss"][w]
@@ -336,6 +342,7 @@ for i, w in enumerate(working):
 plt.ylabel("Sliced Wasserstein")
 plt.xlabel("Best loss")
 plt.savefig("sliced_wasserstein_vs_loss.png")
+len(aucs), len(distances), len(distances_1d)
 fig, ax = plt.subplots(figsize=(10, 8))
 cmap = plt.cm.tab10
 heights = np.linspace(np.min(distances), np.max(distances), n_working)
@@ -344,6 +351,8 @@ from sklearn import metrics
 for i, w in enumerate(working):
     print(f"{i/n_working}", end="\r")
     name = existing_models["names"][w].split("_wo")[0]
+    if name == "original_nb10_fnorms_dhist":
+        continue
     distance = np.mean(distances[i])
     distance_err = np.std(distances[i])                
     auc = aucs[w]
@@ -361,6 +370,7 @@ for i, w in enumerate(working):
 plt.ylabel("Sliced Wasserstein")
 plt.xlabel("AUC")
 plt.savefig("sliced_wasserstein_vs_AUC.png")
+
 fig, ax = plt.subplots(figsize=(10, 8))
 cmap = plt.cm.tab10
 heights = np.linspace(np.min(distances), np.max(distances), n_working)
@@ -369,58 +379,8 @@ from sklearn import metrics
 for i, w in enumerate(working):
     print(f"{i/n_working}", end="\r")
     name = existing_models["names"][w].split("_wo")[0]
-    distance = np.mean(distances[i])
-    if distance>10:
+    if name == "original_nb10_fnorms_dhist":
         continue
-    distance_err = np.std(distances[i])                
-    auc = aucs[w]
-    if auc is None:
-        continue
-    c = cmap(i/n_working)
-    plt.text(auc+0.003, distance, name,
-             rotation=-20, rotation_mode='anchor',
-             color=c, size=8
-            )
-    n_blocks = existing_models["num_blocks"][w]
-    plt.plot([auc, auc], [distance-distance_err, distance+distance_err], lw=3,
-             c=c)
-
-plt.ylabel("Sliced Wasserstein")
-plt.xlabel("AUC")
-plt.savefig("sliced_wasserstein_vs_AUC_zoom.png")
-
-fig, ax = plt.subplots(figsize=(10, 8))
-cmap = plt.cm.tab10
-heights = np.linspace(np.min(distances), np.max(distances), n_working)
-from sklearn import metrics
-
-for i, w in enumerate(working):
-    print(f"{i/n_working}", end="\r")
-    name = existing_models["names"][w].split("_wo")[0]
-    distance = np.mean(distances[i])
-    distance_err = np.std(distances[i])                
-    mean_dis = np.mean(distances_1d[w])            
-    std_dis = np.std(distances_1d[w])/10
-    c = cmap(i/n_working)
-    plt.text(mean_dis+0.01, distance, name,
-             rotation=-20, rotation_mode='anchor',
-             color=c, size=8
-            )
-    n_blocks = existing_models["num_blocks"][w]
-    plt.plot([mean_dis, mean_dis], [distance-distance_err, distance+distance_err], lw=std_dis,
-             c=c)
-
-plt.ylabel("Sliced Wasserstein")
-plt.xlabel("Mean Wasserstein")
-plt.savefig("wasserstein_comparison.png")
-fig, ax = plt.subplots(figsize=(10, 8))
-cmap = plt.cm.tab10
-heights = np.linspace(np.min(distances), np.max(distances), n_working)
-from sklearn import metrics
-
-for i, w in enumerate(working):
-    print(f"{i/n_working}", end="\r")
-    name = existing_models["names"][w].split("_wo")[0]
     distance = np.mean(distances[i])
     distance_err = np.std(distances[i])                
     mean_dis = np.mean(distances_1d[w])            
@@ -447,6 +407,8 @@ aaucs = []
 for i, w in enumerate(working):
     print(f"{i/n_working}", end="\r")
     name = existing_models["names"][w].split("_wo")[0]
+    if name == "original_nb10_fnorms_dhist":
+        continue
     fnorms.append("fnorm" in name)
     n_blocks.append(existing_models["num_blocks"][w])
     lowest_loss.append(existing_models["best_loss"][w])
@@ -474,24 +436,24 @@ blank_axes(axarr[2, 0])
 blank_axes(axarr[2, 1])
 
 def plt_ax(ax, xs, ys, cs, shape, **kwargs):
-    thing = ax.scatter(xs[shape], ys[shape], c=cs[shape], marker="x", label="fixed norm", vmin=1, vmax=10, **kwargs)
-    ax.scatter(xs[~shape], ys[~shape], c=cs[~shape], marker="^", label="variable norm", vmin=1, vmax=10, **kwargs)
+    thing = ax.scatter(xs[shape], ys[shape], c=cs[shape], marker="x", label="fixed norm", vmin=0, vmax=3.6e7, **kwargs)
+    ax.scatter(xs[~shape], ys[~shape], c=cs[~shape], marker="^", label="variable norm", vmin=0, vmax=3.6e7, **kwargs)
     return thing
 
-plt_ax(axarr[2,2], mean, sliced, n_blocks, fnorms)
-plt_ax(axarr[1,2], mean, aaucs, n_blocks, fnorms)
-plt_ax(axarr[0,2], mean, lowest_loss, n_blocks, fnorms)
+plt_ax(axarr[2,2], mean, sliced, params[filter_xs], fnorms)
+plt_ax(axarr[1,2], mean, aaucs, params[filter_xs], fnorms)
+plt_ax(axarr[0,2], mean, lowest_loss, params[filter_xs], fnorms)
 axarr[2, 2].set_ylabel("Sliced Wasserstein")
 axarr[2, 2].set_xlabel("Mean Wasserstein")
-plt_ax(axarr[1, 1], sliced, aaucs, n_blocks, fnorms)
-plt_ax(axarr[0, 1], sliced, lowest_loss, n_blocks, fnorms)
+plt_ax(axarr[1, 1], sliced, aaucs, params[filter_xs], fnorms)
+plt_ax(axarr[0, 1], sliced, lowest_loss, params[filter_xs], fnorms)
 axarr[1, 1].set_xlabel("Sliced Wasserstein")
 axarr[1, 1].set_ylabel("AUC")
-thing = plt_ax(axarr[0, 0], aaucs, lowest_loss, n_blocks, fnorms)
+thing = plt_ax(axarr[0, 0], aaucs, lowest_loss, params[filter_xs], fnorms)
 axarr[0, 0].set_xlabel("AUC")
 axarr[0, 0].set_ylabel("Lowest loss")
 
-plt.colorbar(thing, ax=axarr[2, 0], label="number of blocks")
+plt.colorbar(thing, ax=axarr[2, 0], label="number of parameters")
 hs, ls = axarr[0, 0].get_legend_handles_labels()
 axarr[2, 0].legend(hs, ls)
 
@@ -510,8 +472,8 @@ for ix, iy in ((0, 0), (1, 1), (2, 2)):
         labelleft=True) # labels along the bottom edge are off
     
 plt.tight_layout()
-plt.savefig("multi_comparison.png")
-plt.savefig("multi_comparison.pdf")
+plt.savefig("multi_comparison2.png")
+plt.savefig("multi_comparison2.pdf")
 
 def plt_ax(xs, ys, cs, shape, x_name, y_name, **kwargs):
     fig, ax = plt.subplots()
@@ -561,9 +523,10 @@ print(params)
 
 
 
-
-
+filter_xs = [existing_models["names"][w].split("_wo")[0]!="original_nb10_fnorms_dhist" for w in working]
+print(np.sum(filter_xs))
 def plt_subax(ax, xs, ys, cs, shape, x_name, y_name, **kwargs):
+    xs = xs[filter_xs]
     thing = ax.scatter(xs[shape], ys[shape], c=cs[shape], marker="x", label="fixed norm", vmin=1, vmax=10, **kwargs)
     ax.scatter(xs[~shape], ys[~shape], c=cs[~shape], marker="^", label="variable norm", vmin=1, vmax=10, **kwargs)
     ax.set_xlabel(x_name)
@@ -578,6 +541,81 @@ fig.colorbar(thing, ax=axarr, shrink=0.6, label="Number of blocks")
 plt.savefig("number_of_params_vs_performance.png")
 plt.savefig("number_of_params_vs_performance.pdf")
 
+
+filter_xs = [existing_models["names"][w].split("_wo")[0]!="original_nb10_fnorms_dhist" for w in working]
+print(np.sum(filter_xs))
+def plt_subax(ax, xs, ys, cs, shape, x_name, y_name, **kwargs):
+    xs = xs[filter_xs]
+    thing = ax.scatter(xs[shape], ys[shape], c=cs[shape], marker="x", label="fixed norm", vmin=0.5, vmax=1, **kwargs)
+    ax.scatter(xs[~shape], ys[~shape], c=cs[~shape], marker="^", label="variable norm", vmin=0.5, vmax=1, **kwargs)
+    ax.set_xlabel(x_name)
+    ax.set_ylabel(y_name)
+    return thing
+fig, axarr = plt.subplots(1, 1, figsize=(10, 5), sharex=True)
+
+thing = plt_subax(axarr, params, sliced, aaucs, fnorms, "Number of parameters", "Sliced Wasserstein")
+#thing = plt_subax(axarr[1], params, aaucs, n_blocks, fnorms, "Number of parameters", "AUC")
+
+fig.colorbar(thing, ax=axarr, shrink=0.6, label="AUC")
+plt.savefig("number_of_params_vs_performance2.png")
+plt.savefig("number_of_params_vs_performance2.pdf")
+plt.legend()
+
+def plt_subax(ax, xs, ys, cs, shape, x_name, y_name, **kwargs):
+    xs = xs[filter_xs]
+    unique_xs = np.unique(xs)
+    x_dict = {x:i for i, x in enumerate(unique_xs)}
+    for x in x_dict:
+        matches = xs == x
+        ys_here = ys[shape&matches]
+        xs_here = np.full_like(ys_here, x_dict[x])
+        thing = ax.scatter(xs_here, ys_here, c=cs[shape&matches], marker="x", label="fixed norm", vmin=1, vmax=10, **kwargs)
+        ys_here = ys[(~shape)&matches]
+        xs_here = np.full_like(ys_here, x_dict[x])
+        ax.scatter(xs_here, ys_here, c=cs[(~shape)&matches], marker="^", label="variable norm", vmin=1, vmax=10, **kwargs)
+        ax.set_xlabel(x_name)
+        ax.set_ylabel(y_name)
+    ax.set_xticks(list(range(len(unique_xs))), unique_xs)
+    return thing
+fig, axarr = plt.subplots(1, 2, figsize=(15, 5), sharex=True)
+
+
+weight_decays = np.array(existing_models["weight_decay"])[working]
+plt_subax(axarr[0], weight_decays, sliced, n_blocks, fnorms, "Weight decay", "Sliced Wasserstein")
+thing = plt_subax(axarr[1], weight_decays, aaucs, n_blocks, fnorms, "Weight decay", "AUC")
+
+fig.colorbar(thing, ax=axarr, shrink=0.6, label="Number of blocks")
+plt.savefig("weight_decay_vs_performance.png")
+plt.savefig("weight_decay_vs_performance.pdf")
+
+def plt_subax(ax, xs, ys, cs, shape, x_name, y_name, **kwargs):
+    xs = xs[filter_xs]
+    unique_xs = np.unique(xs)
+    x_dict = {x:i for i, x in enumerate(unique_xs)}
+    for x in x_dict:
+        matches = xs == x
+        ys_here = ys[shape&matches]
+        xs_here = np.full_like(ys_here, x_dict[x])
+        thing = ax.scatter(xs_here, ys_here, c=cs[shape&matches], marker="x", label="fixed norm", vmin=0.5, vmax=1, **kwargs)
+        ys_here = ys[(~shape)&matches]
+        xs_here = np.full_like(ys_here, x_dict[x])
+        ax.scatter(xs_here, ys_here, c=cs[(~shape)&matches], marker="^", label="variable norm", vmin=0.5, vmax=1, **kwargs)
+        ax.set_xlabel(x_name)
+        ax.set_ylabel(y_name)
+    ax.set_xticks(list(range(len(unique_xs))), unique_xs)
+    return thing
+fig, axarr = plt.subplots(1, 1, figsize=(10, 5), sharex=True)
+
+
+weight_decays = np.array(existing_models["weight_decay"])[working]
+thing = plt_subax(axarr, weight_decays, sliced, aaucs, fnorms, "Weight decay", "Sliced Wasserstein")
+#thing = plt_subax(axarr[1], weight_decays, aaucs, n_blocks, fnorms, "Weight decay", "AUC")
+
+fig.colorbar(thing, ax=axarr, shrink=0.6, label="AUC")
+plt.savefig("weight_decay_vs_performance2.png")
+plt.savefig("weight_decay_vs_performance2.pdf")
+
+existing_models.keys()
 for k in existing_models:
     print(f"{k} {len(existing_models[k])}")
 from pointcloud.models import shower_flow

@@ -62,11 +62,6 @@ def get_shower(model, num_points, energy, cond_N, config, bs=1):
 
     cond_feats = torch.cat([e, n], -1)
 
-    model_example_param = next(model.parameters())
-    cond_feats = cond_feats.to(
-        model_example_param.device, dtype=model_example_param.dtype
-    )
-
     with torch.no_grad():
         if config.kdiffusion:
             fake_shower = model.sample(cond_feats, num_points, config)
@@ -93,8 +88,7 @@ def invers_transform_points(n_points):
 # batch inference
 def gen_showers_batch(model, shower_flow, e_min, e_max, config, num=2000, bs=32):
     if (get_cond_feature_names(config)[0] != ["energy"]) or (
-        get_cond_feature_names(config)[1] not in ["n_points", "points"]
-    ):
+            get_cond_feature_names(config)[1] not in ["n_points", "points"]):
         raise NotImplementedError(
             "Currently only energy and points conditioning in diffusion "
             "is supported for batch generation"
@@ -104,10 +98,6 @@ def gen_showers_batch(model, shower_flow, e_min, e_max, config, num=2000, bs=32)
             "Currently only energy conditioning in showerflow "
             "is supported for batch generation"
         )
-    # decide on the data types
-    shower_flow_example_param = next(shower_flow.parameters())
-    shower_flow_dtype = shower_flow_example_param.dtype
-
     output = {}
 
     leyer_pos = np.arange(-0.98, 1, 0.0444)
@@ -127,11 +117,7 @@ def gen_showers_batch(model, shower_flow, e_min, e_max, config, num=2000, bs=32)
         np.log(log_uniform_samples / log_uniform_samples.min())
         / np.log(log_uniform_samples.max() / log_uniform_samples.min())
     ).reshape(-1)
-    cond_E = (
-        torch.tensor(log_uniform_samples)
-        .view(num, 1)
-        .to(config.device, dtype=shower_flow_dtype)
-    )
+    cond_E = torch.tensor(log_uniform_samples).view(num, 1).to(config.device).float()
 
     samples = (
         shower_flow.condition(cond_E)
@@ -265,7 +251,7 @@ def gen_showers_batch_r(model, showers, e_min, e_max, config, num=2000, bs=32):
         np.log(log_uniform_samples / log_uniform_samples.min())
         / np.log(log_uniform_samples.max() / log_uniform_samples.min())
     ).reshape(-1)
-    cond_E = torch.tensor(log_uniform_samples).view(num, 1).to(config.device)
+    cond_E = torch.tensor(log_uniform_samples).view(num, 1).to(config.device).float()
 
     # samples = shower_flow.condition(cond_E).sample(torch.Size([num, ])).cpu().numpy()
     samples = showers
