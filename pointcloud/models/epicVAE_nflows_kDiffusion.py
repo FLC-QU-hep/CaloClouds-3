@@ -7,7 +7,6 @@ from .common import ConcatSquashLinear, KLDloss, reparameterize_gaussian
 from .encoders.epic_encoder_cond import EPiC_encoder_cond
 
 from ..utils.misc import get_flow_model, mean_flat
-from ..utils import precision
 from ..data.conditioning import get_cond_dim
 
 
@@ -44,7 +43,6 @@ class epicVAE_nFlow_kDiffusion(Module):
         self.args = args
         self.distillation = distillation
         cond_dim = get_cond_dim(args, "diffusion")
-        self.dtype = precision.get("diffusion", args)
         if args.latent_dim > 0:
             self.encoder = EPiC_encoder_cond(
                 args.latent_dim,
@@ -76,7 +74,6 @@ class epicVAE_nFlow_kDiffusion(Module):
                 )
             else:
                 raise NotImplementedError("dropout mode not implemented")
-        net.to(args.device, dtype=self.dtype)
         if not distillation:
             self.diffusion = Denoiser(
                 net,
@@ -297,14 +294,12 @@ class Denoiser(torch.nn.Module):
     ):
         super().__init__()
         self.inner_model = inner_model
-        example_param = next(self.inner_model.parameters())
-        self.dtype = example_param.dtype
         if isinstance(sigma_data, float):
             sigma_data = [sigma_data, sigma_data, sigma_data, sigma_data]
         if len(sigma_data) != 4:
             raise ValueError("sigma_data must be either a float or a list of 4 floats.")
         # self.sigma_data = sigma_data   # B,
-        self.sigma_data = torch.tensor(sigma_data, device=device, dtype=self.dtype)
+        self.sigma_data = torch.tensor(sigma_data, device=device)  # 4,
         self.distillation = distillation
         self.sigma_min = sigma_min
         self.diffusion_loss = diffusion_loss
@@ -383,7 +378,7 @@ class Denoiser(torch.nn.Module):
     ):  # same as "denoise" in KarrasDenoiser of CM code
         if isinstance(sigma, float) or isinstance(sigma, int):
             sigma = (
-                torch.tensor([sigma] * input.shape[0], dtype=self.dtype)
+                torch.tensor([sigma] * input.shape[0], dtype=torch.float32)
                 .to(input.device)
                 .unsqueeze(1)
             )

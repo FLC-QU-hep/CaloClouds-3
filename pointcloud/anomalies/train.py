@@ -13,7 +13,6 @@ from torch_geometric.loader import DataLoader
 
 from . import autoencoder
 from ..configs import Configs
-from ..utils import precision
 
 
 def checkpoint_location(loss, folder_name):
@@ -29,7 +28,6 @@ def checkpoint_location(loss, folder_name):
 class TreeDataset(Dataset):
     def __init__(self, configs):
         super(TreeDataset, self).__init__()
-        self.configs = configs
         base = configs.formatted_tree_base
         self.features = np.load(base + "_features.npz")
         try:
@@ -44,8 +42,7 @@ class TreeDataset(Dataset):
 
     def __getitem__(self, idx):
         feat = self.features[f"arr_{idx}"]
-        feat = torch.from_numpy(feat).contiguous().to(self.device)
-        feat = precision.set(feat, "anomaly_tree_feat", self.configs)
+        feat = torch.from_numpy(feat).contiguous().to(self.device).float()
         edge = self.edges[f"arr_{idx}"]
         edge = torch.from_numpy(edge).contiguous().to(self.device)
         data = Data(x=feat, edge_index=edge, tree_idx=idx)
@@ -81,7 +78,6 @@ def train(configs=Configs(), last_chpt=None, num_epochs=50, batch_size=32):
         )
     else:
         model = autoencoder.GraphAutoencoder.load(last_chpt)
-    model.to(precision.get("anomaly_tree_feat", configs))
     model.train()
 
     train_loader = DataLoader(dataset, batch_size=batch_size, shuffle=True)

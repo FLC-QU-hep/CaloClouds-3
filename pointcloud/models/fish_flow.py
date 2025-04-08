@@ -252,19 +252,10 @@ class Adaptor(Distribution):
         )
         outputs.append(value[..., 2][..., None])
         # then the other outputs need rescaling by their max
-        import ipdb
-        try:
-            max_n_hits = value[..., 3:33].max(dim=-1).values
-            outputs.append(value[..., 3:33] / max_n_hits)
-            max_energy = value[..., 33:63].max(dim=-1).values
-            outputs.append(value[..., 33:63] / max_energy)
-        except:
-            ipdb.set_trace()
-            max_n_hits = value[..., 3:33].max(dim=-1).values
-            outputs.append(value[..., 3:33] / max_n_hits)
-            max_energy = value[..., 33:63].max(dim=-1).values
-            outputs.append(value[..., 33:63] / max_energy)
-            pass
+        max_n_hits = value[..., 3:33].max(dim=-1)
+        outputs.append(value[..., 3:33] / max_n_hits)
+        max_energy = value[..., 33:63].max(dim=-1)
+        outputs.append(value[..., 33:63] / max_energy)
         # finally we concatenate along the last dimension
         return torch.cat(outputs, dim=-1)
 

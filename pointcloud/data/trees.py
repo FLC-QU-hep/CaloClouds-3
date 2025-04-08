@@ -7,7 +7,6 @@ from scipy.spatial import distance_matrix
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d.art3d import Line3DCollection
 from .read_write import read_raw_regaxes, get_n_events
-from ..utils import precision
 from ..utils.metadata import Metadata
 from ..utils.detector_map import split_to_layers
 
@@ -42,7 +41,7 @@ class Tree:
 
     """
 
-    def __init__(self, event_as_layers, root_xy, max_skips=5, dtype=np.float32):
+    def __init__(self, event_as_layers, root_xy, max_skips=5):
         """
         Construct the tree from the event data.
         Put a root node bofore the first layer.
@@ -58,8 +57,6 @@ class Tree:
 
         """
         self.max_skips = max_skips
-        self.dtype = dtype
-        self.np_dtype = np.dtype(str(dtype).split('.')[1].split("'", 1)[0])
         self._setup_layers(event_as_layers)
         self._setup_root(root_xy)
         for _ in self.occupied_layers[2:]:
@@ -75,7 +72,7 @@ class Tree:
         event_as_layers : list of np.ndarray (n_points, 4)
             The event data split into layers. Format is x, y, z, energy.
         """
-        root_point = np.array([[0, 0, 0, 1]], dtype=self.np_dtype)
+        root_point = np.array([[0, 0, 0, 1]], dtype=np.float32)
         self._event_as_layers = [root_point] + event_as_layers
         self._layer_masks = [layer[:, 3] > 0 for layer in self._event_as_layers]
         self.n_layers = len(self._event_as_layers)
@@ -84,8 +81,8 @@ class Tree:
         self.occupied_layers = np.where(n_points_in_layer)[0]
         cumulative_points_in_layer = np.cumsum(n_points_in_layer)
         # store the xy positions of the points
-        self.xy = np.zeros((self.total_points, 2), dtype=self.np_dtype)
-        self.energy = np.zeros(self.total_points, dtype=self.np_dtype)
+        self.xy = np.zeros((self.total_points, 2), dtype=np.float32)
+        self.energy = np.zeros(self.total_points, dtype=np.float32)
         for layer_n, layer in enumerate(self._event_as_layers[1:], 1):
             layer_slice = slice(
                 cumulative_points_in_layer[layer_n - 1],
@@ -116,7 +113,7 @@ class Tree:
         self.energy[0] = 1.
         self.xy[0] = root_xy
         self._event_as_layers[0][0] = np.array(
-            [[root_xy[0], root_xy[1], 0, 1]], dtype=self.np_dtype
+            [[root_xy[0], root_xy[1], 0, 1]], dtype=np.float32
         )
         # every point in layer one has the root as parent
         if len(self.occupied_layers) == 1:
@@ -312,8 +309,7 @@ class DataAsTrees:
         event_as_layers = list(
             split_to_layers(event, self._layer_bottom_pos, self._cell_thickness_global)
         )
-        dtype = precision.get("anomaly_tree_feat", self.configs)
-        return Tree(event_as_layers, self.root_xy, dtype=dtype)
+        return Tree(event_as_layers, self.root_xy)
 
     def _hold_tree(self, idx, tree):
         if len(self._held_idxs) >= self._max_trees_in_memory:
