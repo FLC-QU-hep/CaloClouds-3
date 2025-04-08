@@ -1,13 +1,13 @@
 #!/bin/bash
-#SBATCH --time 2-00:00:00
+#SBATCH --time 3-00:00:00
 #SBATCH --nodes 1
-#SBATCH --partition maxgpu
+#SBATCH --partition maxcpu
 #SBATCH --job-name discri
 #SBATCH --mail-type=FAIL
 #SBATCH --mail-user=henry.day-hall@desy.de
-#SBATCH --output /data/dust/user/dayhallh/point-cloud-diffusion-logs/joblogs/%j.out      # terminal output
-#SBATCH --error /data/dust/user/dayhallh/point-cloud-diffusion-logs/joblogs/%j.err
-#SBATCH --array=0-21
+#SBATCH --output /data/dust/user/dayhallh/point-cloud-diffusion-logs/joblogs/discr%j.out      # terminal output
+#SBATCH --error /data/dust/user/dayhallh/point-cloud-diffusion-logs/joblogs/discri%j.err
+#SBATCH --array=1-17
 
 module load maxwell mamba
 . mamba-init

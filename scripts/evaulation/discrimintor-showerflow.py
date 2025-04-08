@@ -39,12 +39,18 @@ g4_data_folder = discriminator.locate_g4_data(configs)
 print(g4_data_folder)
 discriminator.create_g4_data_files(configs)
 # Get the generator models we will be comparing with, and check their data has been generated.
-existing_models1 = showerflow_utils.existing_models(configs)
-configs.shower_flow_fixed_input_norms = not configs.shower_flow_fixed_input_norms
-existing_models2 = showerflow_utils.existing_models(configs)
-existing_models = {
-    key: existing_models1[key] + existing_models2[key] for key in existing_models1
-}
+
+stack = []
+for detailed_history in [True, False]:
+    configs.shower_flow_detailed_history = detailed_history
+    for fixed_input_norms in [True, False]:
+        configs.shower_flow_fixed_input_norms = fixed_input_norms
+        for weight_decay in [0., 0.1, 0.0001]:
+            configs.shower_flow_weight_decay = weight_decay
+            stack.append(showerflow_utils.existing_models(configs))
+        
+existing_models = {key: sum([s[key] for s in stack], []) for key in stack[0]}
+
 existing_models["configs"] = []
 
 for i, name in enumerate(existing_models["names"]):
@@ -85,19 +91,21 @@ def gen_training(model_idx, settings="settings12"):
 
 
 # The data looks fine. Time to launch the training.
-n_epochs = 100
+n_epochs = 15
 print()
 print(f"~~~~~~~~~ {chosen} ~~~~~~~~~~")
 print()
 name, training = gen_training(chosen)
 
+training.chatty = True
 try:
     training.reload()
 except FileNotFoundError:
     print("No existing training found, starting from scratch")
+training.chatty = True
 so_far = len(training.state_dict["epochs"])
-if so_far < n_epochs:
-    training.train(n_epochs - so_far)
+while so_far < n_epochs:
+    training.train(1)
     training.save()
 
 # make some auc plots
@@ -109,22 +117,22 @@ for start in range(0,len(existing_models["names"]), 5):
             name, training = gen_training(plot_for)
             training.reload()
             labels, predictions = training.predict_test()
-        except FileNotFoundError:
+        except filenotfounderror:
             continue
         
         fpr, tpr, threasholds = metrics.roc_curve(labels, predictions)
         auc = metrics.roc_auc_score(labels, predictions)
         if auc < 0.501:
-            print(f"Model {plot_for} has issues")
+            print(f"model {plot_for} has issues")
         existing_models["auc"][plot_for] = auc
-        ax.plot(fpr, tpr, label=f"{name} AUC={auc}")
-    ax.set_xlabel("False positive rate")
-    ax.set_ylabel("True positive rate")
+        ax.plot(fpr, tpr, label=f"{name} auc={auc}")
+    ax.set_xlabel("false positive rate")
+    ax.set_ylabel("true positive rate")
     ax.legend()
     save_to = os.path.join(training.state_dict["generator_data_folder"], f"../auc_{start}.png")
     fig.savefig(save_to)
-    print(f"Saved to {save_to}")
-    fig.close()
+    print(f"saved to {save_to}")
+    plt.close()
 
 
 
@@ -134,7 +142,7 @@ for start in range(0, len(existing_models["names"]), 5):
         try:
             name, training = gen_training(plot_for)
             training.reload()
-            training.plots(axes, colour=nice_hex[int(i/5)%5][i%5], legend_name=name)
+            training.plots(axes, colour=nice_hex[int(plot_for/5)%5][plot_for%5], legend_name=name)
         except FileNotFoundError:
             continue
     axes[0].semilogy()
@@ -145,4 +153,4 @@ for start in range(0, len(existing_models["names"]), 5):
     save_to = os.path.join(training.state_dict["generator_data_folder"], f"../loss_{start}.png")
     fig.savefig(save_to)
     print(f"Saved to {save_to}")
-    fig.close()
+    plt.close()

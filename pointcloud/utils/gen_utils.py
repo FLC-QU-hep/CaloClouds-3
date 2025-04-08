@@ -103,6 +103,7 @@ def get_shower(model, num_points, cond_feats, cond_N=None, bs=1, config=Configs(
             cond_N = cond_N[:, None]
         cond_N = cond_N.to(model_example_param.device, dtype=model_example_param.dtype)
         cond_feats = torch.cat([cond_feats, cond_N], dim=1)
+
     fake_shower = model.sample(cond_feats, num_points, config)
     return fake_shower
 
@@ -566,20 +567,20 @@ def gen_v1_inner_batch(
             scale_factor = get_scale_factor(
                 num_clusters, coef_real, coef_fake, n_splines
             )  # B,1
-    num_clusters = (num_clusters * scale_factor).astype(int)  # B,1
+    if num_clusters is not None:
+        num_clusters = (num_clusters * scale_factor).astype(int)  # B,1
 
-    # scale relative clusters per layer to actual number of clusters per layer
-    # and same for energy
-    clusters_per_layer_gen = (
-        clusters_per_layer_gen
-        / clusters_per_layer_gen.sum(axis=1, keepdims=True)
-        * num_clusters
-    ).astype(
-        int
-    )  # B,30
-    e_per_layer_gen = (
-        e_per_layer_gen / e_per_layer_gen.sum(axis=1, keepdims=True) * energies
-    )  # B,30
+        # scale relative clusters per layer to actual number of clusters per layer
+        # and same for energy
+        clusters_per_layer_gen = (
+            clusters_per_layer_gen
+            / clusters_per_layer_gen.sum(axis=1, keepdims=True)
+            * num_clusters)
+    clusters_per_layer_gen = clusters_per_layer_gen.astype(int)
+    if energies is not None:
+        e_per_layer_gen = (
+            e_per_layer_gen / e_per_layer_gen.sum(axis=1, keepdims=True) * energies
+        )  # B,30
 
     # convert clusters_per_layer_gen to a fractions of points in the layer
     # out of sum(points in the layer) of event
@@ -641,10 +642,11 @@ def gen_v1_inner_batch(
         for j in range(len(z_positions)):
             mask = fake_showers[i, :, 2] == z_positions[j]
             fake_showers[i, :, -1][mask] = (
-                fake_showers[i, :, -1][mask]
-                / fake_showers[i, :, -1][mask].sum()
+                (fake_showers[i, :, -1][mask]
+                / fake_showers[i, :, -1][mask].sum())
                 * e_per_layer_all[i, j]
             )
+    fake_showers = fake_showers[:, :config.max_points, :]
     length = config.max_points - fake_showers.shape[1]
     fake_showers = np.concatenate(
         (fake_showers, np.zeros((bs, length, 4))), axis=1

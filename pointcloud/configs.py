@@ -1,1 +1,1 @@
-config_varients/default.py
+config_varients/caloclouds_3_simple_shower.py

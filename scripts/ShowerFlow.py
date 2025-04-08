@@ -194,8 +194,9 @@ def main(configs, batch_size=2048, total_epochs=1_000_000_000, shuffle=True):
     # torch.manual_seed(123)
 
     lr = 1e-5  # default: 5e-5
+    weight_decay = getattr(configs, "shower_flow_weight_decay", 0)
     model.to(device)
-    optimizer = torch.optim.Adam(model.parameters(), lr=lr)
+    optimizer = torch.optim.Adam(model.parameters(), lr=lr, weight_decay=weight_decay)
 
     start_over = False
     # epoch_load = 550
@@ -203,10 +204,14 @@ def main(configs, batch_size=2048, total_epochs=1_000_000_000, shuffle=True):
     # optimizer.load_state_dict(torch.load(outpath+f'ShowerFlow_{epoch_load}.pth')['optimizer'])
     if os.path.exists(best_model_path) and not start_over:
         model.load_state_dict(
-            torch.load(best_model_path, map_location=configs.device, weights_only=False)["model"]
+            torch.load(
+                best_model_path, map_location=configs.device, weights_only=False
+            )["model"]
         )
         optimizer.load_state_dict(
-            torch.load(best_model_path, map_location=configs.device, weights_only=False)["optimizer"]
+            torch.load(
+                best_model_path, map_location=configs.device, weights_only=False
+            )["optimizer"]
         )
 
         # load best_loss
@@ -221,13 +226,27 @@ def main(configs, batch_size=2048, total_epochs=1_000_000_000, shuffle=True):
         f"A total of {total_epochs} epochs are requested, "
         f"the model had already undergone {epoch_start}"
     )
+
+    detailed_history = getattr(configs, "shower_flow_detailed_history", False)
     if os.path.exists(history_data_path):
         history = np.load(history_data_path)
         epoch_nums = history[0].tolist()
         losses = history[1].tolist()
+        if detailed_history:
+            mean_parameter = history[2].tolist()
+            max_parameter = history[3].tolist()
+            gradient_norm = history[4].tolist()
+
     else:
         epoch_nums = []
         losses = []
+        if detailed_history:
+            mean_parameter = []
+            max_parameter = []
+            gradient_norm = []
+    history_save_list = [epoch_nums, losses]
+    if detailed_history:
+        history_save_list += [mean_parameter, max_parameter, gradient_norm]
 
     # The data is now all loaded, and ready to train on.
     # If we had a previous best epoch it's loaded and we will start there.
@@ -252,7 +271,7 @@ def main(configs, batch_size=2048, total_epochs=1_000_000_000, shuffle=True):
             f"mean loss {mean_loss:.2}",
             end="\r\r",
         )
-        loss_list = []
+        loss_list = losses if detailed_history else []
         for batch_idx, data in enumerate(train_loader):
             context = data[:, :cond_dim].to(device).float()
             input_data = data[:, cond_dim:].to(device).float()
@@ -267,10 +286,14 @@ def main(configs, batch_size=2048, total_epochs=1_000_000_000, shuffle=True):
                 print("Weights are nan!")
                 # load recent model
                 # model.load_state_dict(torch.load(latest_model_path)["model"])
-                model.load_state_dict(torch.load(best_model_path, weights_only=False)["model"])
-                optimizer = optim.Adam(model.parameters(), lr=lr)
+                model.load_state_dict(
+                    torch.load(best_model_path, weights_only=False)["model"]
+                )
+                optimizer = optim.Adam(model.parameters(), lr=lr, weight_decay=weight_decay)
                 # optimizer.load_state_dict(torch.load(latest_model_path)['optimizer'])
-                optimizer.load_state_dict(torch.load(best_model_path, weights_only=False)["optimizer"])
+                optimizer.load_state_dict(
+                    torch.load(best_model_path, weights_only=False)["optimizer"]
+                )
                 # change the seed so we don't get back to the same nan
                 torch.manual_seed(time.time())
                 # print(f'model from {epoch-3} epoch reloaded')
@@ -279,14 +302,26 @@ def main(configs, batch_size=2048, total_epochs=1_000_000_000, shuffle=True):
             nll = -distribution.condition(context).log_prob(input_data)
             loss = nll.mean()
             loss.backward()
+            if detailed_history:
+                norm = 0
+                for p in model.parameters():
+                    norm += torch.norm(p.grad).item() ** 2
+                gradient_norm.append(norm**0.5)
             optimizer.step()
             distribution.clear_cache()
             loss_list.append(loss.item())
-        mean_loss = np.mean(loss_list)
-        epoch_nums.append(epoch)
-        losses.append(mean_loss)
+            if detailed_history:
+                epoch_nums.append(epoch)
+                parameter_list = torch.concatenate([p.flatten() for p in model.parameters()])
+                mean_parameter.append(torch.mean(parameter_list).item())
+                max_parameter.append(torch.max(parameter_list).item())
 
-        np.save(history_data_path, np.array([epoch_nums, losses]))
+        if not detailed_history:
+            mean_loss = np.mean(loss_list)
+            epoch_nums.append(epoch)
+            losses.append(mean_loss)
+
+        np.save(history_data_path, np.array(history_save_list))
 
         if torch.stack(
             [torch.isnan(p).any() for p in model.parameters()]
@@ -323,7 +358,9 @@ def main(configs, batch_size=2048, total_epochs=1_000_000_000, shuffle=True):
     # Setting the seed makes sure the evaluation plots are reproducable.
     # load best checkpoint
     model.load_state_dict(torch.load(best_model_path, weights_only=False)["model"])
-    optimizer.load_state_dict(torch.load(best_model_path, weights_only=False)["optimizer"])
+    optimizer.load_state_dict(
+        torch.load(best_model_path, weights_only=False)["optimizer"]
+    )
 
     model.eval()
     print("model loaded")

@@ -55,6 +55,7 @@ class Configs:
                 ]
         self.shower_flow_num_blocks = 10
         self.shower_flow_cond_features = ["energy"]
+        self.shower_flow_weight_decay = 0.
 
         # Data
         self.storage_base = "/beegfs/desy/user/"
@@ -143,7 +144,7 @@ class Configs:
                 attr_type = type(getattr(self, key))
                 try:
                     value = attr_type(value)
-                except ValueError:
+                except (ValueError, TypeError):
                     pass
             else:
                 print(f"Warning: {key} added to Configs")

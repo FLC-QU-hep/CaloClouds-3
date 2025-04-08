@@ -7,6 +7,8 @@ import pyro.distributions as dist
 import pyro.distributions.transforms as T
 from .custom_pyro import ConditionalAffineCouplingTanH
 
+from pointcloud.utils import precision
+
 
 # a context manager to fix a seed
 class seed_torch:
@@ -21,7 +23,7 @@ class seed_torch:
         torch.manual_seed(self.previous_seed)
 
 
-def get_gauss_basis(num_inputs, device, **kwargs):
+def get_gauss_basis(num_inputs, device, dtype, **kwargs):
     """
     Create a multivariate Gaussian distribution.
 
@@ -39,16 +41,17 @@ def get_gauss_basis(num_inputs, device, **kwargs):
 
     """
     base_dist = dist.Normal(
-        torch.zeros(num_inputs).to(device), torch.ones(num_inputs).to(device)
+        torch.zeros(num_inputs).to(device, dtype=dtype), torch.ones(num_inputs).to(device, dtype=dtype)
     )
     return base_dist
 
 
 class HybridTanH_factory:
-    def __init__(self, num_inputs, num_cond_inputs, device):
+    def __init__(self, num_inputs, num_cond_inputs, device, dtype=None):
         self.num_inputs = num_inputs
         self.num_cond_inputs = num_cond_inputs
         self.device = device
+        self.dtype = dtype if dtype is not None else precision.get("showerflow")
 
     def add_permutation(self, **kwargs):
         perm = torch.randperm(self.num_inputs, dtype=torch.long).to(self.device)
@@ -64,7 +67,7 @@ class HybridTanH_factory:
             [self.num_inputs * 10, self.num_inputs * 10],
             param_dims,
         )
-        ctf = ConditionalAffineCouplingTanH(split_dim, hypernet).to(self.device)
+        ctf = ConditionalAffineCouplingTanH(split_dim, hypernet).to(self.device, dtype=self.dtype)
         self.trainables.append(ctf)
         self.transforms.append(ctf)
 
@@ -78,7 +81,7 @@ class HybridTanH_factory:
         hypernet = DenseNN(
             self.num_cond_inputs, [self.num_inputs * 4, self.num_inputs * 4], param_dims
         )
-        ctf = T.ConditionalSpline(hypernet, self.num_inputs, count_bins).to(self.device)
+        ctf = T.ConditionalSpline(hypernet, self.num_inputs, count_bins).to(self.device, dtype=self.dtype)
         self.trainables.append(ctf)
         self.transforms.append(ctf)
 
@@ -98,12 +101,12 @@ class HybridTanH_factory:
 
         # TODO, could the params of the base dist also be added to the model?
         with seed_torch(42):
-            base_dist = base_dist_gen(self.num_inputs, self.device, **transform_args)
+            base_dist = base_dist_gen(self.num_inputs, self.device, self.dtype, **transform_args)
             self.transforms = []
             self.trainables = []
             for _ in range(num_repeats):
                 self.add_repeat(transform_pattern, transform_args)
-            modules = nn.ModuleList(self.trainables)
+            modules = nn.ModuleList(self.trainables).to(self.device, dtype=self.dtype)
             flow_dist = dist.ConditionalTransformedDistribution(
                 base_dist, self.transforms
             )
@@ -111,7 +114,7 @@ class HybridTanH_factory:
         return modules, flow_dist, self.transforms
 
 
-def compile_HybridTanH_model(num_blocks, num_inputs, num_cond_inputs, device):
+def compile_HybridTanH_model(num_blocks, num_inputs, num_cond_inputs, device, dtype=None):
     """
     Simplified version of the default
 
@@ -154,7 +157,7 @@ def compile_HybridTanH_model(num_blocks, num_inputs, num_cond_inputs, device):
         The list of transformations that the model applies.
 
     """
-    factory = HybridTanH_factory(num_inputs, num_cond_inputs, device)
+    factory = HybridTanH_factory(num_inputs, num_cond_inputs, device, dtype)
 
     transform_pattern = [
         "affine_coupling",
@@ -179,8 +182,8 @@ def compile_HybridTanH_model(num_blocks, num_inputs, num_cond_inputs, device):
     return model, flow_dist, transforms
 
 
-def compile_HybridTanH_alt1(num_blocks, num_inputs, num_cond_inputs, device):
-    factory = HybridTanH_factory(num_inputs, num_cond_inputs, device)
+def compile_HybridTanH_alt1(num_blocks, num_inputs, num_cond_inputs, device, dtype=None):
+    factory = HybridTanH_factory(num_inputs, num_cond_inputs, device, dtype)
 
     transform_pattern = [
         "affine_coupling",
@@ -205,8 +208,8 @@ def compile_HybridTanH_alt1(num_blocks, num_inputs, num_cond_inputs, device):
     return model, flow_dist, transforms
 
 
-def compile_HybridTanH_alt2(num_blocks, num_inputs, num_cond_inputs, device):
-    factory = HybridTanH_factory(num_inputs, num_cond_inputs, device)
+def compile_HybridTanH_alt2(num_blocks, num_inputs, num_cond_inputs, device, dtype=None):
+    factory = HybridTanH_factory(num_inputs, num_cond_inputs, device, dtype)
 
     transform_pattern = [
         "affine_coupling",

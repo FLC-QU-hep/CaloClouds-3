@@ -55,7 +55,7 @@ for i, name in enumerate(existing_models["names"]):
     working.append(i)
             
         
-intrest = ["original_nb4", "alt1_nb4", "original_nb4_fnorms_wo[0, 1, 4]", "alt1_nb4_fnorms_wo[0, 1, 4]"]
+intrest = ["original_nb10", "original_nb4_fnorms_wo[0, 1, 4]", "alt1_nb4_fnorms_wo[0, 1, 4]"]
 idxs = [existing_models["names"].index(i) for i in intrest]
 print(list(zip(idxs, intrest)))
 # ## data plotting
@@ -179,7 +179,7 @@ for i in working:
 from sklearn import metrics
 from matplotlib import pyplot as plt
 existing_models["auc"] = [None for _ in existing_models["names"]]
-for start in range(0,len(existing_models["names"], 5):
+for start in range(0,len(existing_models["names"]), 5):
     fig, ax = plt.subplots()
     for i in range(start, start+5):
         try:
@@ -204,7 +204,7 @@ for start in range(0,len(existing_models["names"], 5):
     ax.legend()
 
 
-for start in range(0, len(existing_models["names"], 5):
+for start in range(0, len(existing_models["names"]), 5):
     fig, axes = plt.subplots(1, 2, figsize=(15, 5))
     for i in range(start, start+5):
         try:

@@ -304,7 +304,7 @@ class Denoiser(torch.nn.Module):
         if len(sigma_data) != 4:
             raise ValueError("sigma_data must be either a float or a list of 4 floats.")
         # self.sigma_data = sigma_data   # B,
-        self.sigma_data = torch.tensor(sigma_data, device=device)  # 4,
+        self.sigma_data = torch.tensor(sigma_data, device=device, dtype=self.dtype)
         self.distillation = distillation
         self.sigma_min = sigma_min
         self.diffusion_loss = diffusion_loss

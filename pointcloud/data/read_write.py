@@ -393,6 +393,7 @@ def read_raw_regaxes(config, pick_events=None, total_size=None, per_event_cols=N
             # account for the variations in shower axes layout
             n_events_here = events_here.shape[-3]
             events_here = events_here[..., indices, :, :]
+
             # and make the axes order regular
             events_here = regularise_event_axes(events_here)
             events.append(events_here)

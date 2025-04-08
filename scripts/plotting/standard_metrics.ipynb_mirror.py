@@ -21,8 +21,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import os
 
-from pointcloud.config_varients.wish import Configs
-from pointcloud.config_varients.wish_maxwell import Configs as MaxwellConfigs
+from pointcloud.config_varients.caloclouds_3_simple_shower import Configs
 
 from pointcloud.evaluation.bin_standard_metrics import BinnedData, get_path
 

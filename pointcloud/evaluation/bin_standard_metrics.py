@@ -9,7 +9,7 @@ from pointcloud.config_varients.wish_maxwell import Configs as MaxwellConfigs
 from pointcloud.utils.metadata import Metadata
 from pointcloud.utils.detector_map import floors_ceilings
 from pointcloud.data.conditioning import read_raw_regaxes_withcond, get_cond_dim
-from pointcloud.utils import showerflow_utils
+from pointcloud.utils import showerflow_utils, precision
 from pointcloud.models.wish import Wish
 from pointcloud.models.fish import Fish
 from pointcloud.models.shower_flow import versions_dict
@@ -514,7 +514,7 @@ class BinnedData:
         np.savez(path, **to_save)
 
     @classmethod
-    def load(cls, path):
+    def load(cls, path, **kwargs):
         """
         Load a binned data object from a file, including construction
         arguments and the counts.
@@ -530,7 +530,15 @@ class BinnedData:
             The loaded binned data.
         """
         saved = np.load(path, allow_pickle=True)
-        args = {name: saved[name] for name in cls.arg_names}
+        args = {name: saved[name] for name in cls.arg_names if name in saved}
+        for key in kwargs:
+            if key not in cls.arg_names:
+                raise ValueError(f"Unknown argument {key}")
+            if key not in args:
+                print(f"Adding {key} to file data")
+                args[key] = kwargs[key]
+            else:
+                print(f"{key} already in file data")
         # don't hard check when loading, the data exists already
         args["hard_check"] = False
         this = cls(**args)
@@ -605,10 +613,11 @@ def sample_model(configs, binned, n_events, model, shower_flow=None):
     """
     if n_events == 0:
         return np.zeros(0), np.zeros((0, 0, 4))
-    if configs.model_name == "fish":
+    if configs.model_name in ["fish", "wish"]:
         batch_len = min(1000, n_events)
     else:
         batch_len = min(100, n_events)
+
     batch_starts = np.arange(0, n_events, batch_len)
     n_batches = np.ceil(n_events / batch_len)
 
@@ -702,7 +711,12 @@ def get_path(configs, name):
     log_dir = configs.logdir
     binned_metrics_dir = os.path.join(log_dir, "binned_metrics")
     try_mkdir(binned_metrics_dir)
-    file_name = name.replace(" ", "_") + ".npz"
+    addition = ""
+    if hasattr(configs, "diffusion_precision"):
+        addition += "_difPrec" + str(configs.diffusion_precision)
+    if hasattr(configs, "showerflow_precision"):
+        addition += "_sfPrec" + str(configs.showerflow_precision)
+    file_name = name.replace(" ", "_") + addition + ".npz"
     return os.path.join(binned_metrics_dir, file_name)
 
 
@@ -833,6 +847,9 @@ def get_caloclouds_models(
         configs = Configs()
     configs.device = device
 
+    diffusion_dtype = precision.get("diffusion", configs)
+    showerflow_dtype = precision.get("showerflow", configs)
+
     if isinstance(caloclouds_paths, str):
         caloclouds_paths = [caloclouds_paths]
         caloclouds_names = [caloclouds_names]
@@ -847,9 +864,12 @@ def get_caloclouds_models(
     for calocloud_name, calocloud_path in zip(caloclouds_names, caloclouds_paths):
         for showerflow_name, showerflow_path in zip(showerflow_names, showerflow_paths):
             model = get_model_class(configs)(configs).to(device)
+            model.to(configs.device, dtype=diffusion_dtype)
             print(calocloud_path)
             model.load_state_dict(
-                torch.load(calocloud_path, map_location=device, weights_only=False)["state_dict"]
+                torch.load(calocloud_path, map_location=device, weights_only=False)[
+                    "state_dict"
+                ]
             )
             try:
                 showerflow_configs = showerflow_utils.configs_from_showerflow_path(
@@ -867,11 +887,26 @@ def get_caloclouds_models(
                 num_inputs=np.sum(input_mask),
                 num_cond_inputs=get_cond_dim(showerflow_configs, "showerflow"),
                 device=device,
+                dtype=showerflow_dtype,
             )
             print(showerflow_path)
+            flow_model = flow_model.to(device, dtype=showerflow_dtype)
             flow_model.load_state_dict(
-                torch.load(showerflow_path, map_location=device, weights_only=False)["model"]
+                torch.load(showerflow_path, map_location=device, weights_only=False)[
+                    "model"
+                ]
             )
+            flow_model = flow_model.to(device, dtype=showerflow_dtype)
+            #flow_dist.transforms = [
+            #    t.to(device, dtype=showerflow_dtype) if hasattr(t, "to") else t
+            #    for t in flow_dist.transforms
+            #]
+            #flow_dist.base_dist.base_dist.loc = flow_dist.base_dist.base_dist.loc.to(
+            #    device, dtype=showerflow_dtype
+            #)
+            #flow_dist.base_dist.base_dist.scale = (
+            #    flow_dist.base_dist.base_dist.scale.to(device, dtype=showerflow_dtype)
+            #)
             name = (
                 f"{calocloud_name}-{showerflow_name}"
                 if showerflow_name

@@ -54,6 +54,15 @@ def model_save_paths(configs, version, num_blocks, cut_inputs):
         name_base += "_tbase"
         nice_name += "_tbase"
 
+    if getattr(configs, "shower_flow_detailed_history", False):
+        name_base += "_dhist"
+        nice_name += "_dhist"
+
+    if getattr(configs, "shower_flow_weight_decay", 0):
+        wd_string = f"{configs.shower_flow_weight_decay:.1e}".replace(".", "p")
+        name_base += f"_wd{wd_string}"
+        nice_name += f"_wd{wd_string}"
+
     showerflow_precision = precision.get("showerflow", configs)
     default_showerflow_precision = precision.get("showerflow")
     if showerflow_precision != default_showerflow_precision:
@@ -126,6 +135,7 @@ def existing_models(configs):
     saved_models["best_loss"] = []
     saved_models["paths"] = []
     saved_models["cond_features"] = []
+    saved_models["weight_decay"] = []
     saved_models["fixed_input_norms"] = []
 
     combinations = itertools.product(
@@ -135,6 +145,7 @@ def existing_models(configs):
     for version, nb, ci in combinations:
         name, model_path, data_path = model_save_paths(configs, version, nb, ci)
         fixed_input_norms = getattr(configs, "shower_flow_fixed_input_norms", False)
+        weight_decay = getattr(configs, "shower_flow_weight_decay", 0)
         if not os.path.exists(model_path):
             continue
         cond_feature_names = get_cond_features_names(configs, "showerflow")
@@ -145,6 +156,7 @@ def existing_models(configs):
         saved_models["cut_inputs"].append(ci)
         saved_models["cond_features"].append(cond_feature_names)
         saved_models["fixed_input_norms"].append(fixed_input_norms)
+        saved_models["weight_decay"].append(weight_decay)
         with open(data_path, "r") as f:
             text = f.read().split()
             saved_models["best_loss"].append(float(text[0]))
