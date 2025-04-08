@@ -629,6 +629,8 @@ def gen_v1_inner_batch(
         layer_sums = (fake_showers[i, :, -1, None] * (closest_layer[:, None] == layer_indices)).sum(
             axis=0
         )
+        layer_sums[layer_sums <= 0] = 1  # avoid division by zero
+
         layer_factors = e_per_layer_all[i] / layer_sums
         fake_showers[i, :, -1] *= layer_factors[closest_layer]
 
