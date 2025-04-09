@@ -556,29 +556,26 @@ def gen_v1_inner_batch(
             scale_factor = get_scale_factor(
                 num_clusters, coef_real, coef_fake, n_splines
             )  # B,1
-    num_clusters = (num_clusters * scale_factor).astype(int)  # B,1
 
     # scale relative clusters per layer to actual number of clusters per layer
     # and same for energy
-    clusters_per_layer_gen = (
-        clusters_per_layer_gen
-        / clusters_per_layer_gen.sum(axis=1, keepdims=True)
-        * num_clusters
-    ).astype(
-        int
-    )  # B,30
-    e_per_layer_gen = (
-        e_per_layer_gen / e_per_layer_gen.sum(axis=1, keepdims=True) * energies
-    )  # B,30
+    if num_clusters is None:
+        clusters_per_layer_gen = (clusters_per_layer_gen * scale_factor).astype(int)
+    else:
+        num_clusters = (num_clusters * scale_factor).astype(int)  # B,1
+        clusters_per_layer_gen = (
+            clusters_per_layer_gen
+            / clusters_per_layer_gen.sum(axis=1, keepdims=True)
+            * num_clusters
+        ).astype(
+            int
+        )  # B,30
+    if energies is not None:
+        e_per_layer_gen = (
+            e_per_layer_gen / e_per_layer_gen.sum(axis=1, keepdims=True) * energies
+        )  # B,30
 
-    # convert clusters_per_layer_gen to a fractions of points in the layer
-    # out of sum(points in the layer) of event
-    # multuply clusters_per_layer_gen by corrected tottal num of points
-    hits_per_layer_all = (
-        clusters_per_layer_gen  # [evt_id : evt_id+bs] # shape (bs, num_layers)
-    )
-    e_per_layer_all = e_per_layer_gen  # [evt_id : evt_id+bs] # shape (bs, num_layers)
-    max_num_clusters = hits_per_layer_all.sum(axis=1).max()
+    max_num_clusters = clusters_per_layer_gen.sum(axis=1).max()
 
     fake_showers = get_shower(
         model,
@@ -598,9 +595,9 @@ def gen_v1_inner_batch(
     # loop over events
     z_positions = metadata.layer_bottom_pos_global + metadata.cell_thickness_global / 2
     layer_indices = np.arange(len(z_positions))
-    for i, hits_per_layer in enumerate(hits_per_layer_all):
+    for i, hits_per_layer in enumerate(clusters_per_layer_gen):
         # for i, (hits_per_layer, e_per_layer) in enumerate(
-        #     zip(hits_per_layer_all, e_per_layer_all)
+        #     zip(clusters_per_layer_gen, e_per_layer_gen)
         # ):
 
         n_hits_to_concat = max_num_clusters - hits_per_layer.sum()
@@ -622,21 +619,21 @@ def gen_v1_inner_batch(
         zero_e_mask = fake_showers[i, :, -1] <= 0
 
         # energy per layer calibration
-        closest_layer = np.abs(
-            fake_showers[i, :, 2][:, None] - z_positions
-        ).argmin(axis=1)
-
-        layer_sums = (fake_showers[i, :, -1, None] * (closest_layer[:, None] == layer_indices)).sum(
-            axis=0
+        closest_layer = np.abs(fake_showers[i, :, 2][:, None] - z_positions).argmin(
+            axis=1
         )
+
+        layer_sums = (
+            fake_showers[i, :, -1, None] * (closest_layer[:, None] == layer_indices)
+        ).sum(axis=0)
         layer_sums[layer_sums <= 0] = 1  # avoid division by zero
 
-        layer_factors = e_per_layer_all[i] / layer_sums
+        layer_factors = e_per_layer_gen[i] / layer_sums
         fake_showers[i, :, -1] *= layer_factors[closest_layer]
 
         fake_showers[i][zero_e_mask] = 0
 
-    fake_showers = fake_showers[:, :config.max_points, :]
+    fake_showers = fake_showers[:, : config.max_points, :]
     length = config.max_points - fake_showers.shape[1]
     fake_showers = np.concatenate(
         (fake_showers, np.zeros((bs, length, 4))), axis=1

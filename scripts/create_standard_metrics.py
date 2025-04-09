@@ -99,7 +99,7 @@ try:
     showerflow_64_path = "/data/dust/user/dayhallh/point-cloud-diffusion-data/showerFlow/sim-E1261AT600AP180-180/ShowerFlow_alt1_nb2_inputs8070450532247928831_fnorms_precfloat64_best.pth"
 
     caloclouds = get_caloclouds_models(
-        caloclouds_paths=[caloclouds_path], showerflow_paths=showerflow_paths, caloclouds_names=["CaloClouds3"], showerflow_names=[f"ShowerFlow_a1_fnorms_{i}" for i in [2, 4, 10]],
+        caloclouds_paths=[caloclouds_path], showerflow_paths=showerflow_paths, caloclouds_names=["CaloClouds3"], showerflow_names=[f"ShowerFlow_a1_fnorms_{i}" for i in [2, ]],
         configs=configs
     )
     models.update(caloclouds)
@@ -137,7 +137,7 @@ def main(
     redo_g4_acc_data=False,
     redo_model_data=False,
     max_g4_events=10_000,
-    max_model_events=1000,
+    max_model_events=10_000,
     models=models,
     accumulator_path=accum_path,
 ):
