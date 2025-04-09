@@ -26,7 +26,9 @@ def get_cond_features_names(config, for_model):
         The names of the conditioning features for the model.
     """
     value = None
-    if for_model == "diffusion" and hasattr(config, "cond_features"):
+    if for_model == "diffusion" and hasattr(config, "cond_features_names"):
+        value = config.cond_features_names
+    elif for_model == "diffusion" and hasattr(config, "cond_features"):
         value = config.cond_features
     elif hasattr(config, "shower_flow_cond_features"):
         value = config.shower_flow_cond_features

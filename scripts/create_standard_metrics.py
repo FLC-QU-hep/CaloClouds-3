@@ -7,9 +7,10 @@ it's very lightweight after binning...
 """
 
 import numpy as np
+import torch
 import os
 
-from pointcloud.configs import Configs
+from pointcloud.config_varients.caloclouds_3_simple_shower import Configs
 
 from pointcloud.utils.metadata import Metadata
 from pointcloud.utils.detector_map import floors_ceilings
@@ -39,6 +40,10 @@ log_base = "/data/dust/user/dayhallh/point-cloud-diffusion-logs"
 # data_base = "../point-cloud-diffusion-data/"
 # data_base = "/beegfs/desy/user/dayhallh/point-cloud-diffusion-data/"
 data_base = "/data/dust/user/dayhallh/point-cloud-diffusion-data/"
+precision = "float32"
+sf_precision = "float32"
+torch.set_default_dtype(torch.float32)
+
 try:
     pass
 #    wish_path = os.path.join(
@@ -67,24 +72,51 @@ except FileNotFoundError as e:
     print(e)
 try:
     pass
-    # caloclouds_path = os.path.join(
-    #    log_base,
-    #    "p22_th90_ph90_en10-100/CD_2024_08_23__16_13_16/ckpt_0.439563_30000.pt"
-    #    #"p22_th90_ph90_en10-100/CD_2024_08_23__16_13_16/ckpt_0.447468_870000.pt",
-    # )
-    # parts = [
-    #    f"{varient}_nb{repeats}_inputs36893488147419103231"
-    #    for varient in ["original", "alt1", "alt2"]
-    #    for repeats in [4, 10]
-    # ]
-    # showerflow_paths = [
-    #    os.path.join(data_base, f"showerFlow/ShowerFlow_{part}_best.pth")
-    #    for part in parts
-    # ]
-    #caloclouds = get_caloclouds_models(
-    #    caloclouds_paths=rani3_cc, showerflow_paths=rani_sf, caloclouds_names="CaloClouds changed loss 3",
-    #)
-    #models.update(caloclouds)
+    configs = Configs()
+    configs.device = 'cpu'
+    configs.diffusion_precision = precision
+    configs.showerflow_precision = sf_precision
+    configs.cond_features = 4
+    configs.cond_features_names = ["energy", "p_norm_local"]
+    caloclouds_path = os.path.join(
+       log_base,
+       "sim-E1261AT600AP180-180/Anatoliis_cc_2.pt"
+       #"p22_th90_ph90_en10-100/CD_2024_08_23__16_13_16/ckpt_0.439563_30000.pt"
+       #"p22_th90_ph90_en10-100/CD_2024_08_23__16_13_16/ckpt_0.447468_870000.pt",
+    )
+    caloclouds_16_path = "/data/dust/user/dayhallh/point-cloud-diffusion-logs/CD_sim-E1261AT600AP180-1802025_02_04__15_00_20_float16/ckpt_unscored_2300000.pt"
+    caloclouds_64_path = "/data/dust/user/dayhallh/point-cloud-diffusion-logs/CD_sim-E1261AT600AP180-1802025_02_04__15_07_10_float64/ckpt_0.428667_1530000.pt"
+    parts = [
+       f"alt1_nb{repeats}_inputs8070450532247928831_fnorms"
+       for repeats in [2, 10]
+    ]
+    showerflow_paths = [
+       os.path.join(data_base, "showerFlow/sim-E1261AT600AP180-180",
+       f"ShowerFlow_{part}_dhist_best.pth")
+       for part in parts
+    ]
+    showerflow_16_path = "/data/dust/user/dayhallh/point-cloud-diffusion-data/showerFlow/sim-E1261AT600AP180-180/ShowerFlow_alt1_nb2_inputs8070450532247928831_fnorms_precfloat16_best.pth"
+    showerflow_64_path = "/data/dust/user/dayhallh/point-cloud-diffusion-data/showerFlow/sim-E1261AT600AP180-180/ShowerFlow_alt1_nb2_inputs8070450532247928831_fnorms_precfloat64_best.pth"
+
+    caloclouds = get_caloclouds_models(
+        caloclouds_paths=[caloclouds_path], showerflow_paths=showerflow_paths, caloclouds_names=["CaloClouds3"], showerflow_names=[f"ShowerFlow_a1_fnorms_{i}" for i in [2, 4, 10]],
+        configs=configs
+    )
+    models.update(caloclouds)
+    parts = [
+       "original_nb10_inputs36893488147419103231"
+    ]
+    showerflow_paths = [
+       os.path.join(data_base, "showerFlow/sim-E1261AT600AP180-180",
+       f"ShowerFlow_{part}_best.pth")
+       for part in parts
+    ]
+
+    caloclouds = get_caloclouds_models(
+        caloclouds_paths=[caloclouds_path], showerflow_paths=showerflow_paths, caloclouds_names=["CaloClouds3"], showerflow_names=[f"ShowerFlow_original_{i}" for i in [10]],
+        configs=configs
+    )
+    models.update(caloclouds)
 except FileNotFoundError as e:
     print("CaloClouds models not found")
     print(e)
@@ -105,7 +137,7 @@ def main(
     redo_g4_acc_data=False,
     redo_model_data=False,
     max_g4_events=10_000,
-    max_model_events=10_000,
+    max_model_events=1000,
     models=models,
     accumulator_path=accum_path,
 ):
@@ -137,6 +169,8 @@ def main(
     accumulator_path : str
         The path to the accumulator to use for the g4 accumulator data.
     """
+    configs.showerflow_precision = sf_precision
+    configs.diffusion_precision = precision
     # The input configs that will be used for the g4 data
     # plus to get detector ceilings and floors.
     # also, it's dataset path must be correct, or the g4 data will not be found.
@@ -173,7 +207,7 @@ def main(
             meta.layer_bottom_pos_hdf5,
             meta.cell_thickness_hdf5,
             # meta.gun_xz_pos_raw)
-            np.array([0, -50]),
+            np.array([0, -50, 0]),
         )
         sample_g4(configs, binned_g4, n_g4_events)
         binned_g4.save(g4_save_path)
@@ -185,6 +219,8 @@ def main(
 
     for model_name in models:
         model, shower_flow, model_configs = models[model_name]
+        model_configs.showerflow_precision = sf_precision
+        model_configs.diffusion_precision = precision
         # configs.logdir = "/home/dayhallh/training/point-cloud-diffusion-logs"
         model_configs.dataset_path = dataset_path
         model_configs.n_dataset_files = 10
@@ -218,7 +254,7 @@ def main(
                 ]
                 layer_bottom_pos = meta.layer_bottom_pos_global
                 rescale_energy = 1e3
-                gun_pos = np.array([0, -60, 0])
+                gun_pos = np.array([0, -50, 0])
             elif "fish" in model_name.lower():
                 xyz_limits = [
                     [-1, 1],

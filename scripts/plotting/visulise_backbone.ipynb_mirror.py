@@ -40,12 +40,13 @@
 # 
 # Start by getting g4 data
 
-from pointcloud.utils.stats_accumulator import StatsAccumulator, HighLevelStats
+from pointcloud.utils.stats_accumulator import StatsAccumulator, HighLevelStats, read_section, save_location
 from pointcloud.models.wish import load_wish_from_accumulator
 import numpy as np
-from pointcloud.config_varients.wish import Configs
+from pointcloud.config_varients.caloclouds_3_simple_shower import Configs
 from pointcloud.utils.metadata import Metadata
 from pointcloud.data.dataset import PointCloudDataset
+import os
 
 configs = Configs()
 configs.poly_degree = 3
@@ -60,8 +61,11 @@ energy_upper = np.inf
 varient = ""  # could also use "_0p25", or "_0"
 #file_path = f"../../../point-cloud-diffusion-logs/wish/dataset_accumulators/10-90GeV_x36_grid_regular_524k_float32_filtered/from_10{varient}.h5"
 #file_path = f"../../../point-cloud-diffusion-logs/wish/dataset_accumulators/initial_accumulation.h5"
-file_path = f"../../../point-cloud-diffusion-logs/wish/dataset_accumulators/p22_th90_ph90_en10-1/p22_th90_ph90_en10-100_seedAll_all_steps.h5"
-
+#file_path = "/data/dust/user/dayhallh/point-cloud-diffusion-logs/wish/dataset_accumulators/p22_th90_ph90_en10-1/p22_th90_ph90_en10-100_seedAll_all_steps.h5"
+file_path = save_location(configs, 10, 0)
+if not os.path.exists(file_path):
+    print("Creating")
+    read_section(10, 0, configs)
 
 accumulated_stats = StatsAccumulator.load(file_path)
 # get bins
@@ -75,6 +79,7 @@ g4_observed_energies = np.sum(accumulated_stats.energy_hist, axis=(1, 2, 3))/non
 g4_observed_energies = g4_observed_energies[1:-1]
 g4_observed_hits = np.sum(accumulated_stats.counts_hist, axis=(1, 2, 3))/non_zero_total_events
 g4_observed_hits = g4_observed_hits[1:-1]
+
 # Get the model under comparison.
 
 from pointcloud.models.wish import Wish

@@ -514,7 +514,7 @@ class BinnedData:
         np.savez(path, **to_save)
 
     @classmethod
-    def load(cls, path):
+    def load(cls, path, **kwargs):
         """
         Load a binned data object from a file, including construction
         arguments and the counts.
@@ -530,7 +530,15 @@ class BinnedData:
             The loaded binned data.
         """
         saved = np.load(path, allow_pickle=True)
-        args = {name: saved[name] for name in cls.arg_names}
+        args = {name: saved[name] for name in cls.arg_names if name in saved}
+        for key in kwargs:
+            if key not in cls.arg_names:
+                raise ValueError(f"Unknown argument {key}")
+            if key not in args:
+                print(f"Adding {key} to file data")
+                args[key] = kwargs[key]
+            else:
+                print(f"{key} already in file data")
         # don't hard check when loading, the data exists already
         args["hard_check"] = False
         this = cls(**args)
@@ -605,10 +613,11 @@ def sample_model(configs, binned, n_events, model, shower_flow=None):
     """
     if n_events == 0:
         return np.zeros(0), np.zeros((0, 0, 4))
-    if configs.model_name == "fish":
+    if configs.model_name in ["fish", "wish"]:
         batch_len = min(1000, n_events)
     else:
         batch_len = min(100, n_events)
+
     batch_starts = np.arange(0, n_events, batch_len)
     n_batches = np.ceil(n_events / batch_len)
 

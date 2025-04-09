@@ -597,6 +597,7 @@ def gen_v1_inner_batch(
 
     # loop over events
     z_positions = metadata.layer_bottom_pos_global + metadata.cell_thickness_global / 2
+    layer_indices = np.arange(len(z_positions))
     for i, hits_per_layer in enumerate(hits_per_layer_all):
         # for i, (hits_per_layer, e_per_layer) in enumerate(
         #     zip(hits_per_layer_all, e_per_layer_all)
@@ -617,24 +618,25 @@ def gen_v1_inner_batch(
 
         fake_showers[i, :, :][mask == 0] = 0
 
-        # fake_showers[:, :, -1] = abs(fake_showers[:, :, -1])
-        fake_showers[fake_showers[:, :, -1] <= 0] = (
-            0  # setting events with negative energy to zero
-        )
-        # fake_showers[:, :, -1] = (
-        #     fake_showers[:, :, -1]
-        #     / fake_showers[:, :, -1].sum(axis=1).reshape(bs, 1)
-        #     * energies[evt_id : evt_id + bs]
-        # )  # energy rescaling to predicted e_sum
+        # before we energy calibrate, get the indices of the points that aren't real
+        zero_e_mask = fake_showers[i, :, -1] <= 0
 
         # energy per layer calibration
-        for j in range(len(z_positions)):
-            mask = fake_showers[i, :, 2] == z_positions[j]
-            fake_showers[i, :, -1][mask] = (
-                fake_showers[i, :, -1][mask]
-                / fake_showers[i, :, -1][mask].sum()
-                * e_per_layer_all[i, j]
-            )
+        closest_layer = np.abs(
+            fake_showers[i, :, 2][:, None] - z_positions
+        ).argmin(axis=1)
+
+        layer_sums = (fake_showers[i, :, -1, None] * (closest_layer[:, None] == layer_indices)).sum(
+            axis=0
+        )
+        layer_sums[layer_sums <= 0] = 1  # avoid division by zero
+
+        layer_factors = e_per_layer_all[i] / layer_sums
+        fake_showers[i, :, -1] *= layer_factors[closest_layer]
+
+        fake_showers[i][zero_e_mask] = 0
+
+    fake_showers = fake_showers[:, :config.max_points, :]
     length = config.max_points - fake_showers.shape[1]
     fake_showers = np.concatenate(
         (fake_showers, np.zeros((bs, length, 4))), axis=1

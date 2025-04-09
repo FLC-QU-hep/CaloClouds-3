@@ -21,8 +21,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import os
 
-from pointcloud.config_varients.wish import Configs
-from pointcloud.config_varients.wish_maxwell import Configs as MaxwellConfigs
+from pointcloud.config_varients.caloclouds_3_simple_shower import Configs
 
 from pointcloud.evaluation.bin_standard_metrics import BinnedData, get_path
 
@@ -71,8 +70,8 @@ binned_g4 = BinnedData.load(g4_save_path)
 to_compare = {}
 
 # Name all the models that we might have binned data for
-model_names = ["CaloClouds3"]
-model_names += [f"Wish-poly{poly_degree}" for poly_degree in range(1, 4)]
+model_names = [f"CaloClouds3-ShowerFlow_a1_fnorms_{i}_difPrecfloat32_sfPrecfloat32" for i in [2, 4, 10]]
+#model_names += [f"Wish-poly{poly_degree}" for poly_degree in range(1, 4)]
 
 for model_name in model_names:
     save_path = get_path_or_ref(configs, model_name)
@@ -84,11 +83,12 @@ for model_name in model_names:
     to_compare[model_name] = binned
         
 # For only some of the distributions, we can also get data from the StatsAccumulator to compare;
+acc_save_path
 acc_name = "Geant 4 Accumulator"
 acc_save_path = get_path_or_ref(configs, acc_name)
     
 if acc_save_path:
-    binned_acc = BinnedData.load(acc_save_path)
+    binned_acc = BinnedData.load(acc_save_path, gun_xyz_pos=np.array([0, 70, 0]))
 else:
     print(f"Can't load accumulator bins, recreate with create_standard_metrics.py if required")
     binned_acc = None

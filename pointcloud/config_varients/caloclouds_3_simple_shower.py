@@ -20,8 +20,9 @@ class Configs(default.Configs):
         )
 
         self.workers = 5
-        self.max_points = 6_000
+        self.max_points = 30_000
 
+        self.cond_features = 4  # number of conditioning features (i.e. energy+points=2)
         self.cond_features_names = ["energy", "p_norm_local"]
 
         self.shower_flow_version = 'alt1'  # options: ['original', 'alt1', 'alt2']

@@ -9,7 +9,7 @@ import torch
 from torch import nn
 from matplotlib import pyplot as plt
 
-from ..data import read_write
+from ..data import read_write, naming
 from ..data.conditioning import read_raw_regaxes_withcond, normalise_cond_feats
 from ..utils import showerflow_training, showerflow_utils, gen_utils
 from ..utils.metadata import Metadata
@@ -587,13 +587,15 @@ class Training:
 
 
 def locate_g4_data(configs):
-    data_folder = os.path.join(configs.logdir, "discriminator/g4")
+    dataset_name = naming.dataset_name_from_path(configs.dataset_path)
+    data_folder = os.path.join(configs.logdir, dataset_name, "discriminator/g4")
     return data_folder
 
 
 def locate_model_data(configs, model_path):
+    dataset_name = naming.dataset_name_from_path(configs.dataset_path)
     model_base_name = ".".join(os.path.basename(model_path).split(".")[:-1])
-    data_folder = os.path.join(configs.logdir, "discriminator", model_base_name)
+    data_folder = os.path.join(configs.logdir, dataset_name, "discriminator", model_base_name)
     return data_folder
 
 
@@ -662,7 +664,7 @@ def create_showerflow_data_files(configs, model_path, redo=False):
     n_events = np.atleast_1d(n_events)
     data_folder = locate_model_data(configs, model_path)
     file_paths = get_file_paths(data_folder, n_events)
-    _, distribution = generate.load_flow_model(configs, model_path)
+    _, distribution, _ = generate.load_flow_model(configs, model_path)
 
     # check if this is already done
     exists = [os.path.exists(file_path) for file_path in file_paths]
@@ -672,7 +674,6 @@ def create_showerflow_data_files(configs, model_path, redo=False):
     print(f"Some {model_path} data files are missing; {sum(exists)}/{len(exists)}")
 
     # sample from shower flow
-    metadata = Metadata(configs)
     print(f"Creating {model_path} data files")
     print()
     local_batch_size = 1000

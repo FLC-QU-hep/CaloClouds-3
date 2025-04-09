@@ -88,7 +88,7 @@ def main(config=Configs()):
     # Train, validate and test
     def train(batch, it):
         # Load data
-        x = batch["event"][0].float().to(config.device)  # B, N, 4
+        x = batch["event"][0].to(config.device)
 
         # Reset grad and model state
         optimizer.zero_grad()
@@ -141,7 +141,7 @@ def main(config=Configs()):
             cond_feats = normalise_cond_feats(config, cond_feats, "diffusion")
 
             noise = torch.randn_like(x)  # noise for forward diffusion
-            sigma = sample_density([x.shape[0]], device=x.device)  # time steps
+            sigma = sample_density([x.shape[0]], device=x.device)
 
             writer = experiment if config.log_comet else None
 

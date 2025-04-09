@@ -6,16 +6,16 @@ from matplotlib import pyplot as plt
 import torch
 import os
 
-from pointcloud.config_varients import wish, caloclouds_3
-from pointcloud.configs import Configs
+from pointcloud.config_varients import wish, caloclouds_3, caloclouds_3_simple_shower, default
 from pointcloud.models import shower_flow, fish_flow
 from pointcloud.utils import stats_accumulator, metadata, showerflow_utils, showerflow_training
+from pointcloud.utils.metadata import Metadata
 
-configs = Configs()
-#configs.dataset_path = "/beegfs/desy/user/akorol/data/AngularShowers_RegularDetector/"\
-#"hdf5_for_CC/sim-E1261AT600AP180-180_file_{}slcio.hdf5"
-
-#configs.n_dataset_files = 88
+configs = caloclouds_3.Configs()
+configs.storage_base = "/data/dust/user/dayhallh/"
+configs.logdir = "/data/dust/user/dayhallh/point-cloud-diffusion-logs/"
+configs.dataset_path_in_storage = False
+configs.dataset_path = caloclouds_3_simple_shower.Configs().dataset_path
 meta = metadata.Metadata(configs)
 
 
@@ -26,7 +26,8 @@ except Exception as e:
     configs.device = "cpu"
     incident_energies = torch.linspace(0.1, 1.0, 5)[:, None].to(configs.device)
 
-
+print(configs.dataset_path)
+print(configs.shower_flow_cond_features)
 # There are 65 values to each draw from the original ShowerFlow;
 # 
 # - 0. Total observed clusters / `meta.n_pts_rescale`
@@ -43,10 +44,8 @@ except Exception as e:
 # 
 # Start by using the functions designed to train showerflow to draw these distributions from the dataset.
 
-#data_dir = os.path.realpath(os.path.join(configs.logdir.split("point-cloud-diffusion-logs")[0], "point-cloud-diffusion-data"))
-#showerflow_dir = os.path.join(data_dir, "showerFlow/sim-E1261AT600AP180-180")
-data_dir = "/data/dust/user/dayhallh/duncan/gen0"
-showerflow_dir = data_dir
+data_dir = os.path.realpath(os.path.join(configs.logdir.split("point-cloud-diffusion-logs")[0], "point-cloud-diffusion-data"))
+showerflow_dir = os.path.join(data_dir, "showerFlow/sim-E1261AT600AP180-180")
 print(f"Showerflow dir is {showerflow_dir}")
 assert os.path.exists(showerflow_dir)
 pointsE_path = showerflow_training.get_incident_npts_visible(configs, showerflow_dir)
@@ -113,14 +112,18 @@ if "energy_per_layer" in configs.shower_flow_inputs:
     idx_reached += 30
 else:
     energy_per_layer_slice = None
+cog_idxs
+dataset_cond = []  # Will be the full 65 element array
 
-dataset_cond = []
 for batch_n, start in enumerate(starts):
     print(f"{batch_n/n_batches:.0%}", end='\r')
     data_matrix = make_train_ds(start, start + local_batch_size)
-    data_matrix_copy = data_matrix.clone()
-    start_point = total_cond + (sum_clusters_idx is not None) + (sum_energy_idx is not None)
-    data_matrix_copy[:, start_point:] = adaptor.to_basis(data_matrix[:, total_cond:])
+    if not configs.shower_flow_fixed_input_norms:
+        data_matrix_copy = data_matrix.clone()
+        start_point = total_cond + (sum_clusters_idx is not None) + (sum_energy_idx is not None)
+        data_matrix_copy[:, start_point:] = adaptor.to_basis(data_matrix[:, total_cond:])
+    else:
+        data_matrix_copy = data_matrix
     dataset_n_events += data_matrix.shape[0]
     dataset_cond.append(data_matrix[:, :total_cond])
         
@@ -205,40 +208,52 @@ def plot_distributions(dists, axes=None, hist_kws=None, line_kws=None, **gen_kws
     axes[4].legend()
     return fig, axes, ratio_axes
     
-
 dataset_kws = {'color': 'gray', 'label': 'G4'}
 fig, axes, ratio_axes = plot_distributions(dataset_distributions, **dataset_kws)
 fig.tight_layout()
 # ## Model varients
 # 
 # That done, we can draw the same values from the models, and plot them alongside.
+saved_models_1 = showerflow_utils.existing_models(caloclouds_3.Configs())
+saved_models_2 = showerflow_utils.existing_models(caloclouds_3_simple_shower.Configs())
+saved_models = {**saved_models_1, **saved_models_2}
 from pointcloud.utils import showerflow_utils
+from pointcloud.data.conditioning import feature_lengths
 configs.shower_flow_data_dir = showerflow_dir
-saved_models = showerflow_utils.models_at_paths(configs.shower_flow_cond_features,
-                                                ["/data/dust/user/dayhallh/duncan/gen0/ShowerFlow_alt1_nb4_inputs36893488147419103231_best.pth",
-                                                 "/data/dust/user/dayhallh/point-cloud-diffusion-data/investigation2/showerFlow/p22_th90_ph90_en10-100/ShowerFlow_original_nb4_inputs36893488147419103231_fnorms_best.pth"])
+
+import ipdb
+if True:
+    core_models = showerflow_utils.models_at_paths(["energy", "p_norm_local"],
+    [
+     "/data/dust/user/dayhallh/point-cloud-diffusion-data/showerFlow/sim-E1261AT600AP180-180/ShowerFlow_original_nb10_inputs8070450532247928831_fnorms_best.pth",
+     "/data/dust/user/dayhallh/point-cloud-diffusion-data/showerFlow/sim-E1261AT600AP180-180/ShowerFlow_original_nb10_inputs36893488147419103231_best.pth",
+     "/data/dust/user/dayhallh/point-cloud-diffusion-data/showerFlow/sim-E1261AT600AP180-180/ShowerFlow_alt1_nb4_inputs8070450532247928831_fnorms_best.pth",
+    ])
+    
+
 default_input_mask = showerflow_utils.get_input_mask(configs)
 max_n_inputs = len(default_input_mask)
 
-cond_feature_mask = showerflow_utils.get_cond_mask(configs)
-n_cond_features = np.sum(cond_feature_mask)
 
 def get_distributions(saved_models):
     distributions = []
     for i, version in enumerate(saved_models["versions"]):
         constructor = shower_flow.versions_dict[version]
         num_inputs = max_n_inputs - len(saved_models["cut_inputs"][i])
+        num_cond_inputs = sum([feature_lengths[f] for f in saved_models['cond_features'][i]])
         model, dist, transforms = constructor(
             num_blocks = saved_models["num_blocks"][i],
             num_inputs = num_inputs,
-            num_cond_inputs = n_cond_features,
+            num_cond_inputs = num_cond_inputs,
             device = configs.device)
         loaded_checkpoint = torch.load(saved_models["paths"][i], map_location=configs.device)
         model.load_state_dict(loaded_checkpoint["model"])
         distributions.append(dist)
     return distributions
 
-def model_distributions(model):
+def model_distributions(model, model_path):
+    configs_here = showerflow_utils.configs_from_showerflow_path(configs, model_path)
+    meta = Metadata(configs_here)
     repeats = 10
     found = np.zeros((n_distributions, n_bins))
     for r in range(repeats):
@@ -250,39 +265,71 @@ def model_distributions(model):
                 break
             conditioned = model.condition(cond)
             values = conditioned.sample(torch.Size([cond.size(0)]))
-            values[..., 5:65] = adaptor.to_basis(values)[..., 3:63]
+            output = torch.zeros((local_batch_size, 65))
+            if False:  # Not working for fnorm data
+                if values.shape[-1] < 65:
+                    output[:, -60:] = values[:, -60:]
+                    output[:, [2, 4]] = values[:, [0, -61]]
+                    output[:, 0] = output[:, 5:35].sum(dim=1)
+                    output[:, 1] = output[:, 35:].sum(dim=1)
+                    
+                else:
+                    output = values
+                    output[:, 2:] = adaptor.to_basis(values)
+            else:
+                (num_clusters, energies, cog_x, cog_y, cog_z,
+                 clusters_per_layer, e_per_layer) = showerflow_utils.truescale_showerflow_output(values, configs_here)
+                if num_clusters is None:
+                    output[:, 0] = torch.sum(clusters_per_layer, dim=1)/meta.n_pts_rescale
+                    output[:, 5:35] = 30*clusters_per_layer/meta.n_pts_rescale
+                else:
+                    output[:, 0] = num_clusters[:, 0]/meta.n_pts_rescale
+                    clusters_per_layer *= output[:, [0]]/torch.sum(clusters_per_layer, dim=1)[:, None]
+                    output[:, 5:35] = clusters_per_layer
+                if energies is None:
+                    output[:, 1] = torch.sum(e_per_layer, dim=1)/(1000*meta.vis_eng_rescale)
+                    output[:, 35:] = 30*e_per_layer/(1000*meta.vis_eng_rescale)
+                else:
+                    output[:, 1] = energies[:, 0]/(1000*meta.vis_eng_rescale)
+                    e_per_layer *= output[:, [1]]/torch.sum(e_per_layer, dim=1)[:, None]
+                    output[:, 35:] = e_per_layer
+                    
+                output[:, 2] = cog_x
+                output[:, 3] = cog_y
+                if cog_z is not None:
+                    output[:, 4] = cog_z
+                
             for i in range(65):
-                found[i] += np.histogram(values[:, i], bins=true_bins[i])[0]
+                found[i] += np.histogram(output[:, i], bins=true_bins[i])[0]
     found /= (repeats*dataset_cond.shape[0])
     return found
 
 
 
 try:
-    distributions[i]
+    assert len(core_distributions) == len(core_models["versions"])
     
-    print(f"Already loaded {len(distributions)}")
+    print(f"Already loaded {len(core_distributions)}")
 except Exception:
-    distributions = get_distributions(saved_models)
+    distributions = get_distributions(core_models)
+
 saved_models['best_loss'] = np.array(saved_models['best_loss'])
-all_inputs_mask = [i for i, x in enumerate(saved_models['cut_inputs']) if not x]
+all_inputs_mask = [i for i, x in enumerate(saved_models['cut_inputs']) if x]
 best_3 = np.array(all_inputs_mask)[np.argsort(saved_models['best_loss'][all_inputs_mask])[:3]]
 len(distributions)
 
 #best_distributions = [model_distributions(distributions[i]) for i in best_3]
 try:
-    all_distributions[0]
-    
+    assert len(all_distributions) == len(distributions)
+    raise Exception
     print("Already run distributions")
 except Exception:
     all_distributions = []
     for i, dist in enumerate(distributions):
-        try:
-            all_distributions.append(model_distributions(dist))
-        except RuntimeError:
-            print(saved_models["names"][i])
+        path = core_models["paths"][i]
+        all_distributions.append(model_distributions(dist, path))
 
-worst_dist_idx = all_inputs_mask[np.argmax(saved_models['best_loss'][all_inputs_mask])]
+#worst_dist_idx = all_inputs_mask[np.argmax(saved_models['best_loss'][all_inputs_mask])]
 y_mins = 0.5*np.ones(7)
 y_maxes = 1.5*np.ones(7)
 def plot_ratios(ratio_axes, distribution, **dataset_kws):
@@ -304,6 +351,7 @@ def plot_ratios(ratio_axes, distribution, **dataset_kws):
         y_maxes[i] = max(min(np.nanmin(ratio), 3), y_maxes[i])
         ratio_axes[i].set_ylim((y_mins[i], y_maxes[i]))
     
+len(all_distributions)
 
 dataset_kws = {'color': 'gray', 'label': 'G4'}
 fig, axes, ratio_axes = plot_distributions(dataset_distributions, **dataset_kws)
@@ -311,107 +359,32 @@ from pointcloud.utils.plotting import nice_hex
 
 dataset_hist_kws = {'histtype': 'step', 'lw': 3}
 line_styles = ['-', '--', ':', '-.']
-for i, model_i in enumerate(best_3[:2]):
-    label = f"{saved_models['names'][model_i]}, {saved_models['best_loss'][model_i]:.1f}"
-    dataset_kws = {'color': nice_hex[4][(i*2+1)%5], 'label': label, 'ls':line_styles[i%4]}
-    plot_distributions(all_distributions[model_i], axes=axes, hist_kws=dataset_hist_kws, **dataset_kws)
-    plot_ratios(ratio_axes, all_distributions[model_i], **dataset_kws)
+line_styles = ['-']*4
 
-label = f"{saved_models['names'][worst_dist_idx]}, {saved_models['best_loss'][worst_dist_idx]:.2f}"
-dataset_kws = {'color': 'red', 'label': label}
-plot_distributions(all_distributions[worst_dist_idx], axes=axes, hist_kws=dataset_hist_kws, **dataset_kws)
-plot_ratios(ratio_axes, all_distributions[worst_dist_idx], **dataset_kws)
+if False:
+    for i, model_i in enumerate(best_3[:2]):
+        label = f"{saved_models['names'][model_i]}, {saved_models['best_loss'][model_i]:.1f}"
+        dataset_kws = {'color': nice_hex[4][(i*2+1)%5], 'label': label, 'ls':line_styles[i%4]}
+        plot_distributions(all_distributions[model_i], axes=axes, hist_kws=dataset_hist_kws, **dataset_kws)
+        plot_ratios(ratio_axes, all_distributions[model_i], **dataset_kws)
+
+
+    label = f"{saved_models['names'][worst_dist_idx]}, {saved_models['best_loss'][worst_dist_idx]:.2f}"
+    dataset_kws = {'color': 'red', 'label': label}
+    plot_distributions(all_distributions[worst_dist_idx], axes=axes, hist_kws=dataset_hist_kws, **dataset_kws)
+    plot_ratios(ratio_axes, all_distributions[worst_dist_idx], **dataset_kws)
+
+for i, name in enumerate(core_models['names']):
+    label = f"{name}, {core_models['best_loss'][i]:.1f}"
+    dataset_kws = {'color': nice_hex[4][(i*2+1)%5], 'label': label, 'ls':line_styles[i%4]}
+    plot_distributions(all_distributions[i], axes=axes, hist_kws=dataset_hist_kws, **dataset_kws)
+    plot_ratios(ratio_axes, all_distributions[i], **dataset_kws)
+
+
+
 
 
 fig.tight_layout()
-plt.savefig("with_worst.png")
-
-dataset_kws = {'color': 'gray', 'label': 'G4'}
-fig, axes, ratio_axes = plot_distributions(dataset_distributions, **dataset_kws)
-from pointcloud.utils.plotting import nice_hex
-
-dataset_hist_kws = {'histtype': 'step', 'lw': 3}
-line_styles = ['-', '--', ':', '-.']
-for i, model_i in enumerate(best_3[:2]):
-    label = f"{saved_models['names'][model_i]}, {saved_models['best_loss'][model_i]:.1f}"
-    dataset_kws = {'color': nice_hex[4][(i*2+1)%5], 'label': label, 'ls':line_styles[i%4]}
-    plot_distributions(all_distributions[model_i], axes=axes, hist_kws=dataset_hist_kws, **dataset_kws)
-    plot_ratios(ratio_axes, all_distributions[model_i], **dataset_kws)
-
-label = f"{saved_models['names'][worst_dist_idx]}, {saved_models['best_loss'][worst_dist_idx]:.2f}"
-dataset_kws = {'color': 'red', 'label': label}
-plot_distributions(all_distributions[worst_dist_idx], axes=axes, hist_kws=dataset_hist_kws, **dataset_kws)
-plot_ratios(ratio_axes, all_distributions[worst_dist_idx], **dataset_kws)
-for ax in axes:
-    ax.semilogy()
-
-
-fig.tight_layout()
-plt.savefig("with_worst_logy.png")
-model_names = [["original_nb4", "original_nb10"], ["alt1_nb4", "alt1_nb10"], ["original_nb4", "alt1_nb4", "alt2_nb4"]]
-try:
-    print(len(model_dists))
-except Exception:
-    model_dists = {}
-for group in model_names:
-    for name in group:
-        if name in model_dists:
-            continue
-        print(name)
-        idx = saved_models["names"].index(name)
-        if idx in best_3:
-            dist = best_distributions[list(best_3).index(idx)]
-        else:
-            dist = model_distributions(distributions[idx])
-        model_dists[name] = dist
-
-    
-for name_group in model_names:
-    idxs = [saved_models["names"].index(n) for n in name_group]
-    dataset_kws = {'color': 'gray', 'label': 'G4'}
-    fig, axes, ratio_axes = plot_distributions(dataset_distributions, **dataset_kws)
-    from pointcloud.utils.plotting import nice_hex
-    dataset_hist_kws = {'histtype': 'step', 'lw': 3}
-    line_styles = ['-', '--', ':', '-.']
-    for i, model_i in enumerate(idxs):
-        name = name_group[i]
-        dist_here = model_dists[name]
-        label = f"{saved_models['names'][model_i]}, {saved_models['best_loss'][model_i]:.1f}"
-        dataset_kws = {'color': nice_hex[4][(i*2+1)%5], 'label': label, 'ls':line_styles[i%4]}
-        plot_distributions(dist_here, axes=axes, hist_kws=dataset_hist_kws, **dataset_kws)
-        plot_ratios(ratio_axes, dist_here, **dataset_kws)
-
-
-
-    fig.tight_layout()
-    plt.savefig('.vs.'.join(name_group) + ".png")
-
-
-
-    
-for name_group in model_names:
-    idxs = [saved_models["names"].index(n) for n in name_group]
-    dataset_kws = {'color': 'gray', 'label': 'G4'}
-    fig, axes, ratio_axes = plot_distributions(dataset_distributions, **dataset_kws)
-    from pointcloud.utils.plotting import nice_hex
-    dataset_hist_kws = {'histtype': 'step', 'lw': 3}
-    line_styles = ['-', '--', ':', '-.']
-    for i, model_i in enumerate(idxs):
-        name = name_group[i]
-        dist_here = model_dists[name]
-        label = f"{saved_models['names'][model_i]}, {saved_models['best_loss'][model_i]:.1f}"
-        dataset_kws = {'color': nice_hex[4][(i*2+1)%5], 'label': label, 'ls':line_styles[i%4]}
-        plot_distributions(dist_here, axes=axes, hist_kws=dataset_hist_kws, **dataset_kws)
-        plot_ratios(ratio_axes, dist_here, **dataset_kws)
-
-    for ax in axes:
-        ax.semilogy()
-
-    fig.tight_layout()
-    plt.savefig('.vs.'.join(name_group) + ".png")
-
-
-all_distributions
-
+#plt.savefig("with_worst.png")
 
 

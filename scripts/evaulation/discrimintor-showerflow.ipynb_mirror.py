@@ -30,10 +30,16 @@ g4_data_folder = discriminator.locate_g4_data(configs)
 print(g4_data_folder)
 discriminator.create_g4_data_files(configs)
 # Get the generator models we will be comparing with, and check their data has been generated.
-existing_models1 = showerflow_utils.existing_models(configs)
-configs.shower_flow_fixed_input_norms = not configs.shower_flow_fixed_input_norms
-existing_models2 = showerflow_utils.existing_models(configs)
-existing_models = {key: existing_models1[key] + existing_models2[key] for key in existing_models1}
+
+stack = []
+configs.shower_flow_detailed_history = True
+for fixed_input_norms in [True, False]:
+    for weight_decay in [0., 0.1, 0.0001]:
+        configs.shower_flow_fixed_input_norms = fixed_input_norms
+        configs.shower_flow_weight_decay = weight_decay
+        stack.append(showerflow_utils.existing_models(configs))
+        
+existing_models = {key: sum([s[key] for s in stack], []) for key in stack[0]}
 existing_models["configs"] = []
 
 for i, name in enumerate(existing_models["names"]):
@@ -55,7 +61,8 @@ for i, name in enumerate(existing_models["names"]):
     working.append(i)
             
         
-intrest = ["original_nb4", "alt1_nb4", "original_nb4_fnorms_wo[0, 1, 4]", "alt1_nb4_fnorms_wo[0, 1, 4]"]
+existing_models['names']
+intrest = ["original_nb10_dhist", "original_nb10_dhist_wd1p0e-04", "original_nb10_dhist_wd1p0e-01"]
 idxs = [existing_models["names"].index(i) for i in intrest]
 print(list(zip(idxs, intrest)))
 # ## data plotting
@@ -160,6 +167,8 @@ if n_es_layers:
 # # Training
 # 
 # The data looks fine. Time to launch the training.enumerate
+print(list(enumerate(working)))
+
 n_epochs = 1
 for i in working:
     print()
@@ -179,7 +188,7 @@ for i in working:
 from sklearn import metrics
 from matplotlib import pyplot as plt
 existing_models["auc"] = [None for _ in existing_models["names"]]
-for start in range(0,len(existing_models["names"], 5):
+for start in range(0,len(existing_models["names"]), 5):
     fig, ax = plt.subplots()
     for i in range(start, start+5):
         try:
@@ -204,7 +213,7 @@ for start in range(0,len(existing_models["names"], 5):
     ax.legend()
 
 
-for start in range(0, len(existing_models["names"], 5):
+for start in range(0, len(existing_models["names"]), 5):
     fig, axes = plt.subplots(1, 2, figsize=(15, 5))
     for i in range(start, start+5):
         try:

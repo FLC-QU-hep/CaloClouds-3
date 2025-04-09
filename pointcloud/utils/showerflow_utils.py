@@ -47,6 +47,20 @@ def model_save_paths(configs, version, num_blocks, cut_inputs):
     if getattr(configs, "shower_flow_fixed_input_norms", False):
         name_base += "_fnorms"
         nice_name += "_fnorms"
+
+    if getattr(configs, "shower_flow_train_base", False):
+        name_base += "_tbase"
+        nice_name += "_tbase"
+
+    if getattr(configs, "shower_flow_detailed_history", False):
+        name_base += "_dhist"
+        nice_name += "_dhist"
+
+    if getattr(configs, "shower_flow_weight_decay", 0):
+        wd_string = f"{configs.shower_flow_weight_decay:.1e}".replace(".", "p")
+        name_base += f"_wd{wd_string}"
+        nice_name += f"_wd{wd_string}"
+
     best_model_path = os.path.join(showerflow_dir, f"{name_base}_best.pth")
     best_data_path = os.path.join(showerflow_dir, f"{name_base}_best_data.txt")
 
@@ -113,6 +127,7 @@ def existing_models(configs):
     saved_models["best_loss"] = []
     saved_models["paths"] = []
     saved_models["cond_features"] = []
+    saved_models["weight_decay"] = []
     saved_models["fixed_input_norms"] = []
 
     combinations = itertools.product(
@@ -122,6 +137,7 @@ def existing_models(configs):
     for version, nb, ci in combinations:
         name, model_path, data_path = model_save_paths(configs, version, nb, ci)
         fixed_input_norms = getattr(configs, "shower_flow_fixed_input_norms", False)
+        weight_decay = getattr(configs, "shower_flow_weight_decay", 0)
         if not os.path.exists(model_path):
             continue
         cond_feature_names = get_cond_features_names(configs, "showerflow")
@@ -132,6 +148,7 @@ def existing_models(configs):
         saved_models["cut_inputs"].append(ci)
         saved_models["cond_features"].append(cond_feature_names)
         saved_models["fixed_input_norms"].append(fixed_input_norms)
+        saved_models["weight_decay"].append(weight_decay)
         with open(data_path, "r") as f:
             text = f.read().split()
             saved_models["best_loss"].append(float(text[0]))
@@ -200,6 +217,10 @@ def config_params_from_showerflow_path(showerflow_path):
         next(part[6:] for part in parts if part.startswith("inputs"))
     )
     inputs_used_mask = [x == "1" for x in f"{inputs_used_as_base10:b}"]
+    max_input_dims = 65
+    if len(inputs_used_mask) < max_input_dims:
+        # pad at the start
+        inputs_used_mask = np.pad(inputs_used_mask, (max_input_dims - len(inputs_used_mask), 0))
     inputs = input_mask_to_list(inputs_used_mask)
     fixed_input_norms = "fnorms" in parts
     cut_inputs = "".join([str(i) for i in range(5) if not inputs_used_mask[i]])

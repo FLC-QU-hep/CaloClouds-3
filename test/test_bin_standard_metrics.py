@@ -261,7 +261,8 @@ def test_get_wish_models(tmpdir):
 def test_get_caloclouds_models(tmpdir):
     # Need to get the right paths
     cfg = config_creator.make("caloclouds_3")
-    cfg.cond_features = ["energy", "points"]
+    cfg.cond_features = 2
+    cfg.cond_features_names = ["energy", "points"]
     cfg.shower_flow_cond_features = ["energy"]
     test_cm_model_path = "test/example_cm_model.pt"
     # fake the flow model
