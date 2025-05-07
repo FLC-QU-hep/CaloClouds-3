@@ -287,8 +287,6 @@ def read_raw_regaxes_withcond(
         # if there are 0 events, but multiple conditions,
         # this ensures the indexing works
         cond = cond.reshape(-1, starts[-1])
-    if len(for_model) == 1:
-        return cond, events
     if len(cond_names) == 1:
         # pottentially dimension length 1, so avoid slicing
         conds = {model_name: cond for model_name in for_model}
@@ -303,6 +301,8 @@ def read_raw_regaxes_withcond(
             conds[model_name] = cond[:, indices]
         else:
             conds[model_name] = cond[:, indices[0]]
+    if len(conds) == 1:
+        conds = conds[list(conds.keys())[0]]
     return conds, events
 
 

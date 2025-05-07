@@ -613,7 +613,54 @@ def sample_model(configs, binned, n_events, model, shower_flow=None):
     """
     if n_events == 0:
         return np.zeros(0), np.zeros((0, 0, 4))
-    if configs.model_name in ["fish", "wish"]:
+    cond, _ = read_raw_regaxes_withcond(
+        configs,
+        total_size=n_events,
+        for_model=["showerflow", "diffusion"],
+    )
+    events = conditioned_sample_model(
+        configs,
+        binned,
+        cond,
+        model,
+        shower_flow=shower_flow,
+    )
+    return cond, events
+
+
+def conditioned_sample_model(model_configs, binned, cond, model, shower_flow=None):
+    """
+    Use a model to produce events and add them to the binned data.
+
+    Parameters
+    ----------
+    model_configs : Configs
+        The configuration used for model metadata
+    binned : BinnedData
+        The binned data to add the samples to, modified inplace.
+    model_config : torch.Tensor (n_events, C)
+        The conditioning for the sample
+    model : torch.nn.Module
+        The model to sample from, will be sampled by
+        pointcloud.utils.gen_utils.gen_cond_showers_batch.
+    shower_flow : distribution, optional
+        The flow to sample from, if the model needs it, by default None
+        also used by gen_cond_showers_batch.
+
+    Returns
+    -------
+    events : np.array (n_events, n_points, 4)
+        The events produced by the model
+        with the last axis being [x, y, z, energy].
+
+    """
+    if isinstance(cond, dict):
+        n_events = len(next(iter(cond.values())))
+    else:
+        n_events = len(cond)
+    if n_events == 0:
+        return np.zeros(0), np.zeros((0, 0, 4))
+    if model_configs.model_name in ["fish", "wish"]:
         batch_len = min(1000, n_events)
     else:
         batch_len = min(100, n_events)
@@ -623,19 +670,18 @@ def sample_model(configs, binned, n_events, model, shower_flow=None):
 
     for b, start in enumerate(batch_starts):
         print(f"{b/n_batches:.1%}", end="\r", flush=True)
-        cond, _ = read_raw_regaxes_withcond(
-            configs,
-            pick_events=slice(start, start + batch_len),
-            for_model=["showerflow", "diffusion"],
-        )
+        if isinstance(cond, dict):
+            cond_here = {key: cond[key][start : start + batch_len] for key in cond}
+        else:
+            cond_here = cond[start : start + batch_len]
         events = gen_cond_showers_batch(
-            model, shower_flow, cond, bs=batch_len, config=configs
+            model, shower_flow, cond_here, bs=batch_len, config=model_configs
         )
         binned.add_events(events)
     print()
     print("Done")
     binned.recompute_mean_energies()
-    return cond, events
+    return events
 
 
 def sample_accumulator(configs, binned, acc, n_events):
@@ -806,6 +852,7 @@ def get_caloclouds_models(
     caloclouds_names="CaloClouds3",
     showerflow_names="",
     configs=None,
+    distillation=True,
 ):
     """
     Gather a set of models for evaluation. Currently just one.
@@ -855,11 +902,12 @@ def get_caloclouds_models(
 
     for calocloud_name, calocloud_path in zip(caloclouds_names, caloclouds_paths):
         for showerflow_name, showerflow_path in zip(showerflow_names, showerflow_paths):
-            model = get_model_class(configs)(configs).to(device)
+            model = get_model_class(configs)(configs, distillation=distillation).to(device)
             print(calocloud_path)
             model.load_state_dict(
                 torch.load(calocloud_path, map_location=device, weights_only=False)["state_dict"]
             )
+            model.eval()
             try:
                 showerflow_configs = showerflow_utils.configs_from_showerflow_path(
                     configs, showerflow_path
@@ -881,6 +929,7 @@ def get_caloclouds_models(
             flow_model.load_state_dict(
                 torch.load(showerflow_path, map_location=device, weights_only=False)["model"]
             )
+            flow_model.eval()
             name = (
                 f"{calocloud_name}-{showerflow_name}"
                 if showerflow_name

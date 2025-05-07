@@ -19,6 +19,7 @@ import time
 from pointcloud.config_varients import (
     wish,
     wish_maxwell,
+    caloclouds_2,
     caloclouds_3,
     caloclouds_3_simple_shower,
 )
@@ -718,6 +719,7 @@ if __name__ == "__main__":
     config_choices = {
         "wish": wish,
         "wish_maxwell": wish_maxwell,
+        "caloclouds_2": caloclouds_2,
         "caloclouds_3": caloclouds_3,
         "caloclouds_3_simple_shower": caloclouds_3_simple_shower,
     }

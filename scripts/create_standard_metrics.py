@@ -10,24 +10,31 @@ import numpy as np
 import torch
 import os
 
-from pointcloud.config_varients.caloclouds_3_simple_shower import Configs
+from pointcloud.config_varients import caloclouds_3_simple_shower, caloclouds_3, default
 
 from pointcloud.utils.metadata import Metadata
 from pointcloud.utils.detector_map import floors_ceilings
 from pointcloud.data.read_write import read_raw_regaxes, get_n_events
+from pointcloud.data.conditioning import read_raw_regaxes_withcond
+
 from pointcloud.utils.stats_accumulator import StatsAccumulator
 
 # imports specific to this evaluation
 from pointcloud.evaluation.bin_standard_metrics import (
     BinnedData,
     sample_g4,
-    sample_model,
+    conditioned_sample_model,
     sample_accumulator,
-    get_path,
     get_wish_models,
     get_fish_models,
     get_caloclouds_models,
 )
+from pointcloud.evaluation.bin_standard_metrics import get_path as base_get_path
+
+def get_path(configs, dataset_name):
+    if hasattr(configs, "dataset_tag"):
+        dataset_name += "_" + configs.dataset_tag
+    return base_get_path(configs, dataset_name)
 
 # Gather the models to evaluate
 # the dict has the format {model_name: (model, shower_flow, configs)}
@@ -40,9 +47,14 @@ log_base = "/data/dust/user/dayhallh/point-cloud-diffusion-logs"
 # data_base = "../point-cloud-diffusion-data/"
 # data_base = "/beegfs/desy/user/dayhallh/point-cloud-diffusion-data/"
 data_base = "/data/dust/user/dayhallh/point-cloud-diffusion-data/"
-precision = "float32"
-sf_precision = "float32"
 torch.set_default_dtype(torch.float32)
+
+static_dataset = "/data/dust/user/dayhallh/data/ILCsoftEvents/p22_th90_ph90_en10-100_joined/p22_th90_ph90_en10-100_seed{}_all_steps.hdf5"
+static_n_files = 10
+
+angular_dataset = caloclouds_3_simple_shower.Configs().dataset_path
+angular_n_files = caloclouds_3_simple_shower.Configs().n_dataset_files
+
 
 try:
     pass
@@ -72,51 +84,69 @@ except FileNotFoundError as e:
     print(e)
 try:
     pass
-    configs = Configs()
-    configs.device = 'cpu'
-    configs.diffusion_precision = precision
-    configs.showerflow_precision = sf_precision
-    configs.cond_features = 4
-    configs.cond_features_names = ["energy", "p_norm_local"]
-    caloclouds_path = os.path.join(
-       log_base,
-       "sim-E1261AT600AP180-180/Anatoliis_cc_2.pt"
-       #"p22_th90_ph90_en10-100/CD_2024_08_23__16_13_16/ckpt_0.439563_30000.pt"
-       #"p22_th90_ph90_en10-100/CD_2024_08_23__16_13_16/ckpt_0.447468_870000.pt",
-    )
-    caloclouds_16_path = "/data/dust/user/dayhallh/point-cloud-diffusion-logs/CD_sim-E1261AT600AP180-1802025_02_04__15_00_20_float16/ckpt_unscored_2300000.pt"
-    caloclouds_64_path = "/data/dust/user/dayhallh/point-cloud-diffusion-logs/CD_sim-E1261AT600AP180-1802025_02_04__15_07_10_float64/ckpt_0.428667_1530000.pt"
-    parts = [
-       f"alt1_nb{repeats}_inputs8070450532247928831_fnorms"
-       for repeats in [2, 10]
-    ]
-    showerflow_paths = [
-       os.path.join(data_base, "showerFlow/sim-E1261AT600AP180-180",
-       f"ShowerFlow_{part}_dhist_best.pth")
-       for part in parts
-    ]
-    showerflow_16_path = "/data/dust/user/dayhallh/point-cloud-diffusion-data/showerFlow/sim-E1261AT600AP180-180/ShowerFlow_alt1_nb2_inputs8070450532247928831_fnorms_precfloat16_best.pth"
-    showerflow_64_path = "/data/dust/user/dayhallh/point-cloud-diffusion-data/showerFlow/sim-E1261AT600AP180-180/ShowerFlow_alt1_nb2_inputs8070450532247928831_fnorms_precfloat64_best.pth"
+    if True:  # new a1 model
+        configs = caloclouds_3_simple_shower.Configs()
+        configs.device = 'cpu'
+        configs.cond_features = 4
+        configs.cond_features_names = ["energy", "p_norm_local"]
+        caloclouds_path = os.path.join(
+           log_base,
+           "sim-E1261AT600AP180-180/Anatoliis_cc_2.pt"
+           #"p22_th90_ph90_en10-100/CD_2024_08_23__16_13_16/ckpt_0.439563_30000.pt"
+           #"p22_th90_ph90_en10-100/CD_2024_08_23__16_13_16/ckpt_0.447468_870000.pt",
+        )
+        parts = [
+           f"alt1_nb{repeats}_inputs8070450532247928831_fnorms"
+           for repeats in [2, 10]
+        ]
+        showerflow_paths = [
+           os.path.join(data_base, "showerFlow/sim-E1261AT600AP180-180",
+           f"ShowerFlow_{part}_dhist_best.pth")
+           for part in parts
+        ]
 
-    caloclouds = get_caloclouds_models(
-        caloclouds_paths=[caloclouds_path], showerflow_paths=showerflow_paths, caloclouds_names=["CaloClouds3"], showerflow_names=[f"ShowerFlow_a1_fnorms_{i}" for i in [2, ]],
-        configs=configs
-    )
-    models.update(caloclouds)
-    parts = [
-       "original_nb10_inputs36893488147419103231"
-    ]
-    showerflow_paths = [
-       os.path.join(data_base, "showerFlow/sim-E1261AT600AP180-180",
-       f"ShowerFlow_{part}_best.pth")
-       for part in parts
-    ]
+        caloclouds = get_caloclouds_models(
+            caloclouds_paths=[caloclouds_path], showerflow_paths=showerflow_paths, caloclouds_names=["CaloClouds3"], showerflow_names=[f"ShowerFlow_a1_fnorms_{i}" for i in [2, ]],
+            configs=configs
+        )
+        models.update(caloclouds)
 
-    caloclouds = get_caloclouds_models(
-        caloclouds_paths=[caloclouds_path], showerflow_paths=showerflow_paths, caloclouds_names=["CaloClouds3"], showerflow_names=[f"ShowerFlow_original_{i}" for i in [10]],
-        configs=configs
-    )
-    models.update(caloclouds)
+    if False:  #  old model, angular dataset
+        configs = caloclouds_3.Configs()
+        configs.device = 'cpu'
+        configs.cond_features = 4
+        configs.cond_features_names = ["energy", "p_norm_local"]
+        parts = [
+           "original_nb10_inputs36893488147419103231"
+        ]
+        showerflow_paths = [
+           os.path.join(data_base, "showerFlow/sim-E1261AT600AP180-180",
+           f"ShowerFlow_{part}_best.pth")
+           for part in parts
+        ]
+
+        caloclouds = get_caloclouds_models(
+            caloclouds_paths=[caloclouds_path], showerflow_paths=showerflow_paths, caloclouds_names=["CaloClouds3"], showerflow_names=[f"ShowerFlow_original_{i}" for i in [10]],
+            configs=configs
+        )
+        models.update(caloclouds)
+
+    if True:
+        configs = caloclouds_3.Configs()
+        configs.device = 'cpu'
+        configs.cond_features = 2  # number of conditioning features (i.e. energy+points=2)
+        configs.cond_features_names = ["energy", "points"]
+        configs.shower_flow_cond_features = ["energy"]
+        configs.dataset_path = static_dataset
+        configs.n_dataset_files = static_n_files
+        configs.dataset_path_in_storage = False
+        showerflow_paths = ["/data/dust/user/dayhallh/point-cloud-diffusion-data/showerFlow/p22_th90_ph90_en10-100/ShowerFlow_original_nb10_inputs36893488147419103231_best.pth"]
+        caloclouds_paths = ["/data/dust/user/dayhallh/point-cloud-diffusion-logs/from_anatoli/CC2/CD_2023_07_07__16_32_09/ckpt_0.000000_1120000.pt"]
+        caloclouds = get_caloclouds_models(
+            caloclouds_paths=caloclouds_paths, showerflow_paths=showerflow_paths, caloclouds_names=["CaloClouds2"], showerflow_names=["ShowerFlow_CC2"],
+            configs=configs
+        )
+        models.update(caloclouds)
 except FileNotFoundError as e:
     print("CaloClouds models not found")
     print(e)
@@ -132,14 +162,14 @@ accum_path = None
 
 
 def main(
-    configs=Configs(),
+    configs,
     redo_g4_data=False,
     redo_g4_acc_data=False,
     redo_model_data=False,
     max_g4_events=10_000,
     max_model_events=10_000,
     models=models,
-    accumulator_path=accum_path,
+    accumulator_path=None, #accum_path,
 ):
     """
     Run me like a script to create the metrics used in
@@ -169,8 +199,6 @@ def main(
     accumulator_path : str
         The path to the accumulator to use for the g4 accumulator data.
     """
-    configs.showerflow_precision = sf_precision
-    configs.diffusion_precision = precision
     # The input configs that will be used for the g4 data
     # plus to get detector ceilings and floors.
     # also, it's dataset path must be correct, or the g4 data will not be found.
@@ -219,11 +247,6 @@ def main(
 
     for model_name in models:
         model, shower_flow, model_configs = models[model_name]
-        model_configs.showerflow_precision = sf_precision
-        model_configs.diffusion_precision = precision
-        # configs.logdir = "/home/dayhallh/training/point-cloud-diffusion-logs"
-        model_configs.dataset_path = dataset_path
-        model_configs.n_dataset_files = 10
 
         save_path = get_path(configs, model_name)
 
@@ -234,6 +257,16 @@ def main(
                 n_events = min(n_g4_events, max_model_events)
             else:
                 n_events = n_g4_events
+            #model_ds = model_configs.dataset_path
+            model_configs.dataset_path_in_storage = False
+            model_configs.dataset_path = configs.dataset_path
+            model_configs.n_dataset_files = configs.n_dataset_files
+            sample_cond, _= read_raw_regaxes_withcond(
+                model_configs,
+                total_size=n_events,
+                for_model=["showerflow", "diffusion"],
+            )
+            #model_configs.dataset_path = model_ds
 
             # Standard normalised model output
             xyz_limits = [[-1, 1], [-1, 1], [0, 29]]
@@ -273,8 +306,8 @@ def main(
                 cell_thickness_global,
                 gun_pos,
             )
-            some_energies, some_events = sample_model(
-                model_configs, binned, n_events, model, shower_flow
+            conditioned_sample_model(
+                model_configs, binned, sample_cond, model, shower_flow
             )
 
             print(f"Saving {model_name} to {save_path}")
@@ -314,35 +347,12 @@ def main(
     else:
         binned_acc = BinnedData.load(acc_save_path)
 
-    try:
-        # Print some stats for a sanity check
-        g4_energy, g4_events = read_raw_regaxes(configs, pick_events=slice(0, 100))
-        some_energies = some_energies.detach().cpu().numpy()
-        for name, (
-            type_inci,
-            type_events,
-        ) in {
-            "g4": (g4_energy, g4_events),
-            "model": (some_energies, some_events),
-        }.items():
-            print(name)
-            es = type_events[:, :, 3]
-            mask = es > 0
-            es = es[mask]
-            xs = type_events[:, :, 0][mask]
-            ys = type_events[:, :, 1][mask]
-            zs = type_events[:, :, 2][mask]
-
-            for func in [np.min, np.max, np.mean, np.std]:
-                print(
-                    f"{func.__name__} \t [{func(type_inci):.2f}] -> "
-                    f"({func(xs):.2f}, {func(ys):.2f}, "
-                    f"{func(zs):.2f}, {func(es*100):.2f})"
-                )
-            print()
-    except Exception:
-        print("Could not print stats")
-
 
 if __name__ == "__main__":
-    main()
+    configs = caloclouds_3_simple_shower.Configs()
+    configs.device = 'cpu'
+    configs.dataset_path_in_storage = False
+    configs._dataset_path = static_dataset
+    configs.n_dataset_files = static_n_files
+    configs.dataset_tag = "p22_th90_ph90_en10-100"
+    main(configs)

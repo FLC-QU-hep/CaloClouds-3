@@ -27,5 +27,5 @@ calchal=\
 "/10-90GeV_x36_grid_regular_524k_float32.hdf5"
 
 
-python3 scripts/main.py caloclouds_3_simple_shower dataset_path=$anatolli_data \
-    n_dataset_files=88 shower_flow_version=original shower_flow_num_blocks=4 diffusion_precision=float32 tag=float32
+python3 scripts/main.py caloclouds_3_simple_shower dataset_path=$gun_henry_path \
+    n_dataset_files=10 shower_flow_version=alt1 shower_flow_num_blocks=2
