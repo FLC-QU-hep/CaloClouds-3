@@ -56,6 +56,7 @@ class epicVAE_nFlow_kDiffusion(Module):
                 point_dim=args.features,
                 context_dim=args.latent_dim + cond_dim,
                 residual=args.residual,
+                args=args,
             )
         else:
             if args.dropout_mode == "all":
@@ -497,7 +498,7 @@ class Denoiser(torch.nn.Module):
 
 class PointwiseNet_kDiffusion(Module):
 
-    def __init__(self, point_dim, context_dim, residual):
+    def __init__(self, point_dim, context_dim, residual, args=None):
         super().__init__()
         time_dim = 64
         fourier_scale = (
@@ -506,14 +507,19 @@ class PointwiseNet_kDiffusion(Module):
 
         self.act = functional.leaky_relu
         self.residual = residual
+        hidden_1 = getattr(args, "diffusion_pointwise_hidden_l1", 128)  # newer models have 32
+        hidden_2 = getattr(args, "diffusion_pointwise_hidden_l2", hidden_1*2)
+        hidden_3 = getattr(args, "diffusion_pointwise_hidden_l3", hidden_2*2)
+        hidden_4 = getattr(args, "diffusion_pointwise_hidden_l4", hidden_2)
+        hidden_5 = getattr(args, "diffusion_pointwise_hidden_l5", hidden_1)
         self.layers = ModuleList(
             [
-                ConcatSquashLinear(point_dim, 128, context_dim + time_dim),
-                ConcatSquashLinear(128, 256, context_dim + time_dim),
-                ConcatSquashLinear(256, 512, context_dim + time_dim),
-                ConcatSquashLinear(512, 256, context_dim + time_dim),
-                ConcatSquashLinear(256, 128, context_dim + time_dim),
-                ConcatSquashLinear(128, point_dim, context_dim + time_dim),
+                ConcatSquashLinear(point_dim, hidden_1, context_dim + time_dim),
+                ConcatSquashLinear(hidden_1, hidden_2, context_dim + time_dim),
+                ConcatSquashLinear(hidden_2, hidden_3, context_dim + time_dim),
+                ConcatSquashLinear(hidden_3, hidden_4, context_dim + time_dim),
+                ConcatSquashLinear(hidden_4, hidden_5, context_dim + time_dim),
+                ConcatSquashLinear(hidden_5, point_dim, context_dim + time_dim),
             ]
         )
 

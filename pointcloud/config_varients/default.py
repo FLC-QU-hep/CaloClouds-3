@@ -23,6 +23,7 @@ class Configs:
         self.features = 4
         self.kl_weight = 1e-3  # default: 0.001 = 1e-3
         self.residual = False  # choices=[True, False]   # !! for CaloClouds was True, but for EDM False might be better (?)
+        self.diffusion_pointwise_hidden_l1 = 128  # newer models have 32
 
         self.cond_features = 2  # number of conditioning features (i.e. energy+points=2)
         self.norm_cond = True  # normalize conditioniong to [-1,1]

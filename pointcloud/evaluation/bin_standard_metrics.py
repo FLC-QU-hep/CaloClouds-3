@@ -852,7 +852,6 @@ def get_caloclouds_models(
     caloclouds_names="CaloClouds3",
     showerflow_names="",
     configs=None,
-    distillation=True,
 ):
     """
     Gather a set of models for evaluation. Currently just one.
@@ -888,6 +887,7 @@ def get_caloclouds_models(
     if configs is None:
         configs = Configs()
     configs.device = device
+    distillation = getattr(configs, "distillation", False)
 
     if isinstance(caloclouds_paths, str):
         caloclouds_paths = [caloclouds_paths]
