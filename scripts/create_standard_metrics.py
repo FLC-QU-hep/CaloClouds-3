@@ -10,7 +10,8 @@ import numpy as np
 import torch
 import os
 
-from pointcloud.config_varients import caloclouds_3_simple_shower, caloclouds_3, default
+from pointcloud.config_varients import caloclouds_3_simple_shower, caloclouds_3, default, caloclouds_2
+
 
 from pointcloud.utils.metadata import Metadata
 from pointcloud.utils.detector_map import floors_ceilings
@@ -51,6 +52,8 @@ torch.set_default_dtype(torch.float32)
 
 static_dataset = "/data/dust/user/dayhallh/data/ILCsoftEvents/p22_th90_ph90_en10-100_joined/p22_th90_ph90_en10-100_seed{}_all_steps.hdf5"
 static_n_files = 10
+
+static_stats = np.load("/data/dust/user/dayhallh/data/ILCsoftEvents/p22_th90_ph90_en10-100_joined/stats.npz")
 
 angular_dataset = caloclouds_3_simple_shower.Configs().dataset_path
 angular_n_files = caloclouds_3_simple_shower.Configs().n_dataset_files
@@ -105,10 +108,31 @@ try:
            for part in parts
         ]
 
+
         caloclouds = get_caloclouds_models(
             caloclouds_paths=[caloclouds_path], showerflow_paths=showerflow_paths, caloclouds_names=["CaloClouds3"], showerflow_names=[f"ShowerFlow_a1_fnorms_{i}" for i in [2, ]],
             configs=configs
         )
+
+        # generate some custom metadata that will allow comparison between this model and the old model
+        train_dataset_meta = Metadata(caloclouds_3_simple_shower.Configs())
+        meta_here = Metadata(caloclouds_2.Configs())
+        meta_here.n_pts_rescale = train_dataset_meta.n_pts_rescale
+
+        #meta_here.n_pts_rescale = 500
+        #meta_here.vis_eng_rescale = train_dataset_meta.vis_eng_rescale/meta_here.vis_eng_rescale
+        #meta_here.std_cog = train_dataset_meta.std_cog/meta_here.std_cog
+        meta_here.std_cog = train_dataset_meta.std_cog
+        #meta_here.mean_cog = train_dataset_meta.mean_cog/meta_here.mean_cog
+        meta_here.mean_cog = train_dataset_meta.mean_cog
+        meta_here.incident_rescale = 127
+    
+        print('\n~~~~~~~~\n')
+        print(repr(meta_here))
+        print('\n~~~~~~~~\n')
+
+        caloclouds["CaloClouds3-ShowerFlow_a1_fnorms_2"][2].metadata = meta_here
+
         models.update(caloclouds)
 
     if False:  #  old model, angular dataset
@@ -132,20 +156,44 @@ try:
         models.update(caloclouds)
 
     if True:
-        configs = caloclouds_3.Configs()
+        configs = caloclouds_2.Configs()
         configs.device = 'cpu'
         configs.cond_features = 2  # number of conditioning features (i.e. energy+points=2)
         configs.cond_features_names = ["energy", "points"]
         configs.shower_flow_cond_features = ["energy"]
-        configs.dataset_path = static_dataset
         configs.n_dataset_files = static_n_files
         configs.dataset_path_in_storage = False
+        configs.dataset_path = static_dataset
         showerflow_paths = ["/data/dust/user/dayhallh/point-cloud-diffusion-data/showerFlow/p22_th90_ph90_en10-100/ShowerFlow_original_nb10_inputs36893488147419103231_best.pth"]
         caloclouds_paths = ["/data/dust/user/dayhallh/point-cloud-diffusion-logs/from_anatoli/CC2/CD_2023_07_07__16_32_09/ckpt_0.000000_1120000.pt"]
         caloclouds = get_caloclouds_models(
             caloclouds_paths=caloclouds_paths, showerflow_paths=showerflow_paths, caloclouds_names=["CaloClouds2"], showerflow_names=["ShowerFlow_CC2"],
             configs=configs
         )
+
+        train_dataset_meta = Metadata(configs)
+        meta_here = Metadata(caloclouds_2.Configs())
+        #meta_here.n_pts_rescale = train_dataset_meta.n_pts_rescale
+        meta_here.n_pts_rescale = 7864
+        meta_here.vis_eng_rescale = train_dataset_meta.vis_eng_rescale
+        #meta_here.vis_eng_rescale = 3.4
+        meta_here.std_cog = static_stats["std_cog"][[2, 0, 1]]
+        meta_here.mean_cog = static_stats["mean_cog"][[2, 0, 1]]
+        meta_here.mean_cog[:] = 0
+        meta_here.incident_rescale = 100
+        #meta_here.incident_rescale = 127
+
+        #caloclouds["CaloClouds2-ShowerFlow_CC2"][2].max_points = 6_000
+        caloclouds["CaloClouds2-ShowerFlow_CC2"][2].max_points = 5_000
+
+        print('\n~~~~~~~~\n')
+        print("CC2")
+        print(repr(meta_here))
+        print(caloclouds["CaloClouds2-ShowerFlow_CC2"][2].max_points)
+        print('\n~~~~~~~~\n')
+
+        caloclouds["CaloClouds2-ShowerFlow_CC2"][2].metadata = meta_here
+
         models.update(caloclouds)
 except FileNotFoundError as e:
     print("CaloClouds models not found")
@@ -204,7 +252,6 @@ def main(
     # also, it's dataset path must be correct, or the g4 data will not be found.
     # so also hold onto it for the configs of the models, which may have
     # incorrect dataset paths.
-    dataset_path = configs.dataset_path
     meta = Metadata(configs)
     floors, ceilings = floors_ceilings(
         meta.layer_bottom_pos_hdf5, meta.cell_thickness_hdf5, 0
@@ -248,6 +295,11 @@ def main(
     for model_name in models:
         model, shower_flow, model_configs = models[model_name]
 
+        model_configs.dataset_path_in_storage = False
+        model_configs.dataset_path = configs.dataset_path
+        model_configs.n_dataset_files = configs.n_dataset_files
+
+
         save_path = get_path(configs, model_name)
 
         if redo_model_data or not os.path.exists(save_path):
@@ -257,23 +309,18 @@ def main(
                 n_events = min(n_g4_events, max_model_events)
             else:
                 n_events = n_g4_events
-            #model_ds = model_configs.dataset_path
-            model_configs.dataset_path_in_storage = False
-            model_configs.dataset_path = configs.dataset_path
-            model_configs.n_dataset_files = configs.n_dataset_files
             sample_cond, _= read_raw_regaxes_withcond(
                 model_configs,
                 total_size=n_events,
                 for_model=["showerflow", "diffusion"],
             )
-            #model_configs.dataset_path = model_ds
 
             # Standard normalised model output
             xyz_limits = [[-1, 1], [-1, 1], [0, 29]]
             layer_bottom_pos = np.linspace(-0.1, 28.9, 30)
             cell_thickness_global = 0.5
             rescale_energy = 1e3
-            gun_pos = np.array([0, -70, 0])
+            gun_pos = np.array([50, -50, 0])
 
             if "caloclouds" in model_name.lower():  # this model unnorms itself.
 
@@ -287,7 +334,6 @@ def main(
                 ]
                 layer_bottom_pos = meta.layer_bottom_pos_global
                 rescale_energy = 1e3
-                gun_pos = np.array([0, -50, 0])
             elif "fish" in model_name.lower():
                 xyz_limits = [
                     [-1, 1],

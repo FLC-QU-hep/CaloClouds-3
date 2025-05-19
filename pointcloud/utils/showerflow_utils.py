@@ -284,12 +284,12 @@ def construct_configs(config_base, saved_models, idx):
     return configs
 
 
-def truescale_showerflow_output(samples, config, metadata=None):
+def truescale_showerflow_output(samples, config):
     # check what inputs are expected
     inputs_mask = get_input_mask(config)
     bs = samples.shape[0]
-    if metadata is None:
-        metadata = Metadata(config)
+    # if config has a metadata attr, that would be pulled here
+    metadata = Metadata(config)
     # name samples
     reached = 0
     if inputs_mask[0]:

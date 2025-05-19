@@ -24,6 +24,8 @@ class Configs(default.Configs):
 
         self.cond_features = 4  # number of conditioning features (i.e. energy+points=2)
         self.cond_features_names = ["energy", "p_norm_local"]
+        self.distillation = True
+        self.diffusion_pointwise_hidden_l1 = 32
 
         self.shower_flow_version = 'alt1'  # options: ['original', 'alt1', 'alt2']
         self.shower_flow_cond_features = ["energy", "p_norm_local"]

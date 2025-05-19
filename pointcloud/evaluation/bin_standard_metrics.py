@@ -409,6 +409,8 @@ class BinnedData:
         energy_per_shower = np.sum(rescaled[:, :, 3] * mask, axis=1)
         self.counts[6] += np.histogram(energy_per_shower, self.bins[6])[0]
 
+        #import ipdb
+        #ipdb.set_trace()
         with np.errstate(divide="ignore", invalid="ignore"):
             for i in range(3):
                 cog = (

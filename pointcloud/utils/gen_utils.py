@@ -7,7 +7,7 @@ from .metadata import Metadata
 from ..configs import Configs
 
 from .showerflow_utils import truescale_showerflow_output
-from ..data.conditioning import get_cond_features_names, normalise_cond_feats
+from ..data.conditioning import get_cond_features_names, normalise_cond_feats, is_cc2_diffusion
 
 
 def get_cog(x, y, z, e):
@@ -191,7 +191,6 @@ def _shower_batch_arg_parser(*args, **kwargs):
     return arg_values.values()
 
 
-
 # batch inference
 def gen_showers_batch(
     *args,
@@ -305,7 +304,6 @@ def gen_cond_showers_batch(
     coef_fake=None,
     n_scaling=True,
     n_splines=None,
-    metadata=None,
 ):
     """
     Generate a batch of showers for evaluation purposes.
@@ -374,7 +372,6 @@ def gen_cond_showers_batch(
             "coef_fake": coef_fake,
             "n_scaling": n_scaling,
             "n_splines": n_splines,
-            "metadata": metadata,
         }
     seperate_showerflow_cond = isinstance(cond, dict)
     if seperate_showerflow_cond:
@@ -430,7 +427,6 @@ def cond_batcher(batch_size, cond, showerflow_cond=None):
         yield cond_batch
 
 
-
 def gen_wish_inner_batch(cond_batch, destination_array, first_index, model):
     """
     Generate a batch of showers using the Wish model
@@ -457,19 +453,10 @@ def gen_wish_inner_batch(cond_batch, destination_array, first_index, model):
     destination_array[first_index:last_index] = model.sample(cond_batch, max_points)
 
 
-
-def is_cc2_diffusion(config):
-    # this is not a very strong test, but it will hopefully work
-    if config.cond_features == 2:
-        return True
-    return False
-
-
 def rotate_cc2_diffusion_output(cc2_shower):
     # must rotate 90 in x-y and 90 in x-z
     cc2_shower = cc2_shower[:, :, [2, 0, 1, 3]]
     return cc2_shower
-
 
 
 def gen_v1_inner_batch(
@@ -483,7 +470,6 @@ def gen_v1_inner_batch(
     coef_fake=None,
     n_scaling=True,
     n_splines=None,
-    metadata=None,
 ):
     """
     Generate a batch of showers using any of the v1 style models
@@ -539,8 +525,7 @@ def gen_v1_inner_batch(
     cond_batch = normalise_cond_feats(config, cond_batch, "diffusion")
     showerflow_cond = normalise_cond_feats(config, showerflow_cond, "showerflow")
 
-    if metadata is None:
-        metadata = Metadata(config)
+    metadata = Metadata(config)
     bs = cond_batch.size(0)
 
     # sample from shower flow
@@ -565,7 +550,7 @@ def gen_v1_inner_batch(
         _,
         clusters_per_layer_gen,
         e_per_layer_gen,
-    ) = truescale_showerflow_output(samples, config, metadata)
+    ) = truescale_showerflow_output(samples, config)
 
     scale_factor = 1.0
     if n_scaling:
@@ -609,6 +594,9 @@ def gen_v1_inner_batch(
     fake_showers = fake_showers.detach().cpu().numpy()
     if is_cc2_diffusion(config):
         fake_showers = rotate_cc2_diffusion_output(fake_showers)
+    else: # its CC3 and we need to un-log the energy
+        fake_showers[:, :, 3] = np.exp(fake_showers[:, :, 3]*metadata.log_incident_std + metadata.log_incident_mean)
+
 
     # if np.isnan(fake_showers).sum() != 0:
     #       return fake_showers

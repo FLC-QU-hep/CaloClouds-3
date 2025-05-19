@@ -6,6 +6,16 @@ from ..utils.metadata import Metadata
 from .read_write import read_raw_regaxes, get_files
 
 
+def is_cc2_diffusion(config):
+    # this is not a very strong test, but it will hopefully work
+    if (
+        config.cond_features == 2
+        and not getattr(config, "diffusion_pointwise_hidden_l1", 0) == 32
+    ):
+        return True
+    return False
+
+
 def get_cond_features_names(config, for_model):
     """
     Get the names of the conditioning features for the model.
@@ -135,8 +145,10 @@ def normalise_cond_feats(config, cond_feats, for_model):
             idx = start_positions[names.index("energy")]
             if for_model == "showerflow":
                 cond_feats[:, idx] /= torch.tensor(meta.incident_rescale)
-            else:
-                cond_feats[:, idx] = (cond_feats[:, idx] / 100) * 2 - 1
+            elif is_cc2_diffusion(config):
+                cond_feats[:, idx] = (cond_feats[:, idx] / meta.incident_rescale) * 2 - 1
+            else:  # CC3 diffusion
+                cond_feats[:, idx] = (cond_feats[:, idx].log() - meta.log_incident_mean)/meta.log_incident_std
         if "n_points" in names:
             idx = start_positions[names.index("n_points")]
             n = cond_feats[:, idx]

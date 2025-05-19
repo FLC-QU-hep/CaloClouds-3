@@ -59,8 +59,14 @@ class Metadata:
         Automatically constructed from what is found in the metadata folder.
         """
         self.config = config
-        self.metadata_folder = get_metadata_folder(config)
-        self._load_top_level()
+        if hasattr(config, "metadata"):
+            self.metadata_folder = config.metadata.metadata_folder
+            self.found_attrs = config.metadata.found_attrs
+            for attr in config.metadata.found_attrs:
+                setattr(self, attr, getattr(config.metadata, attr))
+        else:
+            self.metadata_folder = get_metadata_folder(config)
+            self._load_top_level()
 
     def _load_top_level(self):
         """
