@@ -547,10 +547,15 @@ def gen_v1_inner_batch(
         energies,
         cog_x,
         cog_y,
-        _,
+        cog_z,
         clusters_per_layer_gen,
         e_per_layer_gen,
     ) = truescale_showerflow_output(samples, config)
+
+    if getattr(config, "shower_flow_roll_xyz", False):
+        assert cog_z is not None
+        # it's a CC2 thing...
+        cog_x, cog_y, cog_z = cog_z, cog_x, cog_y
 
     scale_factor = 1.0
     if n_scaling:
@@ -595,7 +600,7 @@ def gen_v1_inner_batch(
     if is_cc2_diffusion(config):
         fake_showers = rotate_cc2_diffusion_output(fake_showers)
     else: # its CC3 and we need to un-log the energy
-        fake_showers[:, :, 3] = np.exp(fake_showers[:, :, 3]*metadata.log_incident_std + metadata.log_incident_mean)
+        fake_showers[:, :, 3] = np.exp(fake_showers[:, :, 3]*metadata.log_incident_std*2 + metadata.log_incident_mean)
 
 
     # if np.isnan(fake_showers).sum() != 0:

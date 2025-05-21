@@ -143,12 +143,10 @@ def normalise_cond_feats(config, cond_feats, for_model):
         start_positions = [sum(lengths[:i]) for i in range(len(lengths))]
         if "energy" in names:
             idx = start_positions[names.index("energy")]
-            if for_model == "showerflow":
-                cond_feats[:, idx] /= torch.tensor(meta.incident_rescale)
-            elif is_cc2_diffusion(config):
+            if for_model == "diffusion" and is_cc2_diffusion(config):
                 cond_feats[:, idx] = (cond_feats[:, idx] / meta.incident_rescale) * 2 - 1
-            else:  # CC3 diffusion
-                cond_feats[:, idx] = (cond_feats[:, idx].log() - meta.log_incident_mean)/meta.log_incident_std
+            else:
+                cond_feats[:, idx] /= torch.tensor(meta.incident_rescale)
         if "n_points" in names:
             idx = start_positions[names.index("n_points")]
             n = cond_feats[:, idx]

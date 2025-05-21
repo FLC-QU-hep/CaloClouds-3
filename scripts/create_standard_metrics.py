@@ -91,41 +91,48 @@ try:
         configs = caloclouds_3_simple_shower.Configs()
         configs.device = 'cpu'
         configs.cond_features = 4
+        configs.diffusion_pointwise_hidden_l1 = 32
+        configs.distillation = True
         configs.cond_features_names = ["energy", "p_norm_local"]
-        caloclouds_path = os.path.join(
-           log_base,
-           "sim-E1261AT600AP180-180/Anatoliis_cc_2.pt"
-           #"p22_th90_ph90_en10-100/CD_2024_08_23__16_13_16/ckpt_0.439563_30000.pt"
-           #"p22_th90_ph90_en10-100/CD_2024_08_23__16_13_16/ckpt_0.447468_870000.pt",
-        )
-        parts = [
-           f"alt1_nb{repeats}_inputs8070450532247928831_fnorms"
-           for repeats in [2, 10]
-        ]
-        showerflow_paths = [
-           os.path.join(data_base, "showerFlow/sim-E1261AT600AP180-180",
-           f"ShowerFlow_{part}_dhist_best.pth")
-           for part in parts
-        ]
+        caloclouds_paths = ["/data/dust/group/ilc/sft-ml/model_weights/CaloClouds/CC3/ckpt_0.000000_6135000.pt"]
+        showerflow_paths = ["/data/dust/group/ilc/sft-ml/model_weights/CaloClouds/CC3/ShowerFlow_alt1_nb2_inputs8070450532247928831_fnorms_dhist_best.pth"]
 
 
         caloclouds = get_caloclouds_models(
-            caloclouds_paths=[caloclouds_path], showerflow_paths=showerflow_paths, caloclouds_names=["CaloClouds3"], showerflow_names=[f"ShowerFlow_a1_fnorms_{i}" for i in [2, ]],
+            caloclouds_paths=caloclouds_paths, showerflow_paths=showerflow_paths, caloclouds_names=["CaloClouds3"], showerflow_names=["ShowerFlow_a1_fnorms_2"],
             configs=configs
         )
+
+        dataset_stats = np.load("/data/dust/user/dayhallh/data/ILCsoftEvents/p22_th90_ph90_en10-100_joined/stats.npz")
+        cc3_stats = np.load(showerflow_paths[0].replace(".pth", "_stats_cond_p22_th90_ph90_en10-100.npz"))
 
         # generate some custom metadata that will allow comparison between this model and the old model
         train_dataset_meta = Metadata(caloclouds_3_simple_shower.Configs())
         meta_here = Metadata(caloclouds_2.Configs())
-        meta_here.n_pts_rescale = train_dataset_meta.n_pts_rescale
 
-        #meta_here.n_pts_rescale = 500
-        #meta_here.vis_eng_rescale = train_dataset_meta.vis_eng_rescale/meta_here.vis_eng_rescale
-        #meta_here.std_cog = train_dataset_meta.std_cog/meta_here.std_cog
-        meta_here.std_cog = train_dataset_meta.std_cog
-        #meta_here.mean_cog = train_dataset_meta.mean_cog/meta_here.mean_cog
-        meta_here.mean_cog = train_dataset_meta.mean_cog
         meta_here.incident_rescale = 127
+        meta_here.n_pts_rescale = train_dataset_meta.n_pts_rescale
+        meta_here.vis_eng_rescale = train_dataset_meta.vis_eng_rescale/meta_here.vis_eng_rescale
+
+        meta_here.mean_cog[:2] = -cc3_stats["cog_x_mean"], -cc3_stats["cog_y_mean"]
+        meta_here.std_cog = 1./dataset_stats["std_cog"][[2,0,1]]
+
+        meta_here.log_incident_mean = train_dataset_meta.log_incident_mean
+        meta_here.log_incident_std = train_dataset_meta.log_incident_std
+        meta_here.found_attrs += ["log_incident_mean", "log_incident_std"]
+
+        # internally, showers are assumed to be scaled between 0 and 1
+        # but in cc3, they are actually normalised to std=0.5 mean=0
+        # so we can alter Zmax_global, Zmin_global, Xmax_global and Xmin_global
+        # to get the scaling needed
+        Xmean, Ymean, Zmean = -0.0074305227, -0.21205868, 12.359252
+        Xstd, Ystd, Zstd = 22.4728036, 23.65837968, 5.305082
+
+        meta_here.Xmax_global = Ymean
+        meta_here.Xmin_global = 2*Ystd - Ymean
+        meta_here.Zmax_global = Xmean
+        meta_here.Zmin_global = 2*Xstd - Xmean
+
     
         print('\n~~~~~~~~\n')
         print(repr(meta_here))
@@ -164,27 +171,26 @@ try:
         configs.n_dataset_files = static_n_files
         configs.dataset_path_in_storage = False
         configs.dataset_path = static_dataset
-        showerflow_paths = ["/data/dust/user/dayhallh/point-cloud-diffusion-data/showerFlow/p22_th90_ph90_en10-100/ShowerFlow_original_nb10_inputs36893488147419103231_best.pth"]
-        caloclouds_paths = ["/data/dust/user/dayhallh/point-cloud-diffusion-logs/from_anatoli/CC2/CD_2023_07_07__16_32_09/ckpt_0.000000_1120000.pt"]
+        configs.shower_flow_roll_xyz = True
+        configs.distillation = True
+        configs.max_points = 6_000
+        showerflow_paths = ["/data/dust/group/ilc/sft-ml/model_weights/CaloClouds/CC2/220714_cog_e_layer_ShowerFlow_best.pth"]
+        caloclouds_paths = ["/data/dust/group/ilc/sft-ml/model_weights/CaloClouds/CC2/ckpt_0.000000_1000000.pt"]
+
         caloclouds = get_caloclouds_models(
             caloclouds_paths=caloclouds_paths, showerflow_paths=showerflow_paths, caloclouds_names=["CaloClouds2"], showerflow_names=["ShowerFlow_CC2"],
             configs=configs
         )
 
+        cc2_stats = np.load(showerflow_paths[0].replace(".pth", "_stats_cond_p22_th90_ph90_en10-100.npz"))
+
         train_dataset_meta = Metadata(configs)
         meta_here = Metadata(caloclouds_2.Configs())
-        #meta_here.n_pts_rescale = train_dataset_meta.n_pts_rescale
-        meta_here.n_pts_rescale = 7864
-        meta_here.vis_eng_rescale = train_dataset_meta.vis_eng_rescale
-        #meta_here.vis_eng_rescale = 3.4
-        meta_here.std_cog = static_stats["std_cog"][[2, 0, 1]]
-        meta_here.mean_cog = static_stats["mean_cog"][[2, 0, 1]]
-        meta_here.mean_cog[:] = 0
+        meta_here.n_pts_rescale = 5000
+        meta_here.vis_eng_rescale = 1.
         meta_here.incident_rescale = 100
-        #meta_here.incident_rescale = 127
-
-        #caloclouds["CaloClouds2-ShowerFlow_CC2"][2].max_points = 6_000
-        caloclouds["CaloClouds2-ShowerFlow_CC2"][2].max_points = 5_000
+        meta_here.std_cog = 1/cc2_stats["cog_x_std"], 1/cc2_stats["cog_y_std"], 1/cc2_stats["cog_z_std"]
+        meta_here.mean_cog = -cc2_stats["cog_x_mean"], -cc2_stats["cog_y_mean"], -cc2_stats["cog_z_mean"]
 
         print('\n~~~~~~~~\n')
         print("CC2")
