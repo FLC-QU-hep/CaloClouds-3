@@ -123,10 +123,6 @@ def _shower_batch_arg_parser(*args, **kwargs):
         "num": 2000,
         "bs": 32,
         "config": Configs(),
-        "coef_real": None,
-        "coef_fake": None,
-        "n_scaling": True,
-        "n_splines": None,
     }
     arg_positions = [
         "model",
@@ -136,10 +132,6 @@ def _shower_batch_arg_parser(*args, **kwargs):
         "num",
         "bs",
         "config",
-        "coef_real",
-        "coef_fake",
-        "n_scaling",
-        "n_splines",
     ]
     config_pos = arg_positions.index("config")
     if "config" in kwargs:
@@ -226,23 +218,6 @@ def gen_showers_batch(
         The configuration object. Used to determine the device
         and the model.
         (default is Configs())
-    coef_real : list
-        The coefficients of the real energy calibration polynomial,
-        only used for v1 style models.
-        (default is None)
-    coef_fake : list
-        The coefficients of the fake energy calibration polynomial,
-        only used for v1 style models.
-        (default is None)
-    n_scaling : bool
-        Whether to scale the number of clusters or not.
-        Only used for v1 style models.
-        (default is True)
-    n_splines : dict
-        The spline models for the number of clusters.
-        Alterative to coef_real and coef_fake.
-        Only used for v1 style models.
-        (default is None)
 
     Returns
     -------
@@ -262,10 +237,6 @@ def gen_showers_batch(
         num,
         bs,
         config,
-        coef_real,
-        coef_fake,
-        n_scaling,
-        n_splines,
     ) = _shower_batch_arg_parser(*args, **kwargs)
 
     # TODO generalise
@@ -285,10 +256,6 @@ def gen_showers_batch(
         cond,
         bs,
         config,
-        coef_real,
-        coef_fake,
-        n_scaling,
-        n_splines,
     )
     cond = cond.detach().cpu().numpy()
     return fake_showers, cond
@@ -300,10 +267,6 @@ def gen_cond_showers_batch(
     cond=None,
     bs=32,
     config=Configs(),
-    coef_real=None,
-    coef_fake=None,
-    n_scaling=True,
-    n_splines=None,
 ):
     """
     Generate a batch of showers for evaluation purposes.
@@ -328,19 +291,6 @@ def gen_cond_showers_batch(
     config : configs.Configs
         The configuration object. Used to determine the device
         and the model.
-    coef_real : list
-        The coefficients of the real energy calibration polynomial,
-        only used for v1 style models.
-    coef_fake : list
-        The coefficients of the fake energy calibration polynomial,
-        only used for v1 style models.
-    n_scaling : bool
-        Whether to scale the number of clusters or not.
-        Only used for v1 style models.
-    n_splines : dict
-        The spline models for the number of clusters.
-        Alterative to coef_real and coef_fake.
-        Only used for v1 style models.
 
     Returns
     -------
@@ -368,10 +318,6 @@ def gen_cond_showers_batch(
             "model": model,
             "shower_flow": shower_flow,
             "config": config,
-            "coef_real": coef_real,
-            "coef_fake": coef_fake,
-            "n_scaling": n_scaling,
-            "n_splines": n_splines,
         }
     seperate_showerflow_cond = isinstance(cond, dict)
     if seperate_showerflow_cond:
@@ -466,10 +412,6 @@ def gen_v1_inner_batch(
     model,
     shower_flow,
     config=Configs(),
-    coef_real=None,
-    coef_fake=None,
-    n_scaling=True,
-    n_splines=None,
 ):
     """
     Generate a batch of showers using any of the v1 style models
@@ -492,19 +434,6 @@ def gen_v1_inner_batch(
     config : configs.Configs
         The configuration object. Used to determine the device
         and the model.
-    coef_real : list
-        The coefficients of the real energy calibration polynomial,
-        only used for v1 style models.
-    coef_fake : list
-        The coefficients of the fake energy calibration polynomial,
-        only used for v1 style models.
-    n_scaling : bool
-        Whether to scale the number of clusters or not.
-        Only used for v1 style models.
-    n_splines : dict
-        The spline models for the number of clusters.
-        Alterative to coef_real and coef_fake.
-        Only used for v1 style models.
 
     Returns
     -------
@@ -558,12 +487,17 @@ def gen_v1_inner_batch(
         cog_x, cog_y, cog_z = cog_z, cog_x, cog_y
 
     scale_factor = 1.0
-    if n_scaling:
+    if getattr(config, "shower_flow_n_scaling", True):
+        n_splines = getattr(config, "shower_flow_n_splines", None)
+        coef_real = getattr(config, "shower_flow_coef_real", None)
+        coef_fake = getattr(config, "shower_flow_coef_fake", None)
         if all(v is None for v in [n_splines, coef_real, coef_fake]):
             warnings.warn(
                 "Warning; not scaling number of clusters as no scaling parameters given"
             )
         else:
+            # Check the old repo for there - splines should be used in CC2!
+            # in C3 it's a single number
             scale_factor = get_scale_factor(
                 num_clusters, coef_real, coef_fake, n_splines
             )  # B,1

@@ -35,6 +35,7 @@ from pointcloud.models.shower_flow import (
 
 
 def main(configs, batch_size=2048, total_epochs=1_000_000_000, shuffle=True):
+#def main(configs, batch_size=64, total_epochs=1_000_000_000, shuffle=True):
     """
     Really this is a script, but for ease of testing, it's the main function.
     """
@@ -317,8 +318,8 @@ def main(configs, batch_size=2048, total_epochs=1_000_000_000, shuffle=True):
                 mean_parameter.append(torch.mean(parameter_list).item())
                 max_parameter.append(torch.max(parameter_list).item())
 
+        mean_loss = np.mean(loss_list[-batch_len:])
         if not detailed_history:
-            mean_loss = np.mean(loss_list)
             epoch_nums.append(epoch)
             losses.append(mean_loss)
 

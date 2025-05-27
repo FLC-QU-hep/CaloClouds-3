@@ -95,7 +95,8 @@ try:
         configs.distillation = True
         configs.cond_features_names = ["energy", "p_norm_local"]
         caloclouds_paths = ["/data/dust/group/ilc/sft-ml/model_weights/CaloClouds/CC3/ckpt_0.000000_6135000.pt"]
-        showerflow_paths = ["/data/dust/group/ilc/sft-ml/model_weights/CaloClouds/CC3/ShowerFlow_alt1_nb2_inputs8070450532247928831_fnorms_dhist_best.pth"]
+        #showerflow_paths = ["/data/dust/group/ilc/sft-ml/model_weights/CaloClouds/CC3/ShowerFlow_alt1_nb2_inputs8070450532247928831_fnorms_dhist_best.pth"]
+        showerflow_paths = ["/data/dust/group/ilc/sft-ml/model_weights/CaloClouds/CC3/ShowerFlow_alt1_nb2_inputs8070450532247928831_fnorms_best.pth"]
 
 
         caloclouds = get_caloclouds_models(
@@ -104,7 +105,7 @@ try:
         )
 
         dataset_stats = np.load("/data/dust/user/dayhallh/data/ILCsoftEvents/p22_th90_ph90_en10-100_joined/stats.npz")
-        cc3_stats = np.load(showerflow_paths[0].replace(".pth", "_stats_cond_p22_th90_ph90_en10-100.npz"))
+        #cc3_stats = np.load(showerflow_paths[0].replace(".pth", "_stats_cond_p22_th90_ph90_en10-100.npz"))
 
         # generate some custom metadata that will allow comparison between this model and the old model
         train_dataset_meta = Metadata(caloclouds_3_simple_shower.Configs())
@@ -112,10 +113,12 @@ try:
 
         meta_here.incident_rescale = 127
         meta_here.n_pts_rescale = train_dataset_meta.n_pts_rescale
-        meta_here.vis_eng_rescale = train_dataset_meta.vis_eng_rescale/meta_here.vis_eng_rescale
+        meta_here.vis_eng_rescale = 3.5
 
-        meta_here.mean_cog[:2] = -cc3_stats["cog_x_mean"], -cc3_stats["cog_y_mean"]
-        meta_here.std_cog = 1./dataset_stats["std_cog"][[2,0,1]]
+       # try as in interance
+        #meta_here.mean_cog[:] = [-4.06743696e-03, -2.27790998e-01,  1.10137465e+01]
+        meta_here.mean_cog[:] = [-4.06743696e-03, 0.321829,  1.10137465e+01]
+        meta_here.std_cog[:] = [1.24559791, 0.95357278, 2.59475371]
 
         meta_here.log_incident_mean = train_dataset_meta.log_incident_mean
         meta_here.log_incident_std = train_dataset_meta.log_incident_std
@@ -128,10 +131,14 @@ try:
         Xmean, Ymean, Zmean = -0.0074305227, -0.21205868, 12.359252
         Xstd, Ystd, Zstd = 22.4728036, 23.65837968, 5.305082
 
-        meta_here.Xmax_global = Ymean
-        meta_here.Xmin_global = 2*Ystd - Ymean
-        meta_here.Zmax_global = Xmean
-        meta_here.Zmin_global = 2*Xstd - Xmean
+        #meta_here.Xmax_global = Ymean
+        #meta_here.Xmin_global = 2*Ystd - Ymean
+        #meta_here.Zmax_global = Xmean
+        #meta_here.Zmin_global = 2*Xstd - Xmean
+        meta_here.Xmax_global = 2*Ymean
+        meta_here.Xmin_global = 2*(2*Ystd - Ymean)
+        meta_here.Zmax_global = 2*Xmean
+        meta_here.Zmin_global = 2*(2*Xstd - Xmean)
 
     
         print('\n~~~~~~~~\n')
@@ -173,24 +180,30 @@ try:
         configs.dataset_path = static_dataset
         configs.shower_flow_roll_xyz = True
         configs.distillation = True
-        configs.max_points = 6_000
-        showerflow_paths = ["/data/dust/group/ilc/sft-ml/model_weights/CaloClouds/CC2/220714_cog_e_layer_ShowerFlow_best.pth"]
+        #configs.max_points = 6_000
+        #configs.max_points = 30_000
+        #showerflow_paths = ["/data/dust/group/ilc/sft-ml/model_weights/CaloClouds/CC2/220714_cog_e_layer_ShowerFlow_best.pth"]
+        showerflow_paths = ["/data/dust/user/dayhallh/point-cloud-diffusion-data/showerFlow/p22_th90_ph90_en10-100/ShowerFlow_original_nb10_inputs36893488147419103231_dhist_best.pth"]
         caloclouds_paths = ["/data/dust/group/ilc/sft-ml/model_weights/CaloClouds/CC2/ckpt_0.000000_1000000.pt"]
+
 
         caloclouds = get_caloclouds_models(
             caloclouds_paths=caloclouds_paths, showerflow_paths=showerflow_paths, caloclouds_names=["CaloClouds2"], showerflow_names=["ShowerFlow_CC2"],
             configs=configs
         )
 
-        cc2_stats = np.load(showerflow_paths[0].replace(".pth", "_stats_cond_p22_th90_ph90_en10-100.npz"))
+        #cc2_stats = np.load(showerflow_paths[0].replace(".pth", "_stats_cond_p22_th90_ph90_en10-100.npz"))
 
         train_dataset_meta = Metadata(configs)
-        meta_here = Metadata(caloclouds_2.Configs())
-        meta_here.n_pts_rescale = 5000
-        meta_here.vis_eng_rescale = 1.
-        meta_here.incident_rescale = 100
-        meta_here.std_cog = 1/cc2_stats["cog_x_std"], 1/cc2_stats["cog_y_std"], 1/cc2_stats["cog_z_std"]
-        meta_here.mean_cog = -cc2_stats["cog_x_mean"], -cc2_stats["cog_y_mean"], -cc2_stats["cog_z_mean"]
+        #meta_here = Metadata(caloclouds_2.Configs())
+        meta_here = Metadata(configs)
+        #meta_here.n_pts_rescale = 5000
+        #meta_here.vis_eng_rescale = 2.5
+        #meta_here.incident_rescale = 100
+        #meta_here.std_cog = 1/cc2_stats["cog_x_std"], 1/cc2_stats["cog_y_std"], 1/cc2_stats["cog_z_std"]
+        #meta_here.mean_cog = -cc2_stats["cog_x_mean"], -cc2_stats["cog_y_mean"], -cc2_stats["cog_z_mean"]
+        #meta_here.mean_cog[:] = [0.3842599999999834, 0, 0.12772120012000343]
+        #meta_here.std_cog[:] = [4.864242154098466**2, 1, 3.2035606359259203**2]
 
         print('\n~~~~~~~~\n')
         print("CC2")
@@ -288,7 +301,7 @@ def main(
             meta.layer_bottom_pos_hdf5,
             meta.cell_thickness_hdf5,
             # meta.gun_xz_pos_raw)
-            np.array([0, -50, 0]),
+            np.array([10, 40, 0]),
         )
         sample_g4(configs, binned_g4, n_g4_events)
         binned_g4.save(g4_save_path)
@@ -326,7 +339,12 @@ def main(
             layer_bottom_pos = np.linspace(-0.1, 28.9, 30)
             cell_thickness_global = 0.5
             rescale_energy = 1e3
-            gun_pos = np.array([50, -50, 0])
+            if "3" in model_name:
+                gun_pos = np.array([60, 40, 0])
+            else:
+                gun_pos = np.array([10, 40, 0])
+            print(f"{model_name} gun pos: {gun_pos}")
+
 
             if "caloclouds" in model_name.lower():  # this model unnorms itself.
 
@@ -406,5 +424,8 @@ if __name__ == "__main__":
     configs.dataset_path_in_storage = False
     configs._dataset_path = static_dataset
     configs.n_dataset_files = static_n_files
+    #configs._dataset_path = angular_dataset
+    #configs.n_dataset_files = angular_n_files
     configs.dataset_tag = "p22_th90_ph90_en10-100"
+    #configs.dataset_tag = "sim-E1261AT600AP180-180"
     main(configs)

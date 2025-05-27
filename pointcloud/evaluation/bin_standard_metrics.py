@@ -7,7 +7,7 @@ from pointcloud.config_varients.wish import Configs
 from pointcloud.config_varients.wish_maxwell import Configs as MaxwellConfigs
 
 from pointcloud.utils.metadata import Metadata
-from pointcloud.utils.detector_map import floors_ceilings
+from pointcloud.utils import detector_map
 from pointcloud.data.conditioning import read_raw_regaxes_withcond, get_cond_dim
 from pointcloud.utils import showerflow_utils
 from pointcloud.models.wish import Wish
@@ -38,7 +38,7 @@ def try_mkdir(dir_name):
 
 configs = Configs()
 meta = Metadata(configs)
-floors, ceilings = floors_ceilings(
+floors, ceilings = detector_map.floors_ceilings(
     meta.layer_bottom_pos_hdf5, meta.cell_thickness_hdf5, 0
 )
 
@@ -107,7 +107,7 @@ class BinnedData:
         self.layer_bottom_pos = layer_bottom_pos
         self.cell_thickness = cell_thickness
         self.gun_xyz_pos = gun_xyz_pos
-        buffed_floors, buffed_ceilings = floors_ceilings(
+        buffed_floors, buffed_ceilings = detector_map.floors_ceilings(
             layer_bottom_pos, cell_thickness, 1.0
         )
         self.layer_bins = np.concatenate([buffed_floors, buffed_ceilings[[-1]]])
@@ -118,14 +118,14 @@ class BinnedData:
         self.bins = []
         self.counts = []
 
-        self.add_hist("sum hits", "radius [mm]", 0, 500, 32)
+        self.add_hist("sum clusters", "radius [mm]", 0, 500, 32)
         self.add_hist("sum energy [MeV]", "radius [mm]", 0, 500, 32)
-        self.add_hist("sum hits", "layers", 1, 30, 30)
+        self.add_hist("sum clusters", "layers", 1, 30, 30)
         self.add_hist("sum energy [MeV]", "layers", 1, 30, 30)
         self.add_hist(
-            "number of cells", "visible cell energy [MeV]", 0.000001, 1, 100, True
+            "number of clusters", "cluster energy [MeV]", 0.000001, 1, 100, True
         )
-        self.add_hist("number of showers", "number of hits", 0, 10000, 50)
+        self.add_hist("number of showers", "number of clusters", 0, 10000, 50)
         self.add_hist("number of showers", "energy sum [MeV]", 0, 10, 50)
         self.add_hist(
             "number of showers",
@@ -141,7 +141,7 @@ class BinnedData:
         )
         self.add_hist(
             "number of showers",
-            "center of gravity Z [mm]",
+            "center of gravity Z [layer]",
             *self.true_xyz_limits[2],
             60,
         )
@@ -181,7 +181,7 @@ class BinnedData:
 
     def recompute_mean_energies(self):
         """
-        Using the summed energy and hits, recompute the mean energy histograms.
+        Using the summed energy and clusters, recompute the mean energy histograms.
         Can be safely called multiple times.
         """
         mask = self.counts[0] > 0
@@ -232,7 +232,7 @@ class BinnedData:
         int
             Total showers in the dataset.
         """
-        hist_idx = self.hist_idx("number of showers", "number of hits")
+        hist_idx = self.hist_idx("number of showers", "number of clusters")
         return np.sum(self.counts[hist_idx])
 
     def dummy_xs(self, idx):
@@ -409,8 +409,6 @@ class BinnedData:
         energy_per_shower = np.sum(rescaled[:, :, 3] * mask, axis=1)
         self.counts[6] += np.histogram(energy_per_shower, self.bins[6])[0]
 
-        #import ipdb
-        #ipdb.set_trace()
         with np.errstate(divide="ignore", invalid="ignore"):
             for i in range(3):
                 cog = (
@@ -555,6 +553,245 @@ class BinnedData:
         except KeyError:
             print("No saved sample events")
         return this
+
+
+class DetectorBinnedData(BinnedData):
+    """
+    Agrigate key metrics for calorimeter models
+    into bins for easy plotting and comparison.
+    """
+
+    true_xyz_limits = [
+        [meta.Xmin_global, meta.Xmax_global],
+        [meta.Zmin_global, meta.Zmax_global],
+        [floors[0], ceilings[-1]],
+    ]
+    arg_names = [
+        "name",
+        "xyz_limits",
+        "energy_scale",
+        "layer_bottom_pos",
+        "cell_thickness",
+        "gun_xyz_pos",
+    ]
+
+    def __init__(
+        self,
+        name,
+        xyz_limits,
+        energy_scale,
+        MAP,
+        layer_bottom_pos,
+        half_cell_size_global,
+        cell_thickness,
+        hard_check=True,
+    ):
+        """Construct a BinnedData object.
+
+        Parameters
+        ----------
+        name : str
+            The name of the model, no mechanical significance.
+        energy_scale : float
+            How much to divide the observed energy by before binning.
+        MAP : list
+            list of dictionaries, each containing the grid of cells for a layer
+            in global coordinates
+            As returned by detector_map.create_map
+            Should be already offset, such that the gun fires at the origin.
+        layer_bottom_pos : np.array
+            The y positions of the bottom of each layer, in the coordinates
+            the data is given in.
+        half_cell_size_global : float
+            Half the size of the cells in the detector,
+            perpendicular to the radial direction
+        cell_thickness: float
+            The thickness in the y direction of each cell, in the coordinates
+            the data is given in.
+        gun_xyz_pos : np.array
+            The x, y and z positions of the gun, in the coordinates the data is
+            given in. The data is shifted so that the gun is at the origin.
+        """
+        self.hard_check = hard_check
+        self.name = name
+        self.energy_scale = energy_scale
+        self.MAP = MAP
+        self.layer_bottom_pos = layer_bottom_pos
+        self.half_cell_size_global = half_cell_size_global
+        self.cell_thickness = cell_thickness
+        buffed_floors, buffed_ceilings = detector_map.floors_ceilings(
+            layer_bottom_pos, cell_thickness, 1.0
+        )
+        self.perpendicular_cell_centers = detector_map.perpendicular_cell_centers(
+            self.MAP, self.half_cell_size_global
+        )
+        radial_min, radial_max, n_radial_bins, self.radial_cell_allocations = self.radial_bins_for_cells()
+        self.layer_bins = np.concatenate([buffed_floors, buffed_ceilings[[-1]]])
+        self.gun_shift = self.get_gunshift()
+
+        self.y_labels = []
+        self.x_labels = []
+        self.bins = []
+        self.counts = []
+
+
+        self.add_hist("sum active cells", "radius [mm]", radial_min, radial_max, n_radial_bins)
+        self.add_hist("sum energy [MeV]", "radius [mm]", radial_min, radial_max, n_radial_bins)
+        self.add_hist("sum active cells", "layers", 1, 30, 30)
+        self.add_hist("sum energy [MeV]", "layers", 1, 30, 30)
+        self.add_hist(
+            "number of cells", "cell energy [MeV]", 0.000001, 1, 100, True
+        )
+        self.add_hist("number of showers", "number of active cells", 0, 10000, 50)
+        self.add_hist("number of showers", "energy sum [MeV]", 0, 10, 50)
+        self.add_hist(
+            "number of showers",
+            "center of gravity X [mm]",
+            *self.true_xyz_limits[0],
+            2000,
+        )
+        self.add_hist(
+            "number of showers",
+            "center of gravity Y [mm]",
+            *self.true_xyz_limits[1],
+            2000,
+        )
+        self.add_hist(
+            "number of showers",
+            "center of gravity Z [layer]",
+            *self.true_xyz_limits[2],
+            60,
+        )
+        self.add_hist("mean energy [MeV]", "radius [mm]", radial_min, radial_max, n_radial_bins)
+        self.add_hist("mean energy [MeV]", "layers", 1, 30, 30)
+
+        self.max_sample_events = 10
+        self.sample_events = []
+
+    def radial_bins_for_cells(self):
+        radial_locations = []
+        radial_max = 0
+        for xs, ys in self.perpendicular_cell_centers:
+            radial_locations.append(np.sqrt(xs[None, :] ** 2 + ys[:, None] ** 2))
+            radial_max = max(radial_max, np.max(radial_locations[-1]))
+        radial_max = radial_max + self.half_cell_size_global
+        radial_min = -self.half_cell_size_global
+        radial_bin_width = 2*self.half_cell_size_global
+        n_radial_bins = int(np.floor((radial_max+self.half_cell_size_global) / radial_bin_width))
+        radial_bins = np.linspace(radial_min, radial_max, n_radial_bins+1)
+        for locations in radial_locations:
+            radial_cell_allocations.append(np.digitize(locations, radial_bins)-1)
+        return radial_min, radial_max, n_radial_bins, radial_cell_allocations
+
+    def add_events(self, events_as_cells):
+        """
+        Add events to the histograms that were created in the constructor.
+
+        Parameters
+        ----------
+        events : list of list of 2d np.array 
+            Outer list is events, next list is layers, final list is cell structure
+            perpendicular to the layers.
+        """
+        if len(self.sample_events) < self.max_sample_events:
+            for i in range(self.max_sample_events - len(self.sample_events)):
+                max_points = 6_000
+                event = detector_map.cells_to_points(events_as_cells[i], self.MAP,
+                                                     self.layer_bottom_pos, self.half_cell_size_global,
+                                                     self.cell_thickness_global,
+                                                     max_points)
+                trimmed = np.array([l[:max_points] for l in event])
+                self.sample_events.append(trimmed)
+
+        # things can be batch processed if we swap the inner and outer lists
+        # and stack the layers
+        layers = [np.stack(l)/self.energy_scale for l in zip(*events_as_cells)]
+
+        hits_per_shower = np.zeros(len(events_as_cells), dtype=int)
+        energy_per_shower = np.zeros(len(events_as_cells))
+        energy_weighted_position = np.zeros((len(events_as_cells), 3))
+
+        for l, cell_energies in enumerate(layers):
+            active_cells = cell_energies > 0
+            active_energies = cell_energies[active_cells]
+            radial_bins = self.radial_cell_allocations[l][None, :][active_cells]
+            # radial counts
+            self.counts[0] += np.bincount(radial_bins)
+            # radial energies
+            self.counts[1] += np.bincount(radial_bins, weights=active_energies)
+            # total in layer
+            self.counts[2][l] += np.sum(active_cells)
+            # energy in layer
+            self.counts[3][l] += np.sum(active_energies)
+            # energy spectrum
+            self.counts[4] += np.histogram(active_energies, self.bins[4])[0]
+            # then accumulate the hist and energy for these events
+            hits_per_shower += np.sum(active_cells, axis=1)
+            energy_per_shower += np.sum(active_energies, axis=1)
+
+            x = self.perpendicular_cell_centers[l][0][active_cells]
+            energy_weighted_position[:, 0] += np.sum(active_energies*x, axis=1)
+            y = self.perpendicular_cell_centers[l][1][active_cells]
+            energy_weighted_position[:, 1] += np.sum(active_energies*y, axis=1)
+            z = self.layer_bottom_pos[l] + self.cell_thickness_global * 0.5
+            energy_weighted_position[:, 3] += np.sum(active_energies*z, axis=1)
+
+        self.counts[5] += np.histogram(hits_per_shower, self.bins[5])[0]
+        self.counts[6] += np.histogram(energy_per_shower, self.bins[6])[0]
+
+
+        with np.errstate(divide="ignore", invalid="ignore"):
+            for i in range(3):
+                cog = energy_weighted_position[:, i]/energy_per_shower
+                self.counts[7 + i] += np.histogram(cog, self.bins[7 + i])[0]
+
+        if len(events) < 4:
+            return  # no point checking with too few events.
+
+        # sanity check 2
+        percent_populated = np.fromiter(
+            (np.sum([b > 0 for b in c]) / len(c) for c in self.counts[:10]), float
+        )
+        if np.sum(percent_populated > 0.01) > 5:
+            return
+        error_message = "Some parameters don't seem to fit in hitogram range;\n"
+        for i, percent in enumerate(percent_populated):
+            if percent > 0.5:
+                continue
+            error_message += f"{self.y_labels[i]} v.s. {self.x_labels[i]}: {percent:.0%} percent populated\n"
+            bin_min = np.min(self.bins[i])
+            bin_max = np.max(self.bins[i])
+            if i in [2, 3]:
+                bin_min = np.min(self.layer_bins)
+                bin_max = np.max(self.layer_bins)
+            error_message += f"Bin range: {bin_min:.2f} to {bin_max:.2f}\t"
+            data = {
+                0: radius,
+                1: radius,
+                2: raw_zs,
+                3: raw_zs,
+                4: energy,
+                5: hits_per_shower,
+                6: energy_per_shower,
+                7: np.sum((gun_shifted[:, :, 0] * gun_shifted[:, :, 3]), axis=1)
+                / energy_per_shower,
+                8: np.sum((gun_shifted[:, :, 1] * gun_shifted[:, :, 3]), axis=1)
+                / energy_per_shower,
+                9: np.sum((gun_shifted[:, :, 2] * gun_shifted[:, :, 3]), axis=1)
+                / energy_per_shower,
+            }.get(i)
+            if len(data):
+                error_message += (
+                    f"Data range: {np.nanmin(data):.2f} to {np.nanmax(data):.2f}, \n"
+                )
+            else:
+                error_message += "No data to show range, \n"
+        error_message += (
+            "change construction arguments of BinnedData, or check input data."
+        )
+        if self.hard_check:
+            raise ValueError(error_message)
+        warnings.warn(error_message)
 
 
 def sample_g4(configs, binned, n_events):

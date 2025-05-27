@@ -33,7 +33,7 @@ dataset_path=$gun_henry_path
 n_dataset_files=10
 shower_flow_version=original
 shower_flow_num_blocks=10
-shower_flow_detailed_history=True
+shower_flow_detailed_history=False
 shower_flow_weight_decay=0.0
 
 #config_name=caloclouds_3_simple_shower

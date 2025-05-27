@@ -336,6 +336,36 @@ def layer_to_cells(x_coord, y_coord, e_coord, MAP_layer, include_artifacts=False
     return H
 
 
+def perpendicular_cell_centers(MAP, half_cell_size_global):
+    """
+    Given the cell map, return the centers of the cells, perpendicular
+    to the radial direction.
+
+    Parameters
+    ----------
+    MAP : list
+        list of dictionaries, each containing the grid of cells for a layer
+        in global coordinates
+        As returned by create_map
+    half_cell_size_global : float
+        Half the size of the cells in the detector,
+        perpendicular to the radial direction
+
+    Returns
+    -------
+    centers : list of (np.array, np.array)
+        2D array containing hits of the points,
+        in global coordinates (x, y, z, energy)
+    """
+    centers = []
+    centers = []
+    for MAP_layer in MAP:
+        x = MAP_layer["xedges"] + half_cell_size_global
+        y = MAP_layer["zedges"] + half_cell_size_global
+        centers.append((x, y))
+    return centers
+
+
 def cells_to_points(
     layers,
     MAP,
@@ -378,6 +408,7 @@ def cells_to_points(
     """
 
     points = []
+    perpendicular_centers = perpendicular_cell_centers(MAP, half_cell_size_global)
     for ln, layer in enumerate(layers):
         xedges = MAP[ln]["xedges"]
         zedges = MAP[ln]["zedges"]
@@ -385,11 +416,11 @@ def cells_to_points(
         x_indx, z_indx = np.where(layer > 0)
 
         cell_energy = layer[layer > 0]
-        cell_coordinate_x = xedges[x_indx] + half_cell_size_global
+        cell_coordinate_x = perpendicular_centers[ln][0][x_indx]
         cell_coordinate_y = np.repeat(
             layer_bottom_pos[ln] + cell_thickness_global / 2, len(x_indx)
         )
-        cell_coordinate_z = zedges[z_indx] + half_cell_size_global
+        cell_coordinate_z = perpendicular_centers[ln][1][z_indx]
 
         # rever the rotation to get shower local coordinates
         points.append(
