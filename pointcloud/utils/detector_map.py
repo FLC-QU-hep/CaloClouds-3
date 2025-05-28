@@ -360,8 +360,8 @@ def perpendicular_cell_centers(MAP, half_cell_size_global):
     centers = []
     centers = []
     for MAP_layer in MAP:
-        x = MAP_layer["xedges"] + half_cell_size_global
-        y = MAP_layer["zedges"] + half_cell_size_global
+        x = MAP_layer["xedges"][:-1] + half_cell_size_global
+        y = MAP_layer["zedges"][:-1] + half_cell_size_global
         centers.append((x, y))
     return centers
 
