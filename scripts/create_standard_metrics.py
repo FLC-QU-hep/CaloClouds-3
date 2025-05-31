@@ -14,7 +14,7 @@ from pointcloud.config_varients import caloclouds_3_simple_shower, caloclouds_3,
 
 
 from pointcloud.utils.metadata import Metadata
-from pointcloud.utils.detector_map import floors_ceilings
+from pointcloud.utils import detector_map
 from pointcloud.data.read_write import read_raw_regaxes, get_n_events
 from pointcloud.data.conditioning import read_raw_regaxes_withcond
 
@@ -22,6 +22,7 @@ from pointcloud.utils.stats_accumulator import StatsAccumulator
 
 # imports specific to this evaluation
 from pointcloud.evaluation.bin_standard_metrics import (
+    DetectorBinnedData,
     BinnedData,
     sample_g4,
     conditioned_sample_model,
@@ -32,14 +33,19 @@ from pointcloud.evaluation.bin_standard_metrics import (
 )
 from pointcloud.evaluation.bin_standard_metrics import get_path as base_get_path
 
-def get_path(configs, dataset_name):
-    if hasattr(configs, "dataset_tag"):
-        dataset_name += "_" + configs.dataset_tag
-    return base_get_path(configs, dataset_name)
+
+detector_projection = True
+
+def get_path(config, dataset_name):
+    if hasattr(config, "dataset_tag"):
+        dataset_name += "_" + config.dataset_tag
+    if detector_projection:
+        dataset_name += "_detectorProj"
+    return base_get_path(config, dataset_name)
 
 # Gather the models to evaluate
-# the dict has the format {model_name: (model, shower_flow, configs)}
-# the configs should hold correct hyperparameters for the model,
+# the dict has the format {model_name: (model, shower_flow, config)}
+# the config should hold correct hyperparameters for the model,
 # but the dataset_path may be incorrect.
 models = {}
 log_base = "../point-cloud-diffusion-logs/"
@@ -88,12 +94,12 @@ except FileNotFoundError as e:
 try:
     pass
     if True:  # new a1 model
-        configs = caloclouds_3_simple_shower.Configs()
-        configs.device = 'cpu'
-        configs.cond_features = 4
-        configs.diffusion_pointwise_hidden_l1 = 32
-        configs.distillation = True
-        configs.cond_features_names = ["energy", "p_norm_local"]
+        config = caloclouds_3_simple_shower.Configs()
+        config.device = 'cpu'
+        config.cond_features = 4
+        config.diffusion_pointwise_hidden_l1 = 32
+        config.distillation = True
+        config.cond_features_names = ["energy", "p_norm_local"]
         caloclouds_paths = ["/data/dust/group/ilc/sft-ml/model_weights/CaloClouds/CC3/ckpt_0.000000_6135000.pt"]
         #showerflow_paths = ["/data/dust/group/ilc/sft-ml/model_weights/CaloClouds/CC3/ShowerFlow_alt1_nb2_inputs8070450532247928831_fnorms_dhist_best.pth"]
         showerflow_paths = ["/data/dust/group/ilc/sft-ml/model_weights/CaloClouds/CC3/ShowerFlow_alt1_nb2_inputs8070450532247928831_fnorms_best.pth"]
@@ -101,7 +107,7 @@ try:
 
         caloclouds = get_caloclouds_models(
             caloclouds_paths=caloclouds_paths, showerflow_paths=showerflow_paths, caloclouds_names=["CaloClouds3"], showerflow_names=["ShowerFlow_a1_fnorms_2"],
-            configs=configs
+            config=config
         )
 
         dataset_stats = np.load("/data/dust/user/dayhallh/data/ILCsoftEvents/p22_th90_ph90_en10-100_joined/stats.npz")
@@ -150,10 +156,10 @@ try:
         models.update(caloclouds)
 
     if False:  #  old model, angular dataset
-        configs = caloclouds_3.Configs()
-        configs.device = 'cpu'
-        configs.cond_features = 4
-        configs.cond_features_names = ["energy", "p_norm_local"]
+        config = caloclouds_3.Configs()
+        config.device = 'cpu'
+        config.cond_features = 4
+        config.cond_features_names = ["energy", "p_norm_local"]
         parts = [
            "original_nb10_inputs36893488147419103231"
         ]
@@ -165,23 +171,23 @@ try:
 
         caloclouds = get_caloclouds_models(
             caloclouds_paths=[caloclouds_path], showerflow_paths=showerflow_paths, caloclouds_names=["CaloClouds3"], showerflow_names=[f"ShowerFlow_original_{i}" for i in [10]],
-            configs=configs
+            config=config
         )
         models.update(caloclouds)
 
     if True:
-        configs = caloclouds_2.Configs()
-        configs.device = 'cpu'
-        configs.cond_features = 2  # number of conditioning features (i.e. energy+points=2)
-        configs.cond_features_names = ["energy", "points"]
-        configs.shower_flow_cond_features = ["energy"]
-        configs.n_dataset_files = static_n_files
-        configs.dataset_path_in_storage = False
-        configs.dataset_path = static_dataset
-        configs.shower_flow_roll_xyz = True
-        configs.distillation = True
-        #configs.max_points = 6_000
-        #configs.max_points = 30_000
+        config = caloclouds_2.Configs()
+        config.device = 'cpu'
+        config.cond_features = 2  # number of conditioning features (i.e. energy+points=2)
+        config.cond_features_names = ["energy", "points"]
+        config.shower_flow_cond_features = ["energy"]
+        config.n_dataset_files = static_n_files
+        config.dataset_path_in_storage = False
+        config.dataset_path = static_dataset
+        config.shower_flow_roll_xyz = True
+        config.distillation = True
+        #config.max_points = 6_000
+        #config.max_points = 30_000
         #showerflow_paths = ["/data/dust/group/ilc/sft-ml/model_weights/CaloClouds/CC2/220714_cog_e_layer_ShowerFlow_best.pth"]
         showerflow_paths = ["/data/dust/user/dayhallh/point-cloud-diffusion-data/showerFlow/p22_th90_ph90_en10-100/ShowerFlow_original_nb10_inputs36893488147419103231_dhist_best.pth"]
         caloclouds_paths = ["/data/dust/group/ilc/sft-ml/model_weights/CaloClouds/CC2/ckpt_0.000000_1000000.pt"]
@@ -189,14 +195,14 @@ try:
 
         caloclouds = get_caloclouds_models(
             caloclouds_paths=caloclouds_paths, showerflow_paths=showerflow_paths, caloclouds_names=["CaloClouds2"], showerflow_names=["ShowerFlow_CC2"],
-            configs=configs
+            config=config
         )
 
         #cc2_stats = np.load(showerflow_paths[0].replace(".pth", "_stats_cond_p22_th90_ph90_en10-100.npz"))
 
-        train_dataset_meta = Metadata(configs)
+        train_dataset_meta = Metadata(config)
         #meta_here = Metadata(caloclouds_2.Configs())
-        meta_here = Metadata(configs)
+        meta_here = Metadata(config)
         #meta_here.n_pts_rescale = 5000
         #meta_here.vis_eng_rescale = 2.5
         #meta_here.incident_rescale = 100
@@ -229,7 +235,7 @@ accum_path = None
 
 
 def main(
-    configs,
+    config,
     redo_g4_data=False,
     redo_g4_acc_data=False,
     redo_model_data=False,
@@ -244,8 +250,8 @@ def main(
 
     Parameters
     ----------
-    configs : Configs
-        The configs used to get g4 data, must have the correct dataset path.
+    config : Configs
+        The config used to get g4 data, must have the correct dataset path.
     redo_g4_data : bool
         If True, ignore the g4 data on disk and recreate it.
     redo_g4_acc_data : bool
@@ -259,26 +265,31 @@ def main(
         as there are G4 events are included.
     models : dict
         The models to evaluate, in the format
-        {model_name: (model, shower_flow, configs)}
-        where model is a torch model, shower_flow is a shower flow model, and configs
+        {model_name: (model, shower_flow, config)}
+        where model is a torch model, shower_flow is a shower flow model, and config
         is a Configs object with the correct dataset path.
         The shower_flow model is only used for caloclouds models, so it can be None
     accumulator_path : str
         The path to the accumulator to use for the g4 accumulator data.
     """
-    # The input configs that will be used for the g4 data
+    # The input config that will be used for the g4 data
     # plus to get detector ceilings and floors.
     # also, it's dataset path must be correct, or the g4 data will not be found.
-    # so also hold onto it for the configs of the models, which may have
+    # so also hold onto it for the config of the models, which may have
     # incorrect dataset paths.
-    meta = Metadata(configs)
-    floors, ceilings = floors_ceilings(
+    meta = Metadata(config)
+    if detector_projection:
+        MAP, _ = detector_map.create_map(config=config)
+        shifted_MAP = MAP[:]
+        for layer in shifted_MAP:
+            layer["xedges"] -= 50
+    floors, ceilings = detector_map.floors_ceilings(
         meta.layer_bottom_pos_hdf5, meta.cell_thickness_hdf5, 0
     )
 
     g4_name = "Geant 4"
-    g4_save_path = get_path(configs, g4_name)
-    n_g4_events = np.sum(get_n_events(configs.dataset_path, configs.n_dataset_files))
+    g4_save_path = get_path(config, g4_name)
+    n_g4_events = np.sum(get_n_events(config.dataset_path, config.n_dataset_files))
     if max_g4_events:
         n_g4_events = min(n_g4_events, max_g4_events)
 
@@ -286,7 +297,7 @@ def main(
     if redo_g4_data or not os.path.exists(g4_save_path):
         print(f"Need to process {g4_name}")
 
-        raw_floors, raw_ceilings = floors_ceilings(
+        raw_floors, raw_ceilings = detector_map.floors_ceilings(
             meta.layer_bottom_pos_hdf5, meta.cell_thickness_hdf5, 0
         )
         xyz_limits = [
@@ -294,32 +305,50 @@ def main(
             [meta.Xmin_global, meta.Xmax_global],
             [raw_floors[0], raw_ceilings[-1]],
         ]
-        binned_g4 = BinnedData(
-            "Geant 4",
-            xyz_limits,
-            1.0,
-            meta.layer_bottom_pos_hdf5,
-            meta.cell_thickness_hdf5,
-            # meta.gun_xz_pos_raw)
-            np.array([10, 40, 0]),
-        )
-        sample_g4(configs, binned_g4, n_g4_events)
+        if detector_projection:
+            binned_g4 = DetectorBinnedData(
+                "Geant 4",
+                xyz_limits,
+                1.0,
+                shifted_MAP,
+                meta.layer_bottom_pos_hdf5,
+                meta.half_cell_size_global,
+                meta.cell_thickness_hdf5,
+                #np.array([10, 40, 0]),
+                np.array([-50, 0, 0]),
+                no_box_cut=True,
+            )
+        else:
+            binned_g4 = BinnedData(
+                "Geant 4",
+                xyz_limits,
+                1.0,
+                meta.layer_bottom_pos_hdf5,
+                meta.cell_thickness_hdf5,
+                # meta.gun_xz_pos_raw)
+                np.array([10, 40, 0]),
+                no_box_cut=True
+            )
+        sample_g4(config, binned_g4, n_g4_events)
         binned_g4.save(g4_save_path)
     else:
-        binned_g4 = BinnedData.load(g4_save_path)
+        if detector_projection:
+            binned_g4 = DetectorBinnedData.load(g4_save_path)
+        else:
+            binned_g4 = BinnedData.load(g4_save_path)
 
     # Get the model data
     model_data = []
 
     for model_name in models:
-        model, shower_flow, model_configs = models[model_name]
+        model, shower_flow, model_config = models[model_name]
 
-        model_configs.dataset_path_in_storage = False
-        model_configs.dataset_path = configs.dataset_path
-        model_configs.n_dataset_files = configs.n_dataset_files
+        model_config.dataset_path_in_storage = False
+        model_config.dataset_path = config.dataset_path
+        model_config.n_dataset_files = config.n_dataset_files
 
 
-        save_path = get_path(configs, model_name)
+        save_path = get_path(config, model_name)
 
         if redo_model_data or not os.path.exists(save_path):
             print(f"Need to process {model_name}")
@@ -329,7 +358,7 @@ def main(
             else:
                 n_events = n_g4_events
             sample_cond, _= read_raw_regaxes_withcond(
-                model_configs,
+                model_config,
                 total_size=n_events,
                 for_model=["showerflow", "diffusion"],
             )
@@ -339,16 +368,22 @@ def main(
             layer_bottom_pos = np.linspace(-0.1, 28.9, 30)
             cell_thickness_global = 0.5
             rescale_energy = 1e3
-            if "3" in model_name:
-                gun_pos = np.array([60, 40, 0])
+            if detector_projection:
+                if "3" in model_name:
+                    gun_pos = np.array([0, 0, 0])
+                else:
+                    gun_pos = np.array([-50, 0, 0])
             else:
-                gun_pos = np.array([10, 40, 0])
+                if "3" in model_name:
+                    gun_pos = np.array([60, 40, 0])
+                else:
+                    gun_pos = np.array([10, 40, 0])
             print(f"{model_name} gun pos: {gun_pos}")
 
 
             if "caloclouds" in model_name.lower():  # this model unnorms itself.
 
-                cc_floors, cc_ceilings = floors_ceilings(
+                cc_floors, cc_ceilings = detector_map.floors_ceilings(
                     meta.layer_bottom_pos_global, meta.cell_thickness_global, 0
                 )
                 xyz_limits = [
@@ -368,64 +403,48 @@ def main(
                 cell_thickness = layer_bottom_pos[1] - layer_bottom_pos[0]
                 gun_pos = np.array([0, -70, 0])
 
-            binned = BinnedData(
-                model_name,
-                xyz_limits,
-                rescale_energy,
-                layer_bottom_pos,
-                cell_thickness_global,
-                gun_pos,
-            )
+            if detector_projection:
+                binned = DetectorBinnedData(
+                    model_name,
+                    xyz_limits,
+                    rescale_energy,
+                    shifted_MAP,
+                    layer_bottom_pos,
+                    meta.half_cell_size_global,
+                    cell_thickness_global,
+                    gun_pos,
+                )
+            else:
+                binned = BinnedData(
+                    model_name,
+                    xyz_limits,
+                    rescale_energy,
+                    layer_bottom_pos,
+                    cell_thickness_global,
+                    gun_pos,
+                )
             conditioned_sample_model(
-                model_configs, binned, sample_cond, model, shower_flow
+                model_config, binned, sample_cond, model, shower_flow
             )
 
             print(f"Saving {model_name} to {save_path}")
             binned.save(save_path)
         else:
-            binned = BinnedData.load(save_path)
+            if detector_projection:
+                binned = DetectorBinnedData.load(save_path)
+            else:
+                binned = BinnedData.load(save_path)
         model_data.append(binned)
-
-    # Get some data from an accumulator too for good measure
-    acc_name = "Geant 4 Accumulator"
-    acc_save_path = get_path(configs, acc_name)
-
-    if (
-        (redo_g4_acc_data
-        or not os.path.exists(acc_save_path))
-        and accumulator_path is not None
-    ):
-        print(f"Need to process {acc_name}")
-
-        xyz_limits = [[-1, 1], [-1, 1], [0, 29]]
-        layer_bottom_pos = np.linspace(-0.1, 28.9, 30)
-        cell_thickness_global = 1
-        gun_pos = np.array([0, -70, 0])
-        rescale_energy = 1e4
-        binned_acc = BinnedData(
-            acc_name,
-            xyz_limits,
-            rescale_energy,
-            layer_bottom_pos,
-            cell_thickness_global,
-            gun_pos,
-        )
-
-        acc = StatsAccumulator.load(accumulator_path)
-        sample_accumulator(configs, binned_acc, acc, n_g4_events)
-        binned_acc.save(acc_save_path)
-    else:
-        binned_acc = BinnedData.load(acc_save_path)
 
 
 if __name__ == "__main__":
-    configs = caloclouds_3_simple_shower.Configs()
-    configs.device = 'cpu'
-    configs.dataset_path_in_storage = False
-    configs._dataset_path = static_dataset
-    configs.n_dataset_files = static_n_files
-    #configs._dataset_path = angular_dataset
-    #configs.n_dataset_files = angular_n_files
-    configs.dataset_tag = "p22_th90_ph90_en10-100"
-    #configs.dataset_tag = "sim-E1261AT600AP180-180"
-    main(configs)
+    config = caloclouds_3_simple_shower.Configs()
+    config.device = 'cpu'
+    config.dataset_path_in_storage = False
+    config._dataset_path = static_dataset
+    config.n_dataset_files = static_n_files
+    #config._dataset_path = angular_dataset
+    #config.n_dataset_files = angular_n_files
+    config.dataset_tag = "p22_th90_ph90_en10-100"
+    #config.dataset_tag = "sim-E1261AT600AP180-180"
+    main(config)
