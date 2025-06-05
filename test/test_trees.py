@@ -105,8 +105,8 @@ def test_akt_distance():
 @patch("pointcloud.data.trees.get_n_events", new=mock_get_n_events)
 @patch("pointcloud.data.trees.read_raw_regaxes", new=mock_read_raw_regaxes)
 def test_DataAsTrees():
-    configs = default.Configs()
-    data_as_trees = trees.DataAsTrees(configs, max_trees_in_memory=2)
+    config = default.Configs()
+    data_as_trees = trees.DataAsTrees(config, max_trees_in_memory=2)
     assert len(data_as_trees) == 3
 
     all_trees = data_as_trees.get([0])

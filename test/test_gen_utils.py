@@ -50,7 +50,7 @@ def test_cond_batcher():
 
 
 class TestGenMethods:
-    configs = []
+    config = []
     models = []
     model_names = {}
 
@@ -60,58 +60,58 @@ class TestGenMethods:
         Make a list of models to test.
         """
         # make ourselves a simple model
-        configs = config_creator.make("wish")
-        configs.cond_features = 1
-        wish_model = get_model_class(configs)(configs)
+        config = config_creator.make("wish")
+        config.cond_features = 1
+        wish_model = get_model_class(config)(config)
 
         # give it some reasonable parameters
         acc = sample_accumulator.make(add_varients=True)
         hls = HighLevelStats(acc, wish_model.poly_degree)
         wish_model.set_from_stats(hls)
 
-        cls.configs.append(configs)
+        cls.config.append(config)
         cls.models.append((wish_model,))
         cls.model_names["wish"] = 0
 
         # now make a caloclouds/showerflow model
-        configs = config_creator.make()
-        configs.cond_features = 1
-        configs.shower_flow_cond_features = 1
+        config = config_creator.make()
+        config.cond_features = 1
+        config.shower_flow_cond_features = 1
 
         # fake the flow model
         flow, distribution, transforms = compile_HybridTanH_model(
-            num_blocks=configs.shower_flow_num_blocks,
+            num_blocks=config.shower_flow_num_blocks,
             num_inputs=65,
-            num_cond_inputs=configs.shower_flow_cond_features,
-            device=configs.device,
+            num_cond_inputs=config.shower_flow_cond_features,
+            device=config.device,
         )
 
-        diff_model = get_model_class(configs)(configs)
+        diff_model = get_model_class(config)(config)
 
-        cls.configs.append(configs)
+        cls.config.append(config)
         cls.models.append((diff_model, distribution))
         cls.model_names["diffusion"] = 1
 
         # try with 2 cond features. Not in the list of models, because requires different input
-        configs = config_creator.make()
-        configs.cond_features = 2
-        configs.shower_flow_cond_features = 2
+        config = config_creator.make()
+        config.cond_features = 2
+        config.shower_flow_cond_features = 2
 
         flow, distribution, transforms = compile_HybridTanH_model(
-            num_blocks=configs.shower_flow_num_blocks,
+            num_blocks=config.shower_flow_num_blocks,
             num_inputs=65,
-            num_cond_inputs=configs.shower_flow_cond_features,
-            device=configs.device,
+            num_cond_inputs=config.shower_flow_cond_features,
+            device=config.device,
         )
 
         diff_model, coef_real, coef_fake, n_splines = generate.load_diffusion_model(
-            configs, "cm", model_path="test/example_cm_model.pt"
+            config, "cm", model_path="test/example_cm_model.pt"
         )
         cls.two_cond_flow = (diff_model, distribution)
 
     @classmethod
     def teardown_class(cls):
-        cls.configs.clear()
+        cls.config.clear()
         cls.models.clear()
 
     def test_model_classes(self):
@@ -139,7 +139,7 @@ class TestGenMethods:
         e_min = 40
         e_max = 100
         # shoud work for all model/config pairs
-        for config, models in zip(self.configs, self.models):
+        for config, models in zip(self.config, self.models):
             found, found_cond = gen_utils.gen_showers_batch(
                 *models, e_min, e_max, num, bs, config
             )
@@ -150,14 +150,14 @@ class TestGenMethods:
     def test_gen_cond_showers_batch(self):
         cond = (torch.arange(10).reshape(-1, 1) * 10).float()
         # cond as a double
-        for config, models in zip(self.configs, self.models):
+        for config, models in zip(self.config, self.models):
             found = gen_utils.gen_cond_showers_batch(*models, cond, config=config)
             assert found.shape == (10, config.max_points, 4)
             assert np.all(found[:, :, 3] >= 0)
 
     def test_gen_wish_inner_batch(self):
         model = self.models[self.model_names["wish"]][0]
-        config = self.configs[self.model_names["wish"]]
+        config = self.config[self.model_names["wish"]]
         destination_array = np.zeros((10, config.max_points, 4))
         cond = {"diffusion": (torch.arange(1, 3).reshape(-1, 1) * 10).float()}
         first_index = 2
@@ -170,7 +170,7 @@ class TestGenMethods:
 
     def test_gen_v1_inner_batch(self):
         model, shower_flow = self.models[self.model_names["diffusion"]]
-        config = self.configs[self.model_names["diffusion"]]
+        config = self.config[self.model_names["diffusion"]]
         destination_array = np.zeros((10, config.max_points, 4))
         first_index = 2
         cond = {"diffusion": (torch.arange(1, 3).reshape(-1, 1) * 10).float()}

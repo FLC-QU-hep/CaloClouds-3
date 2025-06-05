@@ -1104,7 +1104,7 @@ class Wish(Module):
 
         Parameters
         ----------
-        config : configs.Configs
+        config : config.Configs
             Configuration for the run, used to obtain metadata about
             the detector.
 
@@ -1126,7 +1126,7 @@ class Wish(Module):
             The parameters of the fits for each layer.
         layers : list of WishLayer
             The layers of the detector.
-        config : configs.Configs
+        config : config.Configs
             Configuration for the run, used to obtain metadata about
             the detector.
 
@@ -1440,7 +1440,7 @@ def load_wish_from_accumulator(
     accumulator: str or stats_accumulator.StatsAccumulator
         The statistics to set the model from
         If a string, it is the path to the file containing the statistics
-    config: configs.Configs
+    config: config.Configs
         The configuration object
         Optional, the default is the default configuration
 
@@ -1458,7 +1458,7 @@ def load_wish_from_accumulator(
     return loaded
 
 
-def accumulate_and_load_wish(configs=Configs()):
+def accumulate_and_load_wish(config=Configs()):
     """
     This function runs an accumulator over the whole dataset,
     then loads the wish model with the statistics from the accumulator.
@@ -1466,7 +1466,7 @@ def accumulate_and_load_wish(configs=Configs()):
 
     Parameters
     ----------
-    configs: configs.Configs
+    config: config.Configs
         The configuration object
         Optional, the default is the default configuration
 
@@ -1478,7 +1478,7 @@ def accumulate_and_load_wish(configs=Configs()):
         The accumulator object
     """
     print("Accumulating stats")
-    acc = stats_accumulator.read_section_to(configs, False, 1, 0)
+    acc = stats_accumulator.read_section_to(config, False, 1, 0)
     print("Loading model")
-    model = load_wish_from_accumulator(acc, configs)
+    model = load_wish_from_accumulator(acc, config)
     return model, acc

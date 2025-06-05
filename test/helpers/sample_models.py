@@ -20,12 +20,12 @@ def write_fake_flow_model(config, file_path):
     torch.save({"model": flow.state_dict()}, file_path)
 
 
-def make_fake_wish_model(configs):
+def make_fake_wish_model(config):
     """
     Make a wish model with somehwat functional settings.
     """
-    configs.fit_attempts = 2
-    wish_model = Wish(configs)
+    config.fit_attempts = 2
+    wish_model = Wish(config)
     acc = sample_accumulator.make(add_varients=True)
     hls = HighLevelStats(acc, wish_model.poly_degree)
     wish_model.set_from_stats(hls)

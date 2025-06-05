@@ -310,7 +310,7 @@ def read_raw_regaxes(config, pick_events=None, total_size=None, per_event_cols=N
 
     Parameters
     ----------
-    config: configs.Configs
+    config: config.Configs
         The configuration object
     pick_events: list of ints or slice
         Indices of the events to pick

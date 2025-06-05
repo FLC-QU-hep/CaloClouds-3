@@ -237,13 +237,13 @@ class DataAsTrees:
     Will hold a certain number of generated trees in memory to reduce recomputing.
     """
 
-    def __init__(self, configs, max_trees_in_memory=1000, quiet=False):
+    def __init__(self, config, max_trees_in_memory=1000, quiet=False):
         """
         Intialize the data as trees object.
 
         Parameters
         ----------
-        configs : pointcloud.configs.Configs
+        config : pointcloud.configs.Configs
             The configuration object, which indicates where the dataset is.
         max_trees_in_memory : int
             The maximum number of trees to hold in memory, to reduce recomputing.
@@ -251,14 +251,14 @@ class DataAsTrees:
             If True, don't print progress updates when constructing trees.
         """
         self.quiet = quiet
-        self.configs = configs
-        data_lengths = get_n_events(configs.dataset_path, configs.n_dataset_files)
+        self.config = config
+        data_lengths = get_n_events(config.dataset_path, config.n_dataset_files)
         self.__len = np.sum(data_lengths)
         self._max_trees_in_memory = max_trees_in_memory
         self._held_idxs = []
         self._held_trees = []
 
-        metadata = Metadata(configs)
+        metadata = Metadata(config)
         self._layer_bottom_pos = metadata.layer_bottom_pos_hdf5
         self._cell_thickness_global = (
             self._layer_bottom_pos[1] - self._layer_bottom_pos[0]
@@ -284,7 +284,7 @@ class DataAsTrees:
         """
         need_trees = sorted(idx for idx in idxs if idx not in self._held_idxs)
         num_trees = len(idxs)
-        incidents, events = read_raw_regaxes(self.configs, need_trees)
+        incidents, events = read_raw_regaxes(self.config, need_trees)
         results = []
         to_hold = []
         for i, idx in enumerate(idxs):

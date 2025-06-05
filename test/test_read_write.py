@@ -219,61 +219,61 @@ class TestReaders:
         npt.assert_allclose(found, [3, 3, 3])
 
     def test_read_raw_regaxes(self):
-        configs = config_creator.make()
-        configs.dataset_path = self.paths["empty"]
-        configs.n_dataset_files = 0
-        found_energy, found_events = read_write.read_raw_regaxes(configs)
+        config = config_creator.make()
+        config.dataset_path = self.paths["empty"]
+        config.n_dataset_files = 0
+        found_energy, found_events = read_write.read_raw_regaxes(config)
         assert len(found_energy) == 0
         assert len(found_events) == 0
-        configs.dataset_path = self.paths["one_event"]
+        config.dataset_path = self.paths["one_event"]
         for i in range(2):
-            configs.n_dataset_files = i
-            found_energy, found_events = read_write.read_raw_regaxes(configs)
+            config.n_dataset_files = i
+            found_energy, found_events = read_write.read_raw_regaxes(config)
             npt.assert_allclose(found_energy, [1.0])
             npt.assert_allclose(
                 found_events, [[[3.0, 1.0, 2.0, 4.0], [7.0, 5.0, 6.0, 8.0]]]
             )
         # becuase there are 4 points int he longest event,
         # this should throw RuntimeError
-        configs.dataset_path = self.paths["four_events"]
-        configs.n_dataset_files = 2
-        npt.assert_raises(RuntimeError, read_write.read_raw_regaxes, configs)
-        npt.assert_raises(RuntimeError, read_write.read_raw_regaxes, configs, 1)
+        config.dataset_path = self.paths["four_events"]
+        config.n_dataset_files = 2
+        npt.assert_raises(RuntimeError, read_write.read_raw_regaxes, config)
+        npt.assert_raises(RuntimeError, read_write.read_raw_regaxes, config, 1)
 
         # this should work
-        configs.dataset_path = self.paths["last_segment"]
-        found_energy, found_events = read_write.read_raw_regaxes(configs)
+        config.dataset_path = self.paths["last_segment"]
+        found_energy, found_events = read_write.read_raw_regaxes(config)
         npt.assert_allclose(found_energy, self.reg_energy1)
         local_ax_1 = self.reg_events1[..., [2, 0, 1, 3]]
         npt.assert_allclose(found_events, local_ax_1)
 
         # finally, the nine events should be fine
-        configs.dataset_path = self.paths["nine_events"]
-        configs.n_dataset_files = 1
-        found_energy, found_events = read_write.read_raw_regaxes(configs)
+        config.dataset_path = self.paths["nine_events"]
+        config.n_dataset_files = 1
+        found_energy, found_events = read_write.read_raw_regaxes(config)
         npt.assert_allclose(found_energy, self.reg_energy1)
         npt.assert_allclose(found_events, local_ax_1)
-        configs.n_dataset_files = 3
-        found_energy, found_events = read_write.read_raw_regaxes(configs)
+        config.n_dataset_files = 3
+        found_energy, found_events = read_write.read_raw_regaxes(config)
         npt.assert_allclose(found_energy, [2.0, 3.0, 4.0, 2.0, 3.0, 4.0, 2.0, 3.0, 4.0])
         npt.assert_allclose(found_events, np.tile(local_ax_1, (3, 1, 1)))
 
     def test_read_raw_regaxes_direction(self):
         # Again, but with the direction vector too
-        configs = config_creator.make()
-        configs.dataset_path = self.paths["empty"]
-        configs.n_dataset_files = 0
+        config = config_creator.make()
+        config.dataset_path = self.paths["empty"]
+        config.n_dataset_files = 0
         per_event_cols = ["energy", "direction"]
         found_cond, found_events = read_write.read_raw_regaxes(
-            configs, per_event_cols=per_event_cols
+            config, per_event_cols=per_event_cols
         )
         assert len(found_cond) == 0
         assert len(found_events) == 0
-        configs.dataset_path = self.paths["one_event"]
+        config.dataset_path = self.paths["one_event"]
         for i in range(2):
-            configs.n_dataset_files = i
+            config.n_dataset_files = i
             found_cond, found_events = read_write.read_raw_regaxes(
-                configs, per_event_cols=per_event_cols
+                config, per_event_cols=per_event_cols
             )
             npt.assert_allclose(found_cond, [[1.0, 10.0, 10.0, 10.0]])
             npt.assert_allclose(
@@ -281,9 +281,9 @@ class TestReaders:
             )
 
         # this should work
-        configs.dataset_path = self.paths["last_segment"]
+        config.dataset_path = self.paths["last_segment"]
         found_cond, found_events = read_write.read_raw_regaxes(
-            configs, per_event_cols=per_event_cols
+            config, per_event_cols=per_event_cols
         )
         cond = np.hstack([self.reg_energy1[:, None], self.direction1[0]])
         npt.assert_allclose(found_cond, cond)
@@ -291,16 +291,16 @@ class TestReaders:
         npt.assert_allclose(found_events, local_ax_1)
 
         # finally, the nine events should be fine
-        configs.dataset_path = self.paths["nine_events"]
-        configs.n_dataset_files = 1
+        config.dataset_path = self.paths["nine_events"]
+        config.n_dataset_files = 1
         found_cond, found_events = read_write.read_raw_regaxes(
-            configs, per_event_cols=per_event_cols
+            config, per_event_cols=per_event_cols
         )
         npt.assert_allclose(found_cond, cond)
         npt.assert_allclose(found_events, local_ax_1)
-        configs.n_dataset_files = 3
+        config.n_dataset_files = 3
         found_cond, found_events = read_write.read_raw_regaxes(
-            configs, per_event_cols=per_event_cols
+            config, per_event_cols=per_event_cols
         )
         cond = np.tile(cond, (3, 1))
         npt.assert_allclose(found_cond, cond)
@@ -335,16 +335,16 @@ def test_write_raw_regaxes(tmpdir):
     read_write.write_raw_regaxes(
         path_0, TestReaders.reg_energy0, TestReaders.reg_events0
     )
-    configs = config_creator.make()
-    configs.dataset_path = path_0
+    config = config_creator.make()
+    config.dataset_path = path_0
     # when the number of points is also 4 it is ambigus to read
-    npt.assert_raises(RuntimeError, read_write.read_raw_regaxes, configs)
+    npt.assert_raises(RuntimeError, read_write.read_raw_regaxes, config)
     path_1 = os.path.join(tmpdir, "test_1.h5")
-    configs.dataset_path = path_1
+    config.dataset_path = path_1
     read_write.write_raw_regaxes(
         path_1, TestReaders.reg_energy1, TestReaders.reg_events1
     )
-    found_energy, found_events = read_write.read_raw_regaxes(configs)
+    found_energy, found_events = read_write.read_raw_regaxes(config)
     npt.assert_allclose(found_energy, TestReaders.reg_energy1)
     npt.assert_allclose(found_events, TestReaders.reg_events1)
     # should raise an error if the axes are not regular

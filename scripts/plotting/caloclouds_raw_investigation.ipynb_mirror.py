@@ -8,15 +8,15 @@ from pointcloud.config_varients import wish, default
 from matplotlib import pyplot as plt
 import numpy as np
 import os
-wish_configs = wish.Configs()
-configs = default.Configs()
-configs.device = 'cpu'
-configs.logdir = "/data/dust/user/dayhallh/point-cloud-diffusion-logs/investigation"
-#configs.storage_base = wish_configs.storage_base
-#configs._dataset_path = wish_configs._dataset_path
-#configs.dataset_path = "/home/dayhallh/Data/fake_increments_10.npz"
+wish_config = wish.Configs()
+config = default.Configs()
+config.device = 'cpu'
+config.logdir = "/data/dust/user/dayhallh/point-cloud-diffusion-logs/investigation"
+#config.storage_base = wish_config.storage_base
+#config._dataset_path = wish_config._dataset_path
+#config.dataset_path = "/home/dayhallh/Data/fake_increments_10.npz"
 
-raw_samples_dir = os.path.join(configs.logdir, "caloclouds_raw_samples")
+raw_samples_dir = os.path.join(config.logdir, "caloclouds_raw_samples")
 if not os.path.exists(raw_samples_dir):
     os.mkdir(raw_samples_dir)
     
@@ -30,19 +30,19 @@ redo_data = False
 varients = {}
 
 model_path = "/data/dust/user/dayhallh/point-cloud-diffusion-logs/investigation1/CD_2024_11_28__11_13_15/ckpt_0.424436_30000.pt"
-varients[model_path] = (configs.dataset_path, 1000, None, None, configs)
+varients[model_path] = (config.dataset_path, 1000, None, None, config)
 model_path = "/data/dust/user/dayhallh/point-cloud-diffusion-logs/investigation/CD_2024_11_28__13_45_49/ckpt_0.447153_10000.pt"
-varients[model_path] = (configs.dataset_path, 1000, None, None, configs)
+varients[model_path] = (config.dataset_path, 1000, None, None, config)
 
 from pointcloud.config_varients import my_funky_new_config_name
 model_path = "/beegfs/desy/user/weberdun/6_PointCloudDiffusion/log/caloclouds2_2024_11_26__13_52_38/ckpt_0.386185_870000.pt"
-varients[model_path] = (configs.dataset_path, 1000, None, None, my_funky_new_config_name.Configs())
+varients[model_path] = (config.dataset_path, 1000, None, None, my_funky_new_config_name.Configs())
 
 for model_path in varients:
     print(model_path)
-    configs_here = varients[model_path][-1]
-    configs_here.device = 'cpu'
-    configs_here.dataset_path = varients[model_path][0]
+    config_here = varients[model_path][-1]
+    config_here.device = 'cpu'
+    config_here.dataset_path = varients[model_path][0]
     n_events = varients[model_path][1]
     file_name = sample_save_name(model_path, n_events)
     print(file_name)
@@ -51,11 +51,11 @@ for model_path in varients:
         loaded = np.load(file_name)
         hits_per_layer = loaded["hits_per_layer"]
         points = loaded["points"]
-        varients[model_path] = (configs_here.dataset_path, n_events, points, hits_per_layer)
+        varients[model_path] = (config_here.dataset_path, n_events, points, hits_per_layer)
     else:
         print("Redoing data")
-        hits_per_layer, points = caloclouds_raw.process_events(model_path, configs_here, n_events)
-        varients[model_path] = (configs.dataset_path, n_events, points, hits_per_layer, configs_here)
+        hits_per_layer, points = caloclouds_raw.process_events(model_path, config_here, n_events)
+        varients[model_path] = (config.dataset_path, n_events, points, hits_per_layer, config_here)
         np.savez(file_name, hits_per_layer=hits_per_layer, points=points)
 # make a mask that removes leading and trailing zeros
 
@@ -74,7 +74,7 @@ for model_path in varients:
         
     
 
-titles = ["main", "duncan", "duncan_funky_configs"]
+titles = ["main", "duncan", "duncan_funky_config"]
 fig, ax = plt.subplots(1, 1, figsize=(10, 5))
 for title, model_path in zip(titles, varients):
     dataset_path, n_events, points, hits_per_layer = varients[model_path][:4]
@@ -101,7 +101,7 @@ for title, model_path in zip(titles, varients):
     ax.set_title(title)
 
 
-titles = ["main", "duncan", "duncan_funky_configs"]
+titles = ["main", "duncan", "duncan_funky_config"]
 fig, ax = plt.subplots(1, 3, figsize=(15, 5))
 for title, model_path in zip(titles, varients):
     dataset_path, n_events, points, hits_per_layer = varients[model_path][:4]

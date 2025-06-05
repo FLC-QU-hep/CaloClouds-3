@@ -28,36 +28,36 @@ import numpy as np
 import torch
 from torch.distributions import Gumbel, Exponential
 from pointcloud.utils.optimisers import curve_fit
-configs = MWConfigs()
-configs.dataset_path = "/home/dayhallh/Data/p22_th90_ph90_en10-100_joined/p22_th90_ph90_en10-100_seed{}_all_steps.hdf5"
-configs.dataset_path = "/beegfs/desy/user/dayhallh/data/ILCsoftEvents/p22_th90_ph90_en10-100_joined/p22_th90_ph90_en10-100_seed{}_all_steps.hdf5"
+config = MWConfigs()
+config.dataset_path = "/home/dayhallh/Data/p22_th90_ph90_en10-100_joined/p22_th90_ph90_en10-100_seed{}_all_steps.hdf5"
+config.dataset_path = "/beegfs/desy/user/dayhallh/data/ILCsoftEvents/p22_th90_ph90_en10-100_joined/p22_th90_ph90_en10-100_seed{}_all_steps.hdf5"
 
-dataset_class = dataset_class_from_config(configs)
+dataset_class = dataset_class_from_config(config)
 
 align_center = "Mean" if True else "Peak"
 align_even = f"align{align_center}Even"
 align_odd = f"align{align_center}Odd"
 align_all = f"align{align_center}"
 
-acc_even = AlignedStatsAccumulator.load(save_location(configs, 1, 0, align_even))
-acc_odd = AlignedStatsAccumulator.load(save_location(configs, 1, 0, align_odd))
-acc_all = AlignedStatsAccumulator.load(save_location(configs, 1, 0, align_all))
+acc_even = AlignedStatsAccumulator.load(save_location(config, 1, 0, align_even))
+acc_odd = AlignedStatsAccumulator.load(save_location(config, 1, 0, align_odd))
+acc_all = AlignedStatsAccumulator.load(save_location(config, 1, 0, align_all))
 acc = acc_all
-total_events = get_n_events(configs.dataset_path, configs.n_dataset_files)
+total_events = get_n_events(config.dataset_path, config.n_dataset_files)
 check_events = min(sum(total_events), 10_000)
 batch_size = 1_000
 shifts = np.empty((check_events, 2))
 for start_idx in range(0, check_events, batch_size):
     print(f"{start_idx/check_events:.0%}", end='\r')
     end_idx = start_idx + batch_size
-    energies, events = read_raw_regaxes(configs, pick_events=slice(start_idx, end_idx))
+    energies, events = read_raw_regaxes(config, pick_events=slice(start_idx, end_idx))
     dataset_class.normalize_xyze(events)
     shifts[start_idx:end_idx, 0] = energies
     shifts[start_idx:end_idx, 1] = acc.get_shift(events).flatten()
 print("Done")
 dataframe = pandas.DataFrame({"incident energy":shifts[:, 0], "shift":shifts[:, 1]})
 fig = ptx.scatter(dataframe, x="incident energy", y="shift", opacity=0.3)
-coeffs = np.polyfit(shifts[:, 0], shifts[:, 1], configs.poly_degree)
+coeffs = np.polyfit(shifts[:, 0], shifts[:, 1], config.poly_degree)
 xs = np.linspace(np.min(shifts[:, 0]), np.max(shifts[:, 0]), 100)
 ys = np.polyval(coeffs, xs)
 fig.add_scatter(x=xs, y=ys, name="Mean fit")
@@ -106,12 +106,12 @@ axes[0].set_ylabel("counts")
 # 
 # Then we will move on to looking at how tightly corrilated the three 
 
-ze_sample = np.zeros((check_events, configs.max_points*10, 2))
+ze_sample = np.zeros((check_events, config.max_points*10, 2))
 
 for start_idx in range(0, check_events, batch_size):
     print(f"{start_idx/check_events:.0%}", end='\r')
     end_idx = start_idx + batch_size
-    energies, events = read_raw_regaxes(configs, pick_events=slice(start_idx, end_idx))
+    energies, events = read_raw_regaxes(config, pick_events=slice(start_idx, end_idx))
     dataset_class.normalize_xyze(events)
     e = events[:, :, 3]
     n_pts = e.shape[1]

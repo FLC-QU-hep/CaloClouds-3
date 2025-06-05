@@ -30,18 +30,13 @@ from pointcloud.evaluation.bin_standard_metrics import (
     get_wish_models,
     get_fish_models,
     get_caloclouds_models,
+    get_path
 )
-from pointcloud.evaluation.bin_standard_metrics import get_path as base_get_path
+from pointcloud.evaluation.calculate_scale_factors import get_path as factor_get_path
 
 
 detector_projection = True
-
-def get_path(config, dataset_name):
-    if hasattr(config, "dataset_tag"):
-        dataset_name += "_" + config.dataset_tag
-    if detector_projection:
-        dataset_name += "_detectorProj"
-    return base_get_path(config, dataset_name)
+scale_e_n = False
 
 # Gather the models to evaluate
 # the dict has the format {model_name: (model, shower_flow, config)}
@@ -94,12 +89,24 @@ except FileNotFoundError as e:
 try:
     pass
     if True:  # new a1 model
+        model_name = "CaloClouds3-ShowerFlow_a1_fnorms_2"
         config = caloclouds_3_simple_shower.Configs()
+        config.dataset_tag = "p22_th90_ph90_en10-100"
         config.device = 'cpu'
         config.cond_features = 4
         config.diffusion_pointwise_hidden_l1 = 32
         config.distillation = True
         config.cond_features_names = ["energy", "p_norm_local"]
+
+        if scale_e_n:
+            config.shower_flow_n_scaling = True
+            loaded = np.load(factor_get_path(config, model_name), allow_pickle=True)
+            #config.shower_flow_coef_real = loaded['final_n_coeff']
+            config.shower_flow_coef_real = np.zeros(2)
+            config.shower_flow_coef_real[0] =  0.64
+        else:
+            config.shower_flow_n_scaling = False
+
         caloclouds_paths = ["/data/dust/group/ilc/sft-ml/model_weights/CaloClouds/CC3/ckpt_0.000000_6135000.pt"]
         #showerflow_paths = ["/data/dust/group/ilc/sft-ml/model_weights/CaloClouds/CC3/ShowerFlow_alt1_nb2_inputs8070450532247928831_fnorms_dhist_best.pth"]
         showerflow_paths = ["/data/dust/group/ilc/sft-ml/model_weights/CaloClouds/CC3/ShowerFlow_alt1_nb2_inputs8070450532247928831_fnorms_best.pth"]
@@ -119,7 +126,7 @@ try:
 
         meta_here.incident_rescale = 127
         meta_here.n_pts_rescale = train_dataset_meta.n_pts_rescale
-        meta_here.vis_eng_rescale = 3.5
+        meta_here.vis_eng_rescale = 3.4
 
        # try as in interance
         #meta_here.mean_cog[:] = [-4.06743696e-03, -2.27790998e-01,  1.10137465e+01]
@@ -176,7 +183,9 @@ try:
         models.update(caloclouds)
 
     if True:
+        model_name = 'CaloClouds2-ShowerFlow_CC2'
         config = caloclouds_2.Configs()
+        config.dataset_tag = "p22_th90_ph90_en10-100"
         config.device = 'cpu'
         config.cond_features = 2  # number of conditioning features (i.e. energy+points=2)
         config.cond_features_names = ["energy", "points"]
@@ -186,8 +195,18 @@ try:
         config.dataset_path = static_dataset
         config.shower_flow_roll_xyz = True
         config.distillation = True
+
         #config.max_points = 6_000
         #config.max_points = 30_000
+
+        if scale_e_n:
+            config.shower_flow_n_scaling = True
+            loaded = np.load(factor_get_path(config, model_name), allow_pickle=True)
+            config.shower_flow_coef_real = loaded['real_coeff']
+            config.shower_flow_coef_fake = loaded['fake_coeff']
+        else:
+            config.shower_flow_n_scaling = False
+
         #showerflow_paths = ["/data/dust/group/ilc/sft-ml/model_weights/CaloClouds/CC2/220714_cog_e_layer_ShowerFlow_best.pth"]
         showerflow_paths = ["/data/dust/user/dayhallh/point-cloud-diffusion-data/showerFlow/p22_th90_ph90_en10-100/ShowerFlow_original_nb10_inputs36893488147419103231_dhist_best.pth"]
         caloclouds_paths = ["/data/dust/group/ilc/sft-ml/model_weights/CaloClouds/CC2/ckpt_0.000000_1000000.pt"]
@@ -283,12 +302,13 @@ def main(
         shifted_MAP = MAP[:]
         for layer in shifted_MAP:
             layer["xedges"] -= 50
+            layer["zedges"] -= 50
     floors, ceilings = detector_map.floors_ceilings(
         meta.layer_bottom_pos_hdf5, meta.cell_thickness_hdf5, 0
     )
 
     g4_name = "Geant 4"
-    g4_save_path = get_path(config, g4_name)
+    g4_save_path = get_path(config, g4_name, detector_projection)
     n_g4_events = np.sum(get_n_events(config.dataset_path, config.n_dataset_files))
     if max_g4_events:
         n_g4_events = min(n_g4_events, max_g4_events)
@@ -348,7 +368,9 @@ def main(
         model_config.n_dataset_files = config.n_dataset_files
 
 
-        save_path = get_path(config, model_name)
+        save_path = get_path(config, model_name, detector_projection)
+        scale_factor_save_path = factor_get_path(config, model_name)
+            
 
         if redo_model_data or not os.path.exists(save_path):
             print(f"Need to process {model_name}")
@@ -369,6 +391,11 @@ def main(
             cell_thickness_global = 0.5
             rescale_energy = 1e3
             if detector_projection:
+                if scale_e_n:
+                    energy_correction = np.load(scale_factor_save_path, allow_pickle=True)["final_e_coeff"]
+                    #rescale_energy /= energy_correction[-2]
+                    #rescale_energy /= 0.9880121837394529
+                    pass
                 if "3" in model_name:
                     gun_pos = np.array([0, 0, 0])
                 else:
@@ -445,6 +472,9 @@ if __name__ == "__main__":
     config.n_dataset_files = static_n_files
     #config._dataset_path = angular_dataset
     #config.n_dataset_files = angular_n_files
-    config.dataset_tag = "p22_th90_ph90_en10-100"
+    if scale_e_n:
+        config.dataset_tag = "p22_th90_ph90_en10-100"
+    else:
+        config.dataset_tag = "p22_th90_ph90_en10-100_noFactor"
     #config.dataset_tag = "sim-E1261AT600AP180-180"
     main(config)

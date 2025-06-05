@@ -586,16 +586,16 @@ class Training:
         )
 
 
-def locate_g4_data(configs):
-    dataset_name = naming.dataset_name_from_path(configs.dataset_path)
-    data_folder = os.path.join(configs.logdir, dataset_name, "discriminator/g4")
+def locate_g4_data(config):
+    dataset_name = naming.dataset_name_from_path(config.dataset_path)
+    data_folder = os.path.join(config.logdir, dataset_name, "discriminator/g4")
     return data_folder
 
 
-def locate_model_data(configs, model_path):
-    dataset_name = naming.dataset_name_from_path(configs.dataset_path)
+def locate_model_data(config, model_path):
+    dataset_name = naming.dataset_name_from_path(config.dataset_path)
     model_base_name = ".".join(os.path.basename(model_path).split(".")[:-1])
-    data_folder = os.path.join(configs.logdir, dataset_name, "discriminator", model_base_name)
+    data_folder = os.path.join(config.logdir, dataset_name, "discriminator", model_base_name)
     return data_folder
 
 
@@ -608,12 +608,12 @@ def get_file_paths(data_folder, n_events):
     return file_names
 
 
-def create_g4_data_files(configs, redo=False):
+def create_g4_data_files(config, redo=False):
     # find output location and check if it exists
-    n_events = read_write.get_n_events(configs.dataset_path, configs.n_dataset_files)
+    n_events = read_write.get_n_events(config.dataset_path, config.n_dataset_files)
     n_events = np.atleast_1d(n_events)
-    showerflow_dir = showerflow_utils.get_showerflow_dir(configs)
-    data_folder = locate_g4_data(configs)
+    showerflow_dir = showerflow_utils.get_showerflow_dir(config)
+    data_folder = locate_g4_data(config)
     file_paths = get_file_paths(data_folder, n_events)
     exists = [os.path.exists(file_path) for file_path in file_paths]
     if (not redo) and all(exists):
@@ -623,12 +623,12 @@ def create_g4_data_files(configs, redo=False):
 
     # calculate features, of find precalculated features
     clusters_per_layer_path = showerflow_training.get_clusters_per_layer(
-        configs, showerflow_dir
+        config, showerflow_dir
     )
     energy_per_layer_path = showerflow_training.get_energy_per_layer(
-        configs, showerflow_dir
+        config, showerflow_dir
     )
-    cog_path, _ = showerflow_training.get_cog(configs, showerflow_dir)
+    cog_path, _ = showerflow_training.get_cog(config, showerflow_dir)
 
     # decide on output shape
     data = np.load(clusters_per_layer_path)
@@ -659,12 +659,12 @@ def create_g4_data_files(configs, redo=False):
     print()
 
 
-def create_showerflow_data_files(configs, model_path, redo=False):
-    n_events = read_write.get_n_events(configs.dataset_path, configs.n_dataset_files)
+def create_showerflow_data_files(config, model_path, redo=False):
+    n_events = read_write.get_n_events(config.dataset_path, config.n_dataset_files)
     n_events = np.atleast_1d(n_events)
-    data_folder = locate_model_data(configs, model_path)
+    data_folder = locate_model_data(config, model_path)
     file_paths = get_file_paths(data_folder, n_events)
-    _, distribution, _ = generate.load_flow_model(configs, model_path)
+    _, distribution, _ = generate.load_flow_model(config, model_path)
 
     # check if this is already done
     exists = [os.path.exists(file_path) for file_path in file_paths]
@@ -686,15 +686,15 @@ def create_showerflow_data_files(configs, model_path, redo=False):
             print(f"{j/total_events:.0%}", end="\r")
             batch_end = min(j + local_batch_size, end)
             cond, _ = read_raw_regaxes_withcond(
-                configs,
+                config,
                 slice(j, batch_end),
                 for_model="showerflow",
             )
             del _
             if len(cond.shape) == 1:
                 cond = cond[:, None]
-            cond = normalise_cond_feats(configs, cond, for_model="showerflow")
-            batch = conditioned_sample(configs, distribution, cond)
+            cond = normalise_cond_feats(config, cond, for_model="showerflow")
+            batch = conditioned_sample(config, distribution, cond)
             features.append(batch)
         features = np.concatenate(features, axis=0)
         np.save(file_paths[i], features)
@@ -703,9 +703,9 @@ def create_showerflow_data_files(configs, model_path, redo=False):
     print()
 
 
-def conditioned_sample(configs, distribution, cond_batch):
+def conditioned_sample(config, distribution, cond_batch):
     bs = cond_batch.shape[0]
-    cond_batch = torch.tensor(cond_batch).float().to(configs.device)
+    cond_batch = torch.tensor(cond_batch).float().to(config.device)
     samples = (
         distribution.condition(cond_batch)
         .sample(
@@ -727,9 +727,9 @@ def conditioned_sample(configs, distribution, cond_batch):
         cog_z,
         clusters_per_layer_gen,
         e_per_layer_gen,
-    ) = showerflow_utils.truescale_showerflow_output(samples, configs)
+    ) = showerflow_utils.truescale_showerflow_output(samples, config)
 
-    if not getattr(configs, "shower_flow_fixed_input_norms", False):
+    if not getattr(config, "shower_flow_fixed_input_norms", False):
         # scale relative clusters per layer to actual number of clusters per layer
         # and same for energy
         clusters_per_layer_gen = (

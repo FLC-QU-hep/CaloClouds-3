@@ -14,7 +14,7 @@ from matplotlib import colormaps
 
 
 from tqdm import tqdm
-# from configs import Configs
+# from config import Configs
 from utils.plotting import MAP
 
 # cfg = Configs()

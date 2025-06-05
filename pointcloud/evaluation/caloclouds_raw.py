@@ -87,7 +87,7 @@ def gen_raw_caloclouds(
     return points
 
 
-def process_events(model_path, configs, n_events, dataloader=None, n_files=0):
+def process_events(model_path, config, n_events, dataloader=None, n_files=0):
     """
     Run caloclouds using hits per layer drawn from G4 events.
 
@@ -95,7 +95,7 @@ def process_events(model_path, configs, n_events, dataloader=None, n_files=0):
     ----------
     model_path : str
         The path to the caloclouds model.
-    configs : pointcloud.configs.Configs
+    config : pointcloud.configs.Configs
         The configuration object.
     n_events : int
         The number of events to process.
@@ -108,12 +108,12 @@ def process_events(model_path, configs, n_events, dataloader=None, n_files=0):
         The generated showers. The third dimension is (x, y, z, e)
     """
     batch_len = 100
-    meta = Metadata(configs)
+    meta = Metadata(config)
     if dataloader is None:
         assert model_path.endswith(".pt")
-        model = get_model_class(configs)(configs).to(configs.device)
+        model = get_model_class(config)(config).to(config.device)
         model.load_state_dict(
-            torch.load(model_path, map_location=configs.device, weights_only=False)["state_dict"]
+            torch.load(model_path, map_location=config.device, weights_only=False)["state_dict"]
         )
     else:
         assert not model_path.endswith(".pt")
@@ -138,19 +138,19 @@ def process_events(model_path, configs, n_events, dataloader=None, n_files=0):
     for b, start in enumerate(batch_starts):
         print(f"{b/n_batches:.1%}", end="\r", flush=True)
         cond, events = read_raw_regaxes_withcond(
-            configs,
+            config,
             pick_events=slice(start, start + batch_len),
             for_model="diffusion",
         )
-        cond = torch.Tensor(cond).to(configs.device)
+        cond = torch.Tensor(cond).to(config.device)
         if len(cond.shape) == 1:
             cond = cond.unsqueeze(-1)
 
-        hits_per_layer_batch = events_to_hits_per_layer(events, configs)
+        hits_per_layer_batch = events_to_hits_per_layer(events, config)
         hits_per_layer[start : start + batch_len] = hits_per_layer_batch
         if dataloader is None:
             points_batch = gen_raw_caloclouds(
-                model, hits_per_layer_batch, cond, configs
+                model, hits_per_layer_batch, cond, config
             )
         else:
             points_batch = dataloader[i]["event"]

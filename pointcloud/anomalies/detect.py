@@ -39,12 +39,12 @@ def score_data(model_path, dataset, start_idx=0, end_idx=None):
     return scores
 
 
-def detect(model_path, configs, batch_size=1000):
+def detect(model_path, config, batch_size=1000):
     """
     Run over the data in batches, calculate the anomaly scores and save them
     """
     save_path = save_path_for_model(model_path)
-    dataset = TreeDataset(configs)
+    dataset = TreeDataset(config)
     total_datapoints = len(dataset)
     scores = []
     for start_idx in range(0, total_datapoints, batch_size):
@@ -70,7 +70,7 @@ def get_rating():
     return get_rating()
 
 
-def draw_batch(configs, idxs, scores, unrated, batch_length=100):
+def draw_batch(config, idxs, scores, unrated, batch_length=100):
     unrated = np.copy(unrated)
     min_score = scores.min()
     max_score = scores.max()
@@ -83,11 +83,11 @@ def draw_batch(configs, idxs, scores, unrated, batch_length=100):
         if not np.any(unrated):
             break
     pick_idxs = sorted(pick_idxs)
-    incidents, events = read_raw_regaxes(configs, pick_idxs)
+    incidents, events = read_raw_regaxes(config, pick_idxs)
     return list(zip(pick_idxs, incidents, events))
 
 
-def human_evaulation(model_path, configs):
+def human_evaulation(model_path, config):
     # get the scores
     score_path = save_path_for_model(model_path)
     idxs, scores = np.load(score_path).T
@@ -105,7 +105,7 @@ def human_evaulation(model_path, configs):
     plt.ion()
     while np.any(unrated):
         if not batch:
-            batch = draw_batch(configs, idxs, scores, unrated)
+            batch = draw_batch(config, idxs, scores, unrated)
         for idx, incident, event in batch:
             plot_event(idx, incident, event, energy_scale=1000)
             plt.show()

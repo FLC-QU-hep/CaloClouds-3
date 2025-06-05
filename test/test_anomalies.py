@@ -22,8 +22,8 @@ from helpers import sample_trees, config_creator
 @patch("pointcloud.data.trees.get_n_events", new=mock_get_n_events)
 @patch("pointcloud.data.trees.read_raw_regaxes", new=mock_read_raw_regaxes)
 def test_format_data():
-    configs = config_creator.make()
-    data_as_trees = trees.DataAsTrees(configs, max_trees_in_memory=2)
+    config = config_creator.make()
+    data_as_trees = trees.DataAsTrees(config, max_trees_in_memory=2)
 
     features, edges = prep_data.format_data(data_as_trees, [0, 1])
     assert len(features) == 2
@@ -37,7 +37,7 @@ def test_format_data():
     assert features[0].shape == (n_points, number_of_features)
     assert edges[0].shape == (2, n_points - 1)
 
-    root_xy = metadata.Metadata(data_as_trees.configs).gun_xyz_pos_hdf5[[0, 1]]
+    root_xy = metadata.Metadata(data_as_trees.config).gun_xyz_pos_hdf5[[0, 1]]
 
     energies = features[0][:, 3]
     energy_order = np.argsort(energies)
@@ -70,8 +70,8 @@ def test_format_data():
 @patch("pointcloud.data.trees.get_n_events", new=mock_get_n_events)
 @patch("pointcloud.data.trees.read_raw_regaxes", new=mock_read_raw_regaxes)
 def test_direct_data():
-    configs = config_creator.make()
-    data = prep_data.direct_data(configs, "dummy")
+    config = config_creator.make()
+    data = prep_data.direct_data(config, "dummy")
     for item in data:
         # check it's a torch_geometric.data.Data object
         assert isinstance(item, Data)
@@ -80,17 +80,17 @@ def test_direct_data():
 @patch("pointcloud.data.trees.get_n_events", new=mock_get_n_events)
 @patch("pointcloud.data.trees.read_raw_regaxes", new=mock_read_raw_regaxes)
 def test_format_save(tmpdir):
-    configs = config_creator.make(my_tmpdir=tmpdir)
+    config = config_creator.make(my_tmpdir=tmpdir)
     save_dir = tmpdir.mkdir("test_format_save")
-    configs.formatted_tree_base = os.path.join(save_dir, "formatted_trees")
+    config.formatted_tree_base = os.path.join(save_dir, "formatted_trees")
 
-    prep_data.format_save(configs)
-    features_path = configs.formatted_tree_base + "_features.npz"
-    edges_path = configs.formatted_tree_base + "_edges.npz"
+    prep_data.format_save(config)
+    features_path = config.formatted_tree_base + "_features.npz"
+    edges_path = config.formatted_tree_base + "_edges.npz"
     assert os.path.exists(features_path)
     assert os.path.exists(edges_path)
 
-    root_xy = metadata.Metadata(configs).gun_xyz_pos_hdf5[[0, 1]]
+    root_xy = metadata.Metadata(config).gun_xyz_pos_hdf5[[0, 1]]
 
     features = np.load(features_path)["arr_0"]
     edges = np.load(edges_path)["arr_0"]
@@ -166,8 +166,8 @@ def test_get_critrion():
 # Make an enviroment that creates a sample dataset
 class SampleDataset:
     tmpdir = tempfile.mkdtemp()
-    configs = config_creator.make(my_tmpdir=tmpdir)
-    configs_empty = config_creator.make(my_tmpdir=tmpdir)
+    config = config_creator.make(my_tmpdir=tmpdir)
+    config_empty = config_creator.make(my_tmpdir=tmpdir)
     n_features = 8
     sample_model = os.path.join(tmpdir, "sample_model.pth")
 
@@ -185,8 +185,8 @@ class SampleDataset:
         The dataset requires data on disk to read, so we need to create
         some test data.
         """
-        cls.configs.anomaly_checkpoint = cls.mkdir("checkpoints")
-        cls.configs.anomaly_hidden_dim = 8
+        cls.config.anomaly_checkpoint = cls.mkdir("checkpoints")
+        cls.config.anomaly_hidden_dim = 8
         # create some fake data
         features = []
         edges = []
@@ -201,7 +201,7 @@ class SampleDataset:
 
         dataset_dir = cls.mkdir("dataset")
         data_base = os.path.join(dataset_dir, "tree_")
-        cls.configs.formatted_tree_base = data_base
+        cls.config.formatted_tree_base = data_base
         features_path = data_base + "_features.npz"
         np.savez(features_path, *features)
         edges_path = data_base + "_edges.npz"
@@ -209,14 +209,14 @@ class SampleDataset:
 
         empty_dir = cls.mkdir("empty")
         empty_base = os.path.join(empty_dir, "tree_")
-        cls.configs_empty.formatted_tree_base = empty_base
+        cls.config_empty.formatted_tree_base = empty_base
         features_path = empty_base + "_features.npz"
         np.savez(features_path)
         edges_path = empty_base + "_edges.npz"
         np.savez(edges_path)
 
         # make a sample model
-        hidden_dim = cls.configs.anomaly_hidden_dim
+        hidden_dim = cls.config.anomaly_hidden_dim
         model = autoencoder.GraphAutoencoder(cls.n_features, hidden_dim)
         model.save(cls.sample_model)
 
@@ -231,13 +231,13 @@ class SampleDataset:
 
 class TestTrain(SampleDataset):
     tmpdir = tempfile.mkdtemp()
-    configs = config_creator.make(my_tmpdir=tmpdir)
-    configs_empty = config_creator.make(my_tmpdir=tmpdir)
+    config = config_creator.make(my_tmpdir=tmpdir)
+    config_empty = config_creator.make(my_tmpdir=tmpdir)
     n_features = 8
     sample_model = os.path.join(tmpdir, "sample_model.pth")
 
     def test_TreeDataset(self):
-        dataset = train.TreeDataset(self.configs)
+        dataset = train.TreeDataset(self.config)
         assert len(dataset) == 3
         item0 = dataset[0]
         assert isinstance(item0, Data)
@@ -254,19 +254,19 @@ class TestTrain(SampleDataset):
         assert item2.x.shape == (2, 8)
         assert item2.edge_index.shape == (2, 1)
 
-        dataset_empty = train.TreeDataset(self.configs_empty)
+        dataset_empty = train.TreeDataset(self.config_empty)
         assert len(dataset_empty) == 0
 
     def test_epoch(self):
         model = autoencoder.GraphAutoencoder(8, 8)
-        dataloader = DataLoader(train.TreeDataset(self.configs), batch_size=2)
+        dataloader = DataLoader(train.TreeDataset(self.config), batch_size=2)
         optimiser = torch.optim.Adam(model.parameters(), lr=0.01)
         criterion = train.get_criterion()
         loss = train.epoch(model, dataloader, optimiser, criterion)
         assert not np.isnan(loss)
 
     def test_train(self):
-        train.train(self.configs, self.sample_model, 1)
+        train.train(self.config, self.sample_model, 1)
 
 
 ### detect.py ###
@@ -308,19 +308,19 @@ def test_get_rating():
 
 class TestDetect(SampleDataset):
     tmpdir = tempfile.mkdtemp()
-    configs = config_creator.make(my_tmpdir=tmpdir)
+    config = config_creator.make(my_tmpdir=tmpdir)
     n_features = 8
     sample_model = os.path.join(tmpdir, "sample_model.pth")
 
     def test_score_data(self):
-        dataset = train.TreeDataset(self.configs)
+        dataset = train.TreeDataset(self.config)
         scores = detect.score_data(self.sample_model, dataset, 0, 3)
         assert scores.shape == (3, 2)
         npt.assert_allclose(scores[:, 0], [0, 1, 2])
         assert np.all(scores[:, 1] > 0)
 
     def test_detect(self):
-        expected_path = detect.detect(self.sample_model, self.configs, 2)
+        expected_path = detect.detect(self.sample_model, self.config, 2)
         assert os.path.exists(expected_path)
         scores = np.load(expected_path)
         assert scores.shape == (3, 2)

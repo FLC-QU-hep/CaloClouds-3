@@ -575,7 +575,7 @@ def load_fish_from_accumulator(
     accumulator: str or stats_accumulator.StatsAccumulator
         The statistics to set the model from
         If a string, it is the path to the file containing the statistics
-    config: configs.Configs
+    config: config.Configs
         The configuration object
         Optional, the default is the default configuration
 
@@ -591,7 +591,7 @@ def load_fish_from_accumulator(
     return model
 
 
-def accumulate_and_load_fish(configs=Configs()):
+def accumulate_and_load_fish(config=Configs()):
     """
     This function runs an accumulator over the whole dataset,
     then loads the fish model with the statistics from the accumulator.
@@ -599,7 +599,7 @@ def accumulate_and_load_fish(configs=Configs()):
 
     Parameters
     ----------
-    configs: configs.Configs
+    config: config.Configs
         The configuration object
         Optional, the default is the default configuration
 
@@ -611,7 +611,7 @@ def accumulate_and_load_fish(configs=Configs()):
         The accumulator object
     """
     print("Accumulating stats")
-    acc = stats_accumulator.read_section_to(configs, False, 1, 0, "alignMean")
+    acc = stats_accumulator.read_section_to(config, False, 1, 0, "alignMean")
     print("Loading model")
-    model = load_fish_from_accumulator(acc, configs)
+    model = load_fish_from_accumulator(acc, config)
     return model, acc

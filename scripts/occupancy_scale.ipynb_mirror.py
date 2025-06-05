@@ -15,7 +15,7 @@ metadata = Metadata(cfg)
 
 from evaluation import generate
 
-from configs import Configs
+from config import Configs
 cfg = Configs()
 metadata = Metadata(cfg)
 
@@ -60,8 +60,8 @@ from pointcloud.utils.detector_map import create_map
 importlib.reload(plotting)
 
 # events = plotting.get_projections(real_showers[:n], MAP)       # get projection of a point clouds to the detector grid
-MAP, _ = create_map(configs=cfg)
-events_fake = plotting.get_projections(fake_showers[:n], MAP, configs=cfg)  # get projection of a point clouds to the detector grid
+MAP, _ = create_map(config=cfg)
+events_fake = plotting.get_projections(fake_showers[:n], MAP, config=cfg)  # get projection of a point clouds to the detector grid
 importlib.reload(plotting)
 
 _, occ_fake, _, _, _, _, _, _, _ = plotting.get_features(plt_config, MAP, metadata.half_cell_size_global, events_fake, metadata.global_shower_axis_char) # get event level features

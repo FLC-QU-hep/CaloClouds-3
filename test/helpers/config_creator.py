@@ -1,15 +1,15 @@
 """
-Some common setting for testing configs, regardless of the underlying config version.
+Some common setting for testing config, regardless of the underlying config version.
 """
 import os
 import shutil
-from pointcloud.config_varients import default, wish, caloclouds_3, configs_calotransf
+from pointcloud.config_varients import default, wish, caloclouds_3, config_calotransf
 
-dict_of_configs = {
+dict_of_config = {
     "default": default,
     "wish": wish,
     "caloclouds_3": caloclouds_3,
-    "configs_calotransf": configs_calotransf,
+    "config_calotransf": config_calotransf,
 }
 
 
@@ -17,7 +17,7 @@ def make(module_name="default", start_from=None, my_tmpdir=None):
     if start_from is not None:
         config = start_from
     else:
-        config = dict_of_configs[module_name].Configs()
+        config = dict_of_config[module_name].Configs()
     # no logging for tests, as we would need a comet key
     config.log_comet = False
     test_dir = os.path.join(os.path.dirname(os.path.realpath(__file__)), "..")

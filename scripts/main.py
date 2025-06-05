@@ -67,7 +67,7 @@ def get_model(config):
 
 
 def main(config=Configs()):
-    # Prepare logging, models, optimizers, schedulers, dataloaders from configs
+    # Prepare logging, models, optimizers, schedulers, dataloaders from config
     seed_all(seed=config.seed)
     start_time = time.localtime()
     experiment = get_comet_experiment(config, start_time)
@@ -267,8 +267,8 @@ if __name__ == "__main__":
         if chosen not in config_choices:
             print("Invalid choice")
 
-    configs_kwargs = {
+    config_kwargs = {
         a.split("=")[0].strip(): a.split("=")[1].strip() for a in sys.argv[2:]
     }
-    configs = config_choices[chosen].Configs(**configs_kwargs)
-    main(configs)
+    config = config_choices[chosen].Configs(**config_kwargs)
+    main(config)

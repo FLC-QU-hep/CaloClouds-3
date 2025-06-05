@@ -382,11 +382,11 @@ plotting.plt_feats(real_showers, [fake_showers, fake_showers_3], ['G4 50GeV', 'C
 plotting.plt_feats(real_showers, [fake_showers, fake_showers_3], ['G4 50GeV', 'CaloClouds', 'wish'], title=r'\textbf{50 GeV}', scale='log', density=True)
 # # Projections
 
-MAP, _ = create_map(configs=cfg)
+MAP, _ = create_map(config=cfg)
 events, cloud = get_projections(real_showers[0:2000], MAP, max_num_hits=6000, return_cell_point_cloud=True)
 events_fake, cloud_fake = get_projections(fake_showers, MAP, max_num_hits=6000, return_cell_point_cloud=True)
 events_fake_2, cloud_fake_2 = get_projections(fake_showers_2, MAP, max_num_hits=6000, return_cell_point_cloud=True)
-events_fake_3, cloud_fake_3 = get_projections(fake_showers_3[0:2000], MAP, max_num_hits=6000, return_cell_point_cloud=True, configs=cfg)
+events_fake_3, cloud_fake_3 = get_projections(fake_showers_3[0:2000], MAP, max_num_hits=6000, return_cell_point_cloud=True, config=cfg)
 cloud[:,:,-1].max(), cloud_fake_3[:,:,-1].max()
 # log bins 
 bins = np.logspace(np.log10(cloud[:,:,-1,][cloud[:,:,-1] != 0.0].min()),np.log10(cloud[:,:,-1].max()+1e2), 100)

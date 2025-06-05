@@ -11,7 +11,7 @@ import sys
 import pickle
 import h5py
 
-# from configs import Configs
+# from config import Configs
 import utils.plotting as plotting
 from utils.detector_map import get_projections, create_map
 

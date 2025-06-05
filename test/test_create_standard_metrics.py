@@ -12,11 +12,11 @@ from helpers import config_creator
 from scripts.create_standard_metrics import main
 
 
-def fake_models(configs):
-    configs.fit_attempts = 2
-    configs.poly_degree = 2
-    model = make_fake_wish_model(configs)
-    models = {"fake model": (model, None, configs)}
+def fake_models(config):
+    config.fit_attempts = 2
+    config.poly_degree = 2
+    model = make_fake_wish_model(config)
+    models = {"fake model": (model, None, config)}
     return models
 
 
@@ -28,13 +28,13 @@ def fake_accumulator(logdir):
 
 
 def test_main(tmpdir):
-    configs = config_creator.make("wish", my_tmpdir=tmpdir)
+    config = config_creator.make("wish", my_tmpdir=tmpdir)
 
-    models = fake_models(configs)
-    accumulator_path = fake_accumulator(configs.logdir)
+    models = fake_models(config)
+    accumulator_path = fake_accumulator(config.logdir)
 
     main(
-        configs=configs,
+        config=config,
         redo_g4_data=False,
         redo_g4_acc_data=False,
         redo_model_data=False,
@@ -45,9 +45,9 @@ def test_main(tmpdir):
     )
 
     # check things actually got saved
-    expected_path = get_path(configs, "fake model")
+    expected_path = get_path(config, "fake model")
     assert os.path.exists(expected_path)
-    expected_path = get_path(configs, "Geant 4")
+    expected_path = get_path(config, "Geant 4")
     assert os.path.exists(expected_path)
-    expected_path = get_path(configs, "Geant 4 Accumulator")
+    expected_path = get_path(config, "Geant 4 Accumulator")
     assert os.path.exists(expected_path)

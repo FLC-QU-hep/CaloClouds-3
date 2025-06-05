@@ -204,10 +204,10 @@ plotting.plt_cog(cog, [cog_2, cog_3, cog_4], [real_label, ddpm_label, edm_label,
 cfg.bins_r = 35
 # # Projections
 MAP, _ = create_map()
-events, cloud = get_projections(real_showers, MAP, max_num_hits=6000, return_cell_point_cloud=True, configs=cfg)
-events_fake, cloud_fake = get_projections(fake_showers, MAP, max_num_hits=6000, return_cell_point_cloud=True, configs=cfg)
-events_fake_2, cloud_fake_2 = get_projections(fake_showers_2, MAP, max_num_hits=6000, return_cell_point_cloud=True, configs=cfg)
-events_fake_3, cloud_fake_3 = get_projections(fake_showers_3, MAP, max_num_hits=6000, return_cell_point_cloud=True, configs=cfg)
+events, cloud = get_projections(real_showers, MAP, max_num_hits=6000, return_cell_point_cloud=True, config=cfg)
+events_fake, cloud_fake = get_projections(fake_showers, MAP, max_num_hits=6000, return_cell_point_cloud=True, config=cfg)
+events_fake_2, cloud_fake_2 = get_projections(fake_showers_2, MAP, max_num_hits=6000, return_cell_point_cloud=True, config=cfg)
+events_fake_3, cloud_fake_3 = get_projections(fake_showers_3, MAP, max_num_hits=6000, return_cell_point_cloud=True, config=cfg)
 cloud[:,:,-1].max(), cloud_fake_3[:,:,-1].max()
 # log bins 
 bins = np.logspace(np.log10(cloud[:,:,-1][cloud[:,:,-1] != 0.0].min()),np.log10(cloud[:,:,-1].max()+1e2), 100)

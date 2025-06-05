@@ -6,18 +6,18 @@ from pointcloud.models.wish import Wish
 from pointcloud.models.fish import Fish
 
 
-def get_model_class(configs):
-    if configs.model_name == "AllCond_epicVAE_nFlow_PointDiff":
+def get_model_class(config):
+    if config.model_name == "AllCond_epicVAE_nFlow_PointDiff":
         m_class = AllCond_epicVAE_nFlow_PointDiff
-    elif configs.model_name == "epicVAE_nFlow_kDiffusion":
+    elif config.model_name == "epicVAE_nFlow_kDiffusion":
         m_class = epicVAE_nFlow_kDiffusion
-    elif configs.model_name == "wish":
+    elif config.model_name == "wish":
         m_class = Wish
-    elif configs.model_name == "fish":
+    elif config.model_name == "fish":
         m_class = Fish
     else:
         raise NotImplementedError(
-            f"Model {configs.model_name} not implemented, known models: "
+            f"Model {config.model_name} not implemented, known models: "
             "AllCond_epicVAE_nFlow_PointDiff, epicVAE_nFlow_kDiffusion, wish, fish"
         )
     return m_class

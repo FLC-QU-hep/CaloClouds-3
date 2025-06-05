@@ -26,16 +26,16 @@ def checkpoint_location(loss, folder_name):
 
 
 class TreeDataset(Dataset):
-    def __init__(self, configs):
+    def __init__(self, config):
         super(TreeDataset, self).__init__()
-        base = configs.formatted_tree_base
+        base = config.formatted_tree_base
         self.features = np.load(base + "_features.npz")
         try:
             self.n_features = self.features["arr_0"].shape[1]
         except KeyError:
             self.n_features = 1
         self.edges = np.load(base + "_edges.npz")
-        self.device = configs.device
+        self.device = config.device
 
     def __len__(self):
         return len(self.features)
@@ -69,12 +69,12 @@ def get_criterion():
     return nn.MSELoss(reduction="mean")
 
 
-def train(configs=Configs(), last_chpt=None, num_epochs=50, batch_size=32):
-    dataset = TreeDataset(configs)
+def train(config=Configs(), last_chpt=None, num_epochs=50, batch_size=32):
+    dataset = TreeDataset(config)
 
     if last_chpt is None:
         model = autoencoder.GraphAutoencoder(
-            dataset.n_features, configs.anomaly_hidden_dim
+            dataset.n_features, config.anomaly_hidden_dim
         )
     else:
         model = autoencoder.GraphAutoencoder.load(last_chpt)
@@ -87,6 +87,6 @@ def train(configs=Configs(), last_chpt=None, num_epochs=50, batch_size=32):
 
     for epoch_n in range(num_epochs):
         total_loss = epoch(model, train_loader, optimizer, criterion)
-        checkpoint = checkpoint_location(total_loss, configs.anomaly_checkpoint)
+        checkpoint = checkpoint_location(total_loss, config.anomaly_checkpoint)
         model.save(checkpoint)
         print(f"Epoch {epoch_n + 1}, Loss: {total_loss / length}")

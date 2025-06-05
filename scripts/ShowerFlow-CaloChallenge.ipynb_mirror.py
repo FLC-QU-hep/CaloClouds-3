@@ -234,7 +234,7 @@ for item in batch:
     print(item.shape)
 import comet_ml
 import logging
-from configs import Configs
+from config import Configs
 
 # Set the logging level for comet_ml
 logging.getLogger("comet_ml").setLevel(logging.ERROR)

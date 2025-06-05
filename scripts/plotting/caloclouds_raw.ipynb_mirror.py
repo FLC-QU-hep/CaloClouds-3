@@ -8,19 +8,19 @@ from pointcloud.config_varients import wish_maxwell, caloclouds_3_simple_shower,
 from matplotlib import pyplot as plt
 import numpy as np
 import os
-wish_configs = wish_maxwell.Configs()
-configs = caloclouds_3_simple_shower.Configs()
-configs.device = 'cpu'
-configs.logdir = wish_configs.logdir
-configs.storage_base = wish_configs.storage_base
-configs.cond_features = 4
-configs.cond_features_names = ["energy", "p_norm_local"]
-configs.shower_flow_cond_features = configs.cond_features_names
+wish_config = wish_maxwell.Configs()
+config = caloclouds_3_simple_shower.Configs()
+config.device = 'cpu'
+config.logdir = wish_config.logdir
+config.storage_base = wish_config.storage_base
+config.cond_features = 4
+config.cond_features_names = ["energy", "p_norm_local"]
+config.shower_flow_cond_features = config.cond_features_names
 
-#configs._dataset_path = wish_configs._dataset_path
-#configs.dataset_path = "/home/dayhallh/Data/fake_increments_10.npz"
+#config._dataset_path = wish_config._dataset_path
+#config.dataset_path = "/home/dayhallh/Data/fake_increments_10.npz"
 
-raw_samples_dir = os.path.join(configs.logdir, "caloclouds_raw_samples")
+raw_samples_dir = os.path.join(config.logdir, "caloclouds_raw_samples")
 if not os.path.exists(raw_samples_dir):
     os.mkdir(raw_samples_dir)
     
@@ -34,13 +34,13 @@ redo_data = False
 varients = {}
 
 model_path = "/data/dust/user/dayhallh/point-cloud-diffusion-logs/p22_th90_ph90_en10-100/CD_2024_07_23__11_59_44/ckpt_0.342419_1540000.pt"
-varients["old ghenry"] = (model_path, wish_configs.dataset_path, 1000, None, None)
+varients["old ghenry"] = (model_path, wish_config.dataset_path, 1000, None, None)
 model_path = "/data/dust/user/dayhallh/point-cloud-diffusion-logs/investigation2/CD__p22_th90_ph90_en10-1002024_12_11__18_27_01/ckpt_0.487173_140000.pt"
-varients["redone ghenry"] = (model_path, wish_configs.dataset_path, 1000, None, None)
+varients["redone ghenry"] = (model_path, wish_config.dataset_path, 1000, None, None)
 model_path = "/data/dust/user/dayhallh/point-cloud-diffusion-logs/investigation2/CD_sim-E1261AT600AP180-1802024_12_16__19_08_57/ckpt_0.392248_380000.pt"
-varients["redone sim"] = (model_path, configs.dataset_path, 1000, None, None)
+varients["redone sim"] = (model_path, config.dataset_path, 1000, None, None)
 #model_path = "/data/dust/user/akorol/maxwell.merged/logs/point-clouds-angular/CD_ClusteredDS_Pretrained2024_03_27__00_23_43/ckpt_0.000000_1130000.pt"
-#varients["new Anatolii"] = (model_path, configs.dataset_path, 1000, None, None)
+#varients["new Anatolii"] = (model_path, config.dataset_path, 1000, None, None)
 #model_path = "/data/dust/user/dayhallh/point-cloud-diffusion-logs/wish/CD_2024_08_23__13_39_15/ckpt_28.587090_30000.pt"
 #varients[model_path] = ("/home/dayhallh/Data/fake_increments_10.npz", 1000, None, None)
 #model_path = "/data/dust/user/dayhallh/point-cloud-diffusion-logs/wish/CD_2024_08_23__14_43_56/ckpt_14.732546_10000.pt"
@@ -50,7 +50,7 @@ varients["redone sim"] = (model_path, configs.dataset_path, 1000, None, None)
 for name in varients:
     print(model_path)
     model_path = varients[name][0]
-    configs.dataset_path = varients[name][1]
+    config.dataset_path = varients[name][1]
     n_events = varients[name][2]
     file_name = sample_save_name(model_path, n_events)
     print(file_name)
@@ -59,18 +59,18 @@ for name in varients:
         loaded = np.load(file_name)
         hits_per_layer = loaded["hits_per_layer"]
         points = loaded["points"]
-        varients[name] = (model_path, configs.dataset_path, n_events, points, hits_per_layer)
+        varients[name] = (model_path, config.dataset_path, n_events, points, hits_per_layer)
     else:
         print("Redoing data")
-        hits_per_layer, points = caloclouds_raw.process_events(model_path, configs, n_events)
-        varients[name] = (model_path, configs.dataset_path, n_events, points, hits_per_layer)
+        hits_per_layer, points = caloclouds_raw.process_events(model_path, config, n_events)
+        varients[name] = (model_path, config.dataset_path, n_events, points, hits_per_layer)
         np.savez(file_name, hits_per_layer=hits_per_layer, points=points)
 n_events = 1000
 n_files = 10
 dataloaders = ["PointCloudDatasetUnordered", "PointCloudDataset", "PointCloudAngular"]
 for dataloader in dataloaders:
-    hits_per_layer, points = caloclouds_raw.process_events(configs.dataset_path, configs, n_events, "PointCloudDatasetUnordered", n_files)
-    varients[dataloader] = (dataloader, configs.dataset_path, n_events, points, hits_per_layer)
+    hits_per_layer, points = caloclouds_raw.process_events(config.dataset_path, config, n_events, "PointCloudDatasetUnordered", n_files)
+    varients[dataloader] = (dataloader, config.dataset_path, n_events, points, hits_per_layer)
 # make a mask that removes leading and trailing zeros
 
 tails_mask = {title: np.ones(varients[title][3].shape[:-1], dtype=bool) for title in varients}

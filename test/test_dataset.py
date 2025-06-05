@@ -504,7 +504,7 @@ class TestCaloChallangeDataset(AbsDatasetTest):
     rolled_axis = True
 
     def test_init(self):
-        cfg = config_creator.make("configs_calotransf")
+        cfg = config_creator.make("config_calotransf")
         cfg.percentage = 1.0
 
         # For data0
@@ -529,7 +529,7 @@ class TestCaloChallangeDataset(AbsDatasetTest):
         assert ds1.Zmax == 44
 
     def test_getitem(self):
-        cfg = config_creator.make("configs_calotransf")
+        cfg = config_creator.make("config_calotransf")
         cfg.percentage = 1.0
         cfg.norm_cond = False
         # For data0

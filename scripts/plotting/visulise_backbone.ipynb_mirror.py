@@ -48,9 +48,9 @@ from pointcloud.utils.metadata import Metadata
 from pointcloud.data.dataset import PointCloudDataset
 import os
 
-configs = Configs()
-configs.poly_degree = 3
-meta = Metadata(configs)
+config = Configs()
+config.poly_degree = 3
+meta = Metadata(config)
 
 remake_wish = False
 redo_wish_data = False
@@ -62,10 +62,10 @@ varient = ""  # could also use "_0p25", or "_0"
 #file_path = f"../../../point-cloud-diffusion-logs/wish/dataset_accumulators/10-90GeV_x36_grid_regular_524k_float32_filtered/from_10{varient}.h5"
 #file_path = f"../../../point-cloud-diffusion-logs/wish/dataset_accumulators/initial_accumulation.h5"
 #file_path = "/data/dust/user/dayhallh/point-cloud-diffusion-logs/wish/dataset_accumulators/p22_th90_ph90_en10-1/p22_th90_ph90_en10-100_seedAll_all_steps.h5"
-file_path = save_location(configs, 10, 0)
+file_path = save_location(config, 10, 0)
 if not os.path.exists(file_path):
     print("Creating")
-    read_section(10, 0, configs)
+    read_section(10, 0, config)
 
 accumulated_stats = StatsAccumulator.load(file_path)
 # get bins
@@ -88,8 +88,8 @@ from pointcloud.models.wish import Wish
 wish_path = "../../../point-cloud-diffusion-logs/wish/dataset_accumulators/p22_th90_ph90_en10-1/wish_poly3.pt"
 
 if remake_wish:
-    #wish_model = Wish(configs)
-    wish_model = load_wish_from_accumulator(file_path, config=configs)
+    #wish_model = Wish(config)
+    wish_model = load_wish_from_accumulator(file_path, config=config)
     wish_model.save(wish_path)
 
 wish_model = Wish.load(wish_path)
@@ -146,7 +146,7 @@ ax_rangeE.set_ylabel("Standard devation of energies of points in an event")
 ax_hits.legend()
 ax_rangeE.legend()
 
-high_level_stats = HighLevelStats(accumulated_stats, configs.poly_degree)
+high_level_stats = HighLevelStats(accumulated_stats, config.poly_degree)
 hls_points = high_level_stats.incident_energy_bin_centers
 
 def get_n_pts(layer_n):
@@ -527,7 +527,7 @@ try:
 except FileExistsError:
     pass
 from pointcloud.data.read_write import read_raw_regaxes
-configs.storage_base = "/mnt/beegfs/desy/user/"
+config.storage_base = "/mnt/beegfs/desy/user/"
 import os, h5py
 g4_slice_incidents = []
 g4_slice_showers = []
@@ -540,7 +540,7 @@ for lower in slice_lower_bounds:
         
     else:
         print(f"Skimming data for slice {lower}")
-        data_path = configs.dataset_path
+        data_path = config.dataset_path
         with h5py.File(data_path, 'r') as opened_data:
             all_incidents = opened_data['energy']
             upper = lower + energy_slice_width
@@ -548,7 +548,7 @@ for lower in slice_lower_bounds:
             print(f"found {len(good_idxs)} points for slice, will trim to {max_showers_in_slice}")
             good_idxs = np.random.choice(good_idxs, max_showers_in_slice, False)
             good_idxs.sort()
-            incidents_here, showers_here = read_raw_regaxes(configs, good_idxs)
+            incidents_here, showers_here = read_raw_regaxes(config, good_idxs)
             g4_slice_incidents.append(incidents_here)
             g4_slice_showers.append(showers_here)
         with h5py.File(this_slice_path, 'w') as opened_slice:
@@ -670,7 +670,7 @@ for energy_slice_n in range(n_energy_slices):
 
 
 fig_hits, axarr_hits = plt.subplots(len(layers_of_intrest), n_energy_slices, sharey=True, sharex=True, figsize=(15, 12))
-high_level_stats = HighLevelStats(accumulated_stats, configs.poly_degree)
+high_level_stats = HighLevelStats(accumulated_stats, config.poly_degree)
 
 # which dimensions should be logs?
 log_x = False
@@ -764,7 +764,7 @@ def doodle_pdf(bins, energy_slice_n, layer_n, intercept_scale, grad_scale, inter
 
     return process_1_pdf, process_2_pdf
 
-high_level_stats = HighLevelStats(accumulated_stats, configs.poly_degree)
+high_level_stats = HighLevelStats(accumulated_stats, config.poly_degree)
 
 max_means = max(np.nanmax(g4_slices_mean_energy), np.nanmax(wish_slices_mean_energy))
 

@@ -11,23 +11,23 @@ from pointcloud.models import shower_flow, fish_flow
 from pointcloud.utils import stats_accumulator, metadata, showerflow_utils, showerflow_training
 from pointcloud.utils.metadata import Metadata
 
-configs = caloclouds_3.Configs()
-configs.storage_base = "/data/dust/user/dayhallh/"
-configs.logdir = "/data/dust/user/dayhallh/point-cloud-diffusion-logs/"
-configs.dataset_path_in_storage = False
-configs.dataset_path = caloclouds_3_simple_shower.Configs().dataset_path
-meta = metadata.Metadata(configs)
+config = caloclouds_3.Configs()
+config.storage_base = "/data/dust/user/dayhallh/"
+config.logdir = "/data/dust/user/dayhallh/point-cloud-diffusion-logs/"
+config.dataset_path_in_storage = False
+config.dataset_path = caloclouds_3_simple_shower.Configs().dataset_path
+meta = metadata.Metadata(config)
 
 
 try:
-    configs.device = "cuda"
-    incident_energies = torch.linspace(0.1, 1.0, 5)[:, None].to(configs.device)
+    config.device = "cuda"
+    incident_energies = torch.linspace(0.1, 1.0, 5)[:, None].to(config.device)
 except Exception as e:
-    configs.device = "cpu"
-    incident_energies = torch.linspace(0.1, 1.0, 5)[:, None].to(configs.device)
+    config.device = "cpu"
+    incident_energies = torch.linspace(0.1, 1.0, 5)[:, None].to(config.device)
 
-print(configs.dataset_path)
-print(configs.shower_flow_cond_features)
+print(config.dataset_path)
+print(config.shower_flow_cond_features)
 # There are 65 values to each draw from the original ShowerFlow;
 # 
 # - 0. Total observed clusters / `meta.n_pts_rescale`
@@ -44,18 +44,18 @@ print(configs.shower_flow_cond_features)
 # 
 # Start by using the functions designed to train showerflow to draw these distributions from the dataset.
 
-data_dir = os.path.realpath(os.path.join(configs.logdir.split("point-cloud-diffusion-logs")[0], "point-cloud-diffusion-data"))
+data_dir = os.path.realpath(os.path.join(config.logdir.split("point-cloud-diffusion-logs")[0], "point-cloud-diffusion-data"))
 showerflow_dir = os.path.join(data_dir, "showerFlow/sim-E1261AT600AP180-180")
 print(f"Showerflow dir is {showerflow_dir}")
 assert os.path.exists(showerflow_dir)
-pointsE_path = showerflow_training.get_incident_npts_visible(configs, showerflow_dir)
-distance_path = showerflow_training.get_gun_direction(configs, showerflow_dir)
-cog_path, cog_sample = showerflow_training.get_cog(configs, showerflow_dir, local_batch_size=20)
-clusters_per_layer_path = showerflow_training.get_clusters_per_layer(configs, showerflow_dir)
-energy_per_layer_path = showerflow_training.get_energy_per_layer(configs, showerflow_dir)
-make_train_ds = showerflow_training.train_ds_function_factory(pointsE_path, cog_path, clusters_per_layer_path, energy_per_layer_path, configs, distance_path)
+pointsE_path = showerflow_training.get_incident_npts_visible(config, showerflow_dir)
+distance_path = showerflow_training.get_gun_direction(config, showerflow_dir)
+cog_path, cog_sample = showerflow_training.get_cog(config, showerflow_dir, local_batch_size=20)
+clusters_per_layer_path = showerflow_training.get_clusters_per_layer(config, showerflow_dir)
+energy_per_layer_path = showerflow_training.get_energy_per_layer(config, showerflow_dir)
+make_train_ds = showerflow_training.train_ds_function_factory(pointsE_path, cog_path, clusters_per_layer_path, energy_per_layer_path, config, distance_path)
 n_bins = 60
-cond_mask = showerflow_utils.get_cond_mask(configs)
+cond_mask = showerflow_utils.get_cond_mask(config)
 total_cond = np.sum(cond_mask)
 n_distributions = 65
 bins = np.tile(np.linspace(0., 0.1, n_bins+1), (n_distributions, 1))
@@ -76,7 +76,7 @@ if log_x_01:
     true_bins[0][0] = 0.
     true_bins[1][0] = 0.
 dataset_distributions = np.zeros((n_distributions, n_bins))
-adaptor = fish_flow.Adaptor(configs)
+adaptor = fish_flow.Adaptor(config)
 use_events = 10_000
 local_batch_size = 100
 starts = np.arange(0, use_events, local_batch_size)
@@ -85,29 +85,29 @@ dataset_n_events = 0
 
 cond_slice = slice(0, total_cond)
 idx_reached = total_cond
-if "total_clusters" in configs.shower_flow_inputs:    
+if "total_clusters" in config.shower_flow_inputs:    
     sum_clusters_idx = idx_reached
     idx_reached += 1
 else:
     sum_clusters_idx = None
-if "total_energy" in configs.shower_flow_inputs:    
+if "total_energy" in config.shower_flow_inputs:    
     sum_energy_idx = idx_reached
     idx_reached += 1
 else:
     sum_energy_idx = None
 cog_idxs = []
 for c in "xyz":
-    if "cog_" + c in configs.shower_flow_inputs:    
+    if "cog_" + c in config.shower_flow_inputs:    
         cog_idxs.append(idx_reached)
         idx_reached += 1
     else:
         cog_idxs.append(None)
-if "clusters_per_layer" in configs.shower_flow_inputs:
+if "clusters_per_layer" in config.shower_flow_inputs:
     clusters_per_layer_slice = slice(idx_reached,idx_reached+30)
     idx_reached += 30
 else:
     clusters_per_layer_slice = None
-if "energy_per_layer" in configs.shower_flow_inputs:
+if "energy_per_layer" in config.shower_flow_inputs:
     energy_per_layer_slice = slice(idx_reached,idx_reached+30)
     idx_reached += 30
 else:
@@ -118,7 +118,7 @@ dataset_cond = []  # Will be the full 65 element array
 for batch_n, start in enumerate(starts):
     print(f"{batch_n/n_batches:.0%}", end='\r')
     data_matrix = make_train_ds(start, start + local_batch_size)
-    if not configs.shower_flow_fixed_input_norms:
+    if not config.shower_flow_fixed_input_norms:
         data_matrix_copy = data_matrix.clone()
         start_point = total_cond + (sum_clusters_idx is not None) + (sum_energy_idx is not None)
         data_matrix_copy[:, start_point:] = adaptor.to_basis(data_matrix[:, total_cond:])
@@ -219,7 +219,7 @@ saved_models_2 = showerflow_utils.existing_models(caloclouds_3_simple_shower.Con
 saved_models = {**saved_models_1, **saved_models_2}
 from pointcloud.utils import showerflow_utils
 from pointcloud.data.conditioning import feature_lengths
-configs.shower_flow_data_dir = showerflow_dir
+config.shower_flow_data_dir = showerflow_dir
 
 import ipdb
 if True:
@@ -231,7 +231,7 @@ if True:
     ])
     
 
-default_input_mask = showerflow_utils.get_input_mask(configs)
+default_input_mask = showerflow_utils.get_input_mask(config)
 max_n_inputs = len(default_input_mask)
 
 
@@ -245,15 +245,15 @@ def get_distributions(saved_models):
             num_blocks = saved_models["num_blocks"][i],
             num_inputs = num_inputs,
             num_cond_inputs = num_cond_inputs,
-            device = configs.device)
-        loaded_checkpoint = torch.load(saved_models["paths"][i], map_location=configs.device)
+            device = config.device)
+        loaded_checkpoint = torch.load(saved_models["paths"][i], map_location=config.device)
         model.load_state_dict(loaded_checkpoint["model"])
         distributions.append(dist)
     return distributions
 
 def model_distributions(model, model_path):
-    configs_here = showerflow_utils.configs_from_showerflow_path(configs, model_path)
-    meta = Metadata(configs_here)
+    config_here = showerflow_utils.config_from_showerflow_path(config, model_path)
+    meta = Metadata(config_here)
     repeats = 10
     found = np.zeros((n_distributions, n_bins))
     for r in range(repeats):
@@ -278,7 +278,7 @@ def model_distributions(model, model_path):
                     output[:, 2:] = adaptor.to_basis(values)
             else:
                 (num_clusters, energies, cog_x, cog_y, cog_z,
-                 clusters_per_layer, e_per_layer) = showerflow_utils.truescale_showerflow_output(values, configs_here)
+                 clusters_per_layer, e_per_layer) = showerflow_utils.truescale_showerflow_output(values, config_here)
                 if num_clusters is None:
                     output[:, 0] = torch.sum(clusters_per_layer, dim=1)/meta.n_pts_rescale
                     output[:, 5:35] = 30*clusters_per_layer/meta.n_pts_rescale

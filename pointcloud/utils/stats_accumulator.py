@@ -701,7 +701,7 @@ def read_section_to(
 
     Parameters
     ----------
-    config: configs.Configs
+    config: config.Configs
         The configuration object
     save_to: str
         Path to save this section of the statistics
@@ -777,7 +777,7 @@ def save_location(config, num_sections, section_number, varient=""):
 
     Parameters
     ----------
-    config: configs.Configs
+    config: config.Configs
         The configuration object
     num_sections: int
         Total number of sections to split the dataset into
@@ -814,7 +814,7 @@ def read_section(num_sections, section_number, config=Configs(), varient=""):
         Total number of sections to split the dataset into
     section_number: int
         Section number this call should read and save
-    config: configs.Configs
+    config: config.Configs
         The configuration object
         Optional, the default is the default configuration
     """

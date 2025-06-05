@@ -7,7 +7,7 @@
 # 
 # While looking at the G4 data a common need is to check for anomalous data. This is done with the help pf functions in `pointcloud.utils.clean_data`.
 # 
-# ## Start with imports and configs
+# ## Start with imports and config
 import numpy as np
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
@@ -32,14 +32,14 @@ def try_mkdir(dir_name):
 
 #%matplotlib widget
 
-configs = MaxwellConfigs()
+config = MaxwellConfigs()
 defaults = DefaultConfigs()
-configs.poly_degree = 3
-print(f" Dataset used {configs.dataset_path}")
+config.poly_degree = 3
+print(f" Dataset used {config.dataset_path}")
 
-metadata = Metadata(configs)
+metadata = Metadata(config)
 
-energy, events = read_raw_regaxes(configs, pick_events=list(range(1000)))
+energy, events = read_raw_regaxes(config, pick_events=list(range(1000)))
 mask = events[:, :, 3] > 0
 zs = events[:, :, 2][mask].flatten()
 
@@ -61,7 +61,7 @@ layer_bottom_pos = np.linspace(-1, 1, 31)[:-1]
 cell_thickness_global = layer_bottom_pos[1] - layer_bottom_pos[0]
 floors, ceilings = floors_ceilings(layer_bottom_pos, cell_thickness_global)
 
-dataset_class = dataset_class_from_config(configs)
+dataset_class = dataset_class_from_config(config)
 normed_events = np.copy(events)
 dataset_class.normalize_xyze(normed_events)
 
@@ -81,7 +81,7 @@ ax.vlines(ceilings, 0, low, color='green', alpha=0.5)
 ax.semilogy()
 metadata.Zmin
 from pointcloud.utils import stats_accumulator
-stats_accumulator.read_section_to(configs, "temp.h5", 1, 0) 
+stats_accumulator.read_section_to(config, "temp.h5", 1, 0) 
 acc = stats_accumulator.StatsAccumulator.load("temp.h5")
 yx = np.sum(acc.counts_hist, axis=(0, 3))
 fig, ax = plt.subplots(figsize=(10, 10))

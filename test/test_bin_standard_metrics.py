@@ -195,16 +195,16 @@ def test_sample_g4():
 
 def test_sample_model():
     # test with wish
-    configs = config_creator.make("wish")
-    wish_model = make_fake_wish_model(configs)
+    config = config_creator.make("wish")
+    wish_model = make_fake_wish_model(config)
 
     binned = make_default_binned([[-100, 100], [-100, 100], [-100, 100]])
     # sample no events
-    sample_model(configs, binned, 0, wish_model)
+    sample_model(config, binned, 0, wish_model)
     for counts in binned.counts:
         assert np.all(counts == 0)
     # sample many events
-    energies, events = sample_model(configs, binned, 100, wish_model)
+    energies, events = sample_model(config, binned, 100, wish_model)
     # check something got added
     for i, counts in enumerate(binned.counts[:6]):
         assert np.any(
@@ -214,27 +214,27 @@ def test_sample_model():
 
 def test_sample_accumulator():
     # test with an empty accumulator
-    configs = config_creator.make()
+    config = config_creator.make()
     acc = stats_accumulator.StatsAccumulator()
     binned = make_default_binned()
-    sample_accumulator(configs, binned, acc, 0)
+    sample_accumulator(config, binned, acc, 0)
     for counts in binned.counts[:4]:
         assert np.all(counts == 0)
-    sample_accumulator(configs, binned, acc, 100)
+    sample_accumulator(config, binned, acc, 100)
     for counts in binned.counts[:4]:
         assert np.all(counts == 0)
     fake_events = np.zeros((1, 10, 4))
     fake_events[0, :, 3] = 1
     acc.add([1], np.ones(1), fake_events)
-    sample_accumulator(configs, binned, acc, 1)
+    sample_accumulator(config, binned, acc, 1)
     assert np.any(binned.counts[0] > 0)
 
 
 def test_get_path(tmpdir):
-    configs = config_creator.make()
-    configs.logdir = str(tmpdir)
+    config = config_creator.make()
+    config.logdir = str(tmpdir)
     name = "test me"
-    path = get_path(configs, name)
+    path = get_path(config, name)
     assert isinstance(path, str)
     dir_name = os.path.dirname(path)
     assert os.path.exists(dir_name)
@@ -242,8 +242,8 @@ def test_get_path(tmpdir):
 
 def test_get_wish_models(tmpdir):
     # make some fake models to read
-    configs = config_creator.make("wish")
-    wish_model = make_fake_wish_model(configs)
+    config = config_creator.make("wish")
+    wish_model = make_fake_wish_model(config)
     save_path = os.path.join(str(tmpdir), "wish_model_{}.pt")
     n_poly_degrees = 3
     for i in range(n_poly_degrees):
@@ -268,5 +268,5 @@ def test_get_caloclouds_models(tmpdir):
     # fake the flow model
     test_model_path = str(tmpdir) + "/example_flow_model.pt"
     write_fake_flow_model(cfg, test_model_path)
-    models = get_caloclouds_models(test_cm_model_path, test_model_path, configs=cfg)
+    models = get_caloclouds_models(test_cm_model_path, test_model_path, config=cfg)
     assert len(models) == 1

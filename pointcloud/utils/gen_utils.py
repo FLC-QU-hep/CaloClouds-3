@@ -64,6 +64,9 @@ def get_scale_factor(
             ).reshape(-1, 1)
             / num_clusters
         )
+    elif coef_fake is None:
+        poly_fn_real = np.poly1d(coef_real)
+        scale_factor = poly_fn_real(num_clusters) / num_clusters
     else:
         poly_fn_real = np.poly1d(coef_real)
         poly_fn_fake = np.poly1d(coef_fake)
@@ -196,7 +199,7 @@ def gen_showers_batch(
     ----------
     models : torch.nn.Module
         The model to generate showers from.
-        If the configs.model_name specifies a model
+        If the config.model_name specifies a model
         that uses a shower flow, like caloclouds, then this should
         be both the model and the flow distribution;
     shower_flow : torch.distributions.Distribution, (optional)
@@ -214,14 +217,14 @@ def gen_showers_batch(
     bs : int
         The inner batch size to generate the batch in ....
         (default is 32)
-    config : configs.Configs
+    config : config.Configs
         The configuration object. Used to determine the device
         and the model.
         (default is Configs())
 
     Returns
     -------
-    showers : np.array (num, configs.max_points, 4)
+    showers : np.array (num, config.max_points, 4)
         The generated showers. The third dimension is (x, y, z, e)
     cond : np.array (num, C)
         The conditioning variables for the showers,
@@ -288,13 +291,13 @@ def gen_cond_showers_batch(
         is just a (num, 1) array of the incident energies.
     bs : int
         The inner batch size to generate the batch in ....
-    config : configs.Configs
+    config : config.Configs
         The configuration object. Used to determine the device
         and the model.
 
     Returns
     -------
-    showers : np.array (condE.shape[0], configs.max_points, 4)
+    showers : np.array (condE.shape[0], config.max_points, 4)
         The generated showers. The third dimension is (x, y, z, e)
 
     """
@@ -390,7 +393,7 @@ def gen_wish_inner_batch(cond_batch, destination_array, first_index, model):
         The index to start storing the generated showers at.
     model : torch.nn.Module
         The model to generate showers from.
-    config : configs.Configs
+    config : config.Configs
         The configuration object, used to determine the max points.
     """
     cond_batch = cond_batch["diffusion"]
@@ -431,13 +434,13 @@ def gen_v1_inner_batch(
         The flow to sample from. Only needed for models that use one,
         for models that don't like Wish, the e_min can be the second
         positional argument, or shower_flow can be None.
-    config : configs.Configs
+    config : config.Configs
         The configuration object. Used to determine the device
         and the model.
 
     Returns
     -------
-    output : np.array (cond_batch.size(0), configs.max_points, 4)
+    output : np.array (cond_batch.size(0), config.max_points, 4)
         The generated showers. The third dimension is (x, y, z, e)
     """
     if isinstance(cond_batch, dict):
@@ -486,7 +489,7 @@ def gen_v1_inner_batch(
         # it's a CC2 thing...
         cog_x, cog_y, cog_z = cog_z, cog_x, cog_y
 
-    scale_factor = 1.0
+    scale_factor = np.array([1.0])
     if getattr(config, "shower_flow_n_scaling", True):
         n_splines = getattr(config, "shower_flow_n_splines", None)
         coef_real = getattr(config, "shower_flow_coef_real", None)
@@ -496,6 +499,8 @@ def gen_v1_inner_batch(
                 "Warning; not scaling number of clusters as no scaling parameters given"
             )
         else:
+            if num_clusters is None:
+                num_clusters = clusters_per_layer_gen.sum(axis=1)
             # Check the old repo for there - splines should be used in CC2!
             # in C3 it's a single number
             scale_factor = get_scale_factor(
@@ -504,8 +509,10 @@ def gen_v1_inner_batch(
 
     # scale relative clusters per layer to actual number of clusters per layer
     # and same for energy
-    if num_clusters is None:
-        clusters_per_layer_gen = (clusters_per_layer_gen * scale_factor).astype(int)
+    if config.shower_flow_fixed_input_norms:
+        clusters_per_layer_gen = (clusters_per_layer_gen * scale_factor[:, None]).astype(int)
+        if num_clusters is not None:
+            num_clusters = (num_clusters * scale_factor).astype(int)  # B,1
     else:
         num_clusters = (num_clusters * scale_factor).astype(int)  # B,1
         clusters_per_layer_gen = (

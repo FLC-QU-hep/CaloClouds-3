@@ -581,7 +581,7 @@ def dataset_class_from_config(config):
 
     Parameters
     ----------
-    config : configs.Configs
+    config : config.Configs
         The config object with string attribute `dataset`
         that specifies the dataset.
 

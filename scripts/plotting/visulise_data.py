@@ -6,7 +6,7 @@ from pointcloud.data.read_write import read_raw_regaxes, regularise_event_axes
 
 
 def get_cfg():
-    from configs import Configs
+    from config import Configs
 
     # set a test config
     cfg = Configs()

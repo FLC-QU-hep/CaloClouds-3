@@ -440,13 +440,13 @@ def test_WishLayer():
 def test_Wish(tmpdir):
     # test each of the functions is callable in princple.
     # all of the internal working are tested in the other tests
-    configs = config_creator.make("wish", my_tmpdir=tmpdir)
+    config = config_creator.make("wish", my_tmpdir=tmpdir)
 
-    wish_model = wish.Wish(configs)
+    wish_model = wish.Wish(config)
 
     # check the created attributes
     assert wish_model.n_layers == 30
-    assert wish_model.poly_degree == configs.poly_degree
+    assert wish_model.poly_degree == config.poly_degree
     assert isinstance(wish_model.backbone, wish.LayersBackBone)
     assert len(wish_model.layers) == 30
     for layer in wish_model.layers:

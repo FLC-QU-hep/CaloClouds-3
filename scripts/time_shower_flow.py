@@ -54,8 +54,8 @@ def time_saved(models, cond):
     repeats = 10
     ticks = repeats * len(models)
     for r, name in enumerate(models["names"]):
-        configs = showerflow_utils.construct_configs(Configs(), models, r)
-        flow_dist = model_loader(configs, models["paths"][r])
+        config = showerflow_utils.construct_config(Configs(), models, r)
+        flow_dist = model_loader(config, models["paths"][r])
         big_tick = r * repeats
         first = True
         for q in range(repeats):
@@ -83,21 +83,21 @@ patterns = {
     "permute_affine_spline": ["permutation", "affine_coupling", "spline_coupling"],
 }
 pattern_repeats = np.arange(1, 11) * 10
-configs = Configs()
+config = Configs()
 n_cond_inputs = 4
-configs.logdir = "/data/dust/user/dayhallh/point-cloud-diffusion-logs/"
-configs.dataset_path = (
+config.logdir = "/data/dust/user/dayhallh/point-cloud-diffusion-logs/"
+config.dataset_path = (
     "/beegfs/desy/user/akorol/data/AngularShowers_RegularDetector/"
     "hdf5_for_CC/sim-E1261AT600AP180-180_file_{}slcio.hdf5"
 )
 
 try:
-    configs.device = "cuda"
-    cond = torch.linspace(0.1, 1.0, 5)[:, None].to(configs.device)
+    config.device = "cuda"
+    cond = torch.linspace(0.1, 1.0, 5)[:, None].to(config.device)
 
 except Exception as e:
-    configs.device = "cpu"
-    cond = torch.linspace(0.1, 1.0, 5)[:, None].to(configs.device)
+    config.device = "cpu"
+    cond = torch.linspace(0.1, 1.0, 5)[:, None].to(config.device)
 
 if n_cond_inputs > 1:
     cond = torch.tile(cond, (1, n_cond_inputs))
@@ -105,27 +105,27 @@ if n_cond_inputs > 1:
 # dataset_basename = "p22_th90_ph90_en10-100"
 dataset_basename = "sim-E1261AT600AP180-180"
 save_path = os.path.join(
-    configs.logdir, dataset_basename, f"time_shower_flow_{configs.device}_disk.npz"
+    config.logdir, dataset_basename, f"time_shower_flow_{config.device}_disk.npz"
 )
 
 
-def model_loader(configs, model_path):
-    shower_flow_compiler = versions_dict[configs.shower_flow_version]
+def model_loader(config, model_path):
+    shower_flow_compiler = versions_dict[config.shower_flow_version]
 
-    cond_used = showerflow_utils.get_cond_mask(configs)
+    cond_used = showerflow_utils.get_cond_mask(config)
     cond_dim = np.sum(cond_used)
-    inputs_used = showerflow_utils.get_input_mask(configs)
+    inputs_used = showerflow_utils.get_input_mask(config)
     input_dim = np.sum(inputs_used)
 
     # use cuda if avaliable
     if torch.cuda.is_available():
-        configs.device = "cuda"
+        config.device = "cuda"
     else:
-        configs.device = "cpu"
-    device = torch.device(configs.device)
+        config.device = "cpu"
+    device = torch.device(config.device)
 
     model, distribution = shower_flow_compiler(
-        num_blocks=configs.shower_flow_num_blocks,
+        num_blocks=config.shower_flow_num_blocks,
         num_inputs=input_dim,
         num_cond_inputs=cond_dim,
         device=device,
@@ -134,11 +134,11 @@ def model_loader(configs, model_path):
     return distribution
 
 
-def get_saved_models(configs):
-    configs.shower_flow_fixed_input_norms = True
-    saved_models = showerflow_utils.existing_models(configs)
-    configs.shower_flow_fixed_input_norms = False
-    other_models = showerflow_utils.existing_models(configs)
+def get_saved_models(config):
+    config.shower_flow_fixed_input_norms = True
+    saved_models = showerflow_utils.existing_models(config)
+    config.shower_flow_fixed_input_norms = False
+    other_models = showerflow_utils.existing_models(config)
     for k in other_models:
         saved_models[k].extend(other_models[k])
     return saved_models
@@ -149,7 +149,7 @@ def time_all():
 
     to_save["pattern_repeats"] = pattern_repeats
     to_save["cond"] = cond.cpu().numpy()
-    factory = HybridTanH_factory(DEFAULT_NUM_INPUTS, DEFAULT_NUM_COND, configs.device)
+    factory = HybridTanH_factory(DEFAULT_NUM_INPUTS, DEFAULT_NUM_COND, config.device)
 
     for pattern in patterns:
         print(f"Pattern: {pattern}")
@@ -165,7 +165,7 @@ def time_all():
 
 
 def time_all_saved():
-    saved_models = get_saved_models(configs)
+    saved_models = get_saved_models(config)
     times = time_saved(saved_models, cond)
     to_save = {"cond": cond.cpu().numpy()}
     to_save.update(saved_models)
@@ -174,7 +174,7 @@ def time_all_saved():
 
 
 def update_losses_only():
-    saved_models = showerflow_utils.existing_models(configs)
+    saved_models = showerflow_utils.existing_models(config)
     from_disk = np.load(save_path)
     new_data = {k: from_disk[k] for k in from_disk.files}
     for i, name in enumerate(saved_models["names"]):

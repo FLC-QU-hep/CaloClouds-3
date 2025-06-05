@@ -6,7 +6,7 @@ from matplotlib import pyplot as plt
 from IPython.display import display_markdown
 import matplotlib
 import os
-configs = Configs()
+config = Configs()
 matplotlib.rcParams['figure.figsize'] = 5, 5
 
 model_path = "/home/dayhallh/training/point-cloud-diffusion-logs/anomalies/24-05-27.23_13496.pt"
@@ -14,10 +14,10 @@ scores_path = save_path_for_model(model_path)
 
 recalc_scores = False
 if not os.path.exists(scores_path) or recalc_scores:
-    detect(model_path, configs)
+    detect(model_path, config)
 scores = np.load(scores_path)
 
-dat = trees.DataAsTrees(configs)
+dat = trees.DataAsTrees(config)
 plot_args = {"xlims":(-150, 150), "ylims":(-200, 100), "zlims":(-2, 32)}
 
 
@@ -27,7 +27,7 @@ plot_args = {"xlims":(-150, 150), "ylims":(-200, 100), "zlims":(-2, 32)}
 # Also, define the ability to make a double plot and show it.
 plot_num = 0
 
-plots_folder = os.path.join(configs.image_dir, "anomaly_nb")
+plots_folder = os.path.join(config.image_dir, "anomaly_nb")
 if not os.path.exists(plots_folder):
     os.mkdir(plots_folder)
 def make_double(i):
@@ -66,7 +66,7 @@ for i in low_anomaly:
 from pointcloud.data.read_write import read_raw_regaxes
 pick_events = np.arange(5000)
 
-incidents, events = read_raw_regaxes(configs, pick_events=pick_events)
+incidents, events = read_raw_regaxes(config, pick_events=pick_events)
 
 
 xs = np.linspace(10, 90, 50)

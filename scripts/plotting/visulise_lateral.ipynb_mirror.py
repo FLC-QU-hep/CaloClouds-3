@@ -31,9 +31,9 @@ from pointcloud.config_varients.wish import Configs
 from pointcloud.utils.metadata import Metadata
 from pointcloud.data.dataset import PointCloudDataset
 
-configs = Configs()
-configs.poly_degree = 3
-meta = Metadata(configs)
+config = Configs()
+config.poly_degree = 3
+meta = Metadata(config)
 
 redo_wish_data = True
 remake_wish = True
@@ -68,8 +68,8 @@ from pointcloud.models.wish import Wish
 wish_path = "../../../point-cloud-diffusion-logs/wish/dataset_accumulators/p22_th90_ph90_en10-100_wish.pt"
 
 if remake_wish:
-    #wish_model = Wish(configs)
-    wish_model = load_wish_from_accumulator(file_path, config=configs)
+    #wish_model = Wish(config)
+    wish_model = load_wish_from_accumulator(file_path, config=config)
     wish_model.save(wish_path)
 
 wish_model = Wish.load(wish_path)

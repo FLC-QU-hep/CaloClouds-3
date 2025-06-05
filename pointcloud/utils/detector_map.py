@@ -36,7 +36,7 @@ def create_map(
     half_cell_size_global=None,
     cell_thickness_global=None,
     dm=1,
-    configs=Configs(),
+    config=Configs(),
 ):
     """
     Using metadata about the detector, create a map of the cells in the detector.
@@ -56,7 +56,7 @@ def create_map(
     dm : int
         dimension split multiplicity
         can be (1, 2, 3, 4, 5)
-    configs : Configs (optional)
+    config : Configs (optional)
         Configs object containing the configuration of the dataset
         Only used if X, Y, Z or layer_bottom_pos are not given.
         A default Configs object is created if not given.
@@ -69,7 +69,7 @@ def create_map(
         The cell size divided by the dimension split multiplicity
     """
 
-    metadata = Metadata(configs)
+    metadata = Metadata(config)
     if not all(hasattr(item, "__iter__") for item in [X, Y, Z]):
         X, Y, Z, E = confine_to_box(*metadata.load_muon_map(), metadata=metadata)
 
@@ -449,7 +449,7 @@ def get_projections(
     return_cell_point_cloud=False,
     include_artifacts=False,
     max_num_hits=None,
-    configs=Configs(),
+    config=Configs(),
 ):
     """
     Project all events onto the detector map, and optionally
@@ -485,7 +485,7 @@ def get_projections(
         largest shower.
         If not given the value will be taken from the max_points
         attribute of the Configs object.
-    configs : Configs (optional)
+    config : Configs (optional)
         Configs object containing the configuration of the dataset
         Only used if layer_bottom_pos is not given.
         A default Configs object is created if not given.
@@ -501,9 +501,9 @@ def get_projections(
         in coordinates (x, y, z, energy)
     """
     if max_num_hits is None:
-        max_num_hits = configs.max_points
+        max_num_hits = config.max_points
 
-    metadata = Metadata(configs)
+    metadata = Metadata(config)
     if layer_bottom_pos is None:
         layer_bottom_pos = metadata.layer_bottom_pos_global
     if half_cell_size_global is None:
@@ -540,6 +540,17 @@ def get_projections(
         cell_point_clouds = np.empty((0, 0, 4))
 
     return events, cell_point_clouds
+
+
+def mip_cut(events_as_cells, energy_scale=1.):
+    """
+    The mip peak is 0.2 MeV. Anything with less than half that
+    Should be zeroed.
+    """
+    half_mip = 0.5*2e-4*energy_scale
+    for event in events_as_cells:
+        for layer in event:
+            layer[layer < half_mip] = 0
 
 
 def confine_to_box(X, Y, Z, E, metadata=Metadata()):

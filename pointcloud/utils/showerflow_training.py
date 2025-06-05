@@ -15,7 +15,7 @@ from ..data.conditioning import get_cond_features_names
 
 
 def get_incident_npts_visible(
-    configs, showerflow_dir, redo=False, local_batch_size=10_000
+    config, showerflow_dir, redo=False, local_batch_size=10_000
 ):
     """
     Save and return the incident energy and the number of
@@ -24,7 +24,7 @@ def get_incident_npts_visible(
 
     Parameters
     ----------
-    configs : pointcloud.configs.Configs
+    config : pointcloud.configs.Configs
         Description of setup, including location of dataset.
     showerflow_dir : str
         Location to store the data, should exist.
@@ -42,13 +42,13 @@ def get_incident_npts_visible(
         visible points in the shower for all showers in the dataset.
     """
     assert os.path.exists(showerflow_dir)
-    meta = Metadata(configs)
+    meta = Metadata(config)
     pointsE_path = os.path.join(showerflow_dir, "pointsE.npz")
     if os.path.exists(pointsE_path) and not redo:
         print("Using precaluclated energies and counts", flush=True)
     else:
         print("Recalculating energies and counts", flush=True)
-        n_events = np.sum(get_n_events(configs.dataset_path, configs.n_dataset_files))
+        n_events = np.sum(get_n_events(config.dataset_path, config.n_dataset_files))
         floors, ceilings = floors_ceilings(
             meta.layer_bottom_pos_hdf5, meta.cell_thickness_hdf5
         )
@@ -59,7 +59,7 @@ def get_incident_npts_visible(
             print(f"{start_idx/n_events:.0%}", end="\r")
             my_slice = slice(start_idx, start_idx + local_batch_size)
             energies_batch, events_batch = read_raw_regaxes(
-                configs, pick_events=my_slice
+                config, pick_events=my_slice
             )
             energy[my_slice] = energies_batch
             num_points[my_slice] = (events_batch[:, :, 3] > 0).sum(axis=1)
@@ -75,14 +75,14 @@ def get_incident_npts_visible(
     return pointsE_path
 
 
-def get_gun_direction(configs, showerflow_dir, redo=False, local_batch_size=10_000):
+def get_gun_direction(config, showerflow_dir, redo=False, local_batch_size=10_000):
     """
     Save and return the unti vector for the gun direction
     for all showers in the dataset. If found on disk, will just return.
 
     Parameters
     ----------
-    configs : pointcloud.configs.Configs
+    config : pointcloud.configs.Configs
         Description of setup, including location of dataset.
     showerflow_dir : str
         Location to store the data, should exist.
@@ -105,14 +105,14 @@ def get_gun_direction(configs, showerflow_dir, redo=False, local_batch_size=10_0
         print("Using precaluclated gun direction", flush=True)
     else:
         print("Recalculating gun direction", flush=True)
-        n_events = np.sum(get_n_events(configs.dataset_path, configs.n_dataset_files))
+        n_events = np.sum(get_n_events(config.dataset_path, config.n_dataset_files))
         gun_direction = np.zeros((n_events, 3))
         try:
             for start_idx in range(0, n_events, local_batch_size):
                 print(f"{start_idx/n_events:.0%}", end="\r")
                 my_slice = slice(start_idx, start_idx + local_batch_size)
                 per_event_batch, _ = read_raw_regaxes(
-                    configs, pick_events=my_slice, per_event_cols=["p_norm_local"]
+                    config, pick_events=my_slice, per_event_cols=["p_norm_local"]
                 )
                 gun_direction[my_slice] = per_event_batch
         except KeyError:
@@ -130,7 +130,7 @@ def get_gun_direction(configs, showerflow_dir, redo=False, local_batch_size=10_0
 
 
 def get_clusters_per_layer(
-    configs, showerflow_dir, redo=False, local_batch_size=10_000
+    config, showerflow_dir, redo=False, local_batch_size=10_000
 ):
     """
     Save and return the number of clusters in each layer for all showers
@@ -138,7 +138,7 @@ def get_clusters_per_layer(
 
     Parameters
     ----------
-    configs : pointcloud.configs.Configs
+    config : pointcloud.configs.Configs
         Description of setup, including location of dataset.
     showerflow_dir : str
         Location to store the data.
@@ -156,8 +156,8 @@ def get_clusters_per_layer(
         for all showers in the dataset.
     """
     assert os.path.exists(showerflow_dir)
-    meta = Metadata(configs)
-    n_events = np.sum(get_n_events(configs.dataset_path, configs.n_dataset_files))
+    meta = Metadata(config)
+    n_events = np.sum(get_n_events(config.dataset_path, config.n_dataset_files))
     clusters_per_layer_path = os.path.join(showerflow_dir, "clusters_per_layer.npz")
     if os.path.exists(clusters_per_layer_path) and not redo:
         print("Using precaluclated clusters per layer", flush=True)
@@ -170,7 +170,7 @@ def get_clusters_per_layer(
         for start_idx in range(0, n_events, local_batch_size):
             print(f"{start_idx/n_events:.0%}", end="\r")
             my_slice = slice(start_idx, start_idx + local_batch_size)
-            _, events_batch = read_raw_regaxes(configs, pick_events=my_slice)
+            _, events_batch = read_raw_regaxes(config, pick_events=my_slice)
             mask = events_batch[:, :, 3] > 0
             clusters_here = [
                 ((events_batch[:, :, 2] < c) & (events_batch[:, :, 2] > f) & mask).sum(
@@ -189,14 +189,14 @@ def get_clusters_per_layer(
     return clusters_per_layer_path
 
 
-def get_energy_per_layer(configs, showerflow_dir, redo=False, local_batch_size=10_000):
+def get_energy_per_layer(config, showerflow_dir, redo=False, local_batch_size=10_000):
     """
     Save and return the observed total energy in each layer
     for all showers in the dataset.
 
     Parameters
     ----------
-    configs : pointcloud.configs.Configs
+    config : pointcloud.configs.Configs
         Description of setup, including location of dataset.
     showerflow_dir : str
         Location to store the data.
@@ -215,8 +215,8 @@ def get_energy_per_layer(configs, showerflow_dir, redo=False, local_batch_size=1
 
     """
     assert os.path.exists(showerflow_dir)
-    meta = Metadata(configs)
-    n_events = np.sum(get_n_events(configs.dataset_path, configs.n_dataset_files))
+    meta = Metadata(config)
+    n_events = np.sum(get_n_events(config.dataset_path, config.n_dataset_files))
     energy_per_layer_path = os.path.join(showerflow_dir, "energy_per_layer.npz")
     if os.path.exists(energy_per_layer_path) and not redo:
         print("Using precaluclated energy per layer", flush=True)
@@ -229,7 +229,7 @@ def get_energy_per_layer(configs, showerflow_dir, redo=False, local_batch_size=1
         for start_idx in range(0, n_events, local_batch_size):
             print(f"{start_idx/n_events:.0%}", end="\r")
             my_slice = slice(start_idx, start_idx + local_batch_size)
-            _, events_batch = read_raw_regaxes(configs, pick_events=my_slice)
+            _, events_batch = read_raw_regaxes(config, pick_events=my_slice)
             energy_here = [
                 (
                     events_batch[..., 3]
@@ -249,7 +249,7 @@ def get_energy_per_layer(configs, showerflow_dir, redo=False, local_batch_size=1
     return energy_per_layer_path
 
 
-def get_cog(configs, showerflow_dir, redo=False, local_batch_size=10_000):
+def get_cog(config, showerflow_dir, redo=False, local_batch_size=10_000):
     """
     Save and return the number of center of gravity of each shower
     in the dataset. If found on disk, will just return.
@@ -257,7 +257,7 @@ def get_cog(configs, showerflow_dir, redo=False, local_batch_size=10_000):
 
     Parameters
     ----------
-    configs : pointcloud.configs.Configs
+    config : pointcloud.configs.Configs
         Description of setup, including location of dataset.
     showerflow_dir : str
         Location to store the data.
@@ -278,12 +278,12 @@ def get_cog(configs, showerflow_dir, redo=False, local_batch_size=10_000):
         `local_batch_size` showers in the dataset.
     """
     assert os.path.exists(showerflow_dir)
-    n_events = np.sum(get_n_events(configs.dataset_path, configs.n_dataset_files))
+    n_events = np.sum(get_n_events(config.dataset_path, config.n_dataset_files))
     cog_path = os.path.join(showerflow_dir, "cog.npy")
     if os.path.exists(cog_path) and not redo:
         print("Using precaluclated cog", flush=True)
         my_slice = slice(0, local_batch_size)
-        _, events_batch = read_raw_regaxes(configs, pick_events=my_slice)
+        _, events_batch = read_raw_regaxes(config, pick_events=my_slice)
         cog_batch = cog_from_kinematics(
             events_batch[..., 0],
             events_batch[..., 1],
@@ -296,7 +296,7 @@ def get_cog(configs, showerflow_dir, redo=False, local_batch_size=10_000):
         for start_idx in range(0, n_events, local_batch_size):
             print(f"{start_idx/n_events:.0%}", end="\r")
             my_slice = slice(start_idx, start_idx + local_batch_size)
-            _, events_batch = read_raw_regaxes(configs, pick_events=my_slice)
+            _, events_batch = read_raw_regaxes(config, pick_events=my_slice)
             cog_batch = cog_from_kinematics(
                 events_batch[..., 0],
                 events_batch[..., 1],
@@ -314,7 +314,7 @@ def train_ds_function_factory(
     cog_path,
     clusters_per_layer_path,
     energy_per_layer_path,
-    configs,
+    config,
     direction_path=None,
 ):
     """
@@ -335,7 +335,7 @@ def train_ds_function_factory(
     energy_per_layer_path : str
         Path to the file containing the observed total energy in each layer
         for all showers in the dataset.
-    configs : pointcloud.configs.Configs
+    config : pointcloud.configs.Configs
         Description of setup, including location of dataset.
     direction_path : str, optional
         If the gun direction is used for conditioning, the path to the
@@ -348,10 +348,10 @@ def train_ds_function_factory(
         Function that returns a training dataset for a given index range.
         Arguments are `start_idx` and `end_idx`.
     """
-    meta = Metadata(configs)
-    device = configs.device
+    meta = Metadata(config)
+    device = config.device
 
-    if getattr(configs, "shower_flow_fixed_input_norms", False):
+    if getattr(config, "shower_flow_fixed_input_norms", False):
         clusters_per_layer_key = "clusters_per_layer"
         energy_per_layer_key = "energy_per_layer"
         n_layers = len(meta.layer_bottom_pos_hdf5)
@@ -363,9 +363,9 @@ def train_ds_function_factory(
         clusters_per_layer_norm = 1.0
         energy_per_layer_norm = 1.0
 
-    condition_energy = "energy" in get_cond_features_names(configs, "showerflow")
+    condition_energy = "energy" in get_cond_features_names(config, "showerflow")
     condition_direction = "p_norm_local" in get_cond_features_names(
-        configs, "showerflow"
+        config, "showerflow"
     )
 
     def make_train_ds(start_idx, end_idx):
@@ -386,13 +386,13 @@ def train_ds_function_factory(
             output.append(direction)
 
         # for predicted values
-        if "total_clusters" in configs.shower_flow_inputs:
+        if "total_clusters" in config.shower_flow_inputs:
             num_points = (
                 torch.tensor(pointE["num_points"][my_slice]) / meta.n_pts_rescale
             )
             num_points = num_points.view(-1, 1).to(device).float()
             output.append(num_points)
-        if "total_energy" in configs.shower_flow_inputs:
+        if "total_energy" in config.shower_flow_inputs:
             visible_energy = (
                 torch.tensor(pointE["visible_energy"][my_slice]) / meta.vis_eng_rescale
             )
@@ -402,27 +402,27 @@ def train_ds_function_factory(
         normed_cog = np.load(cog_path, mmap_mode="r")[my_slice].copy()
         normed_cog = (normed_cog - meta.mean_cog) / meta.std_cog
 
-        if "cog_x" in configs.shower_flow_inputs:
+        if "cog_x" in config.shower_flow_inputs:
             cog_x = torch.tensor(normed_cog[:, 0])
             cog_x = cog_x.view(-1, 1).to(device).float()
             output.append(cog_x)
-        if "cog_y" in configs.shower_flow_inputs:
+        if "cog_y" in config.shower_flow_inputs:
             cog_y = torch.tensor(normed_cog[:, 1])
             cog_y = cog_y.view(-1, 1).to(device).float()
             output.append(cog_y)
-        if "cog_z" in configs.shower_flow_inputs:
+        if "cog_z" in config.shower_flow_inputs:
             cog_z = torch.tensor(normed_cog[:, 2])
             cog_z = cog_z.view(-1, 1).to(device).float()
             output.append(cog_z)
 
-        if "clusters_per_layer" in configs.shower_flow_inputs:
+        if "clusters_per_layer" in config.shower_flow_inputs:
             clusters = np.load(clusters_per_layer_path, mmap_mode="r")
             clusters_per_layer = (
                 torch.tensor(clusters[clusters_per_layer_key][my_slice]).to(device)
                 * clusters_per_layer_norm
             )
             output.append(clusters_per_layer)
-        if "energy_per_layer" in configs.shower_flow_inputs:
+        if "energy_per_layer" in config.shower_flow_inputs:
             energies = np.load(energy_per_layer_path, mmap_mode="r")
             e_per_layer = (
                 torch.tensor(energies[energy_per_layer_key][my_slice]).to(device)

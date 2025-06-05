@@ -17,7 +17,7 @@ from matplotlib import colormaps
 import utils.plotting as plotting
 import utils.gen_utils as gen_utils
 from tqdm import tqdm
-# from configs import Configs
+# from config import Configs
 from utils.plotting import get_projections, MAP, offset, layer_bottom_pos, cell_thickness_global, Xmax, Xmin, Zmax, Zmin
 
 # import k_diffusion as K

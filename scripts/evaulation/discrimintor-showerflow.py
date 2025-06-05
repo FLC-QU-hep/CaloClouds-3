@@ -4,7 +4,7 @@
 #
 # ## data prep
 #
-# The starting point is loading the configs for this dataset.
+# The starting point is loading the config for this dataset.
 import sys
 import os
 import torch
@@ -25,45 +25,45 @@ from matplotlib import pyplot as plt
 chosen = int(sys.argv[1])
 print(f"We will train the {chosen}th model")
 
-default_configs = default.Configs()
-configs = caloclouds_3_simple_shower.Configs()
+default_config = default.Configs()
+config = caloclouds_3_simple_shower.Configs()
 if torch.cuda.is_available():
-    configs.device = "cuda"
+    config.device = "cuda"
 else:
-    configs.device = "cpu"
-if os.path.exists(os.path.dirname(configs.dataset_path)):
-    print(f"Found dataset at {configs.dataset_path}")
+    config.device = "cpu"
+if os.path.exists(os.path.dirname(config.dataset_path)):
+    print(f"Found dataset at {config.dataset_path}")
 
 # Then we check that the ground truth features exist for this dataset.
-g4_data_folder = discriminator.locate_g4_data(configs)
+g4_data_folder = discriminator.locate_g4_data(config)
 print(g4_data_folder)
-discriminator.create_g4_data_files(configs)
+discriminator.create_g4_data_files(config)
 # Get the generator models we will be comparing with, and check their data has been generated.
 
 stack = []
 for detailed_history in [True, False]:
-    configs.shower_flow_detailed_history = detailed_history
+    config.shower_flow_detailed_history = detailed_history
     for fixed_input_norms in [True, False]:
-        configs.shower_flow_fixed_input_norms = fixed_input_norms
+        config.shower_flow_fixed_input_norms = fixed_input_norms
         for weight_decay in [0., 0.1, 0.0001]:
-            configs.shower_flow_weight_decay = weight_decay
-            stack.append(showerflow_utils.existing_models(configs))
+            config.shower_flow_weight_decay = weight_decay
+            stack.append(showerflow_utils.existing_models(config))
         
 existing_models = {key: sum([s[key] for s in stack], []) for key in stack[0]}
 
-existing_models["configs"] = []
+existing_models["config"] = []
 
 for i, name in enumerate(existing_models["names"]):
-    model_configs = showerflow_utils.construct_configs(configs, existing_models, i)
-    existing_models["configs"].append(model_configs)
+    model_config = showerflow_utils.construct_config(config, existing_models, i)
+    existing_models["config"].append(model_config)
 
 
 for i, name in enumerate(existing_models["names"]):
     if i == chosen:
-        model_configs = existing_models["configs"][i]
+        model_config = existing_models["config"][i]
         path = existing_models["paths"][i]
         print(name, path)
-        discriminator.create_showerflow_data_files(model_configs, path)
+        discriminator.create_showerflow_data_files(model_config, path)
 
 
 existing_models["paths"]
@@ -76,9 +76,9 @@ existing_models["paths"]
 
 def gen_training(model_idx, settings="settings12"):
     model_name = existing_models["names"][model_idx]
-    model_configs = existing_models["configs"][model_idx]
+    model_config = existing_models["config"][model_idx]
     model_path = existing_models["paths"][model_idx]
-    model_data_folder = discriminator.locate_model_data(model_configs, model_path)
+    model_data_folder = discriminator.locate_model_data(model_config, model_path)
     feature_mask = discriminator.feature_masks[settings]
     training = discriminator.Training(
         settings,

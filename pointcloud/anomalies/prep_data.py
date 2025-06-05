@@ -1,8 +1,8 @@
 """
 Use me like this:
 from pointcloud.configs import Configs
-configs = Configs()
-format_save(configs)
+config = Configs()
+format_save(config)
 """
 
 import numpy as np
@@ -78,28 +78,28 @@ def format_data(data_as_trees, sample_idxs):
     return features, edges
 
 
-def direct_data(configs, file_path):
+def direct_data(config, file_path):
     """
     Quick and direct convertion of a single file to pytorch geometric data.
     """
-    config_copy = copy.deepcopy(configs)
+    config_copy = copy.deepcopy(config)
     config_copy.datset_path = file_path
     config_copy.n_dataset_files = 0
     data_as_trees = DataAsTrees(config_copy, quiet=True)
     features, edges = format_data(data_as_trees, list(range(len(data_as_trees))))
     data = []
     for i, (feat, edge) in enumerate(zip(features, edges)):
-        feat = torch.from_numpy(feat).contiguous().to(configs.device)
-        edge = torch.from_numpy(edge).contiguous().to(configs.device)
+        feat = torch.from_numpy(feat).contiguous().to(config.device)
+        edge = torch.from_numpy(edge).contiguous().to(config.device)
         data.append(Data(x=feat, edge_index=edge, tree_idx=i))
     return data
 
 
-def format_save(configs, max_trees_in_memory=1000):
-    save_base = configs.formatted_tree_base
+def format_save(config, max_trees_in_memory=1000):
+    save_base = config.formatted_tree_base
     features = []
     edges = []
-    data = DataAsTrees(configs, max_trees_in_memory, quiet=True)
+    data = DataAsTrees(config, max_trees_in_memory, quiet=True)
     total_trees = len(data)
     for start_idx in range(0, total_trees, max_trees_in_memory):
         print(f"{start_idx/total_trees:.1%}", end="\r", flush=True)

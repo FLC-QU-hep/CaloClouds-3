@@ -15,7 +15,7 @@
 # 
 # Lining up these distributions with geant 4 shows good simulation behaviour.
 # 
-# ## Start with imports and configs
+# ## Start with imports and config
 
 import numpy as np
 import matplotlib.pyplot as plt
@@ -26,7 +26,7 @@ from pointcloud.config_varients.wish_maxwell import Configs as MaxwellConfigs
 
 from pointcloud.evaluation.bin_standard_metrics import BinnedData, get_path
 
-configs = Configs()
+config = Configs()
 
 # ## Histogramming
 # 
@@ -43,14 +43,14 @@ configs = Configs()
 
 g4_name = "Geant 4"
 
-def get_path_or_ref(configs, name):
+def get_path_or_ref(config, name):
     """
-    Get a path to the binned data from the logdir in the configs,
+    Get a path to the binned data from the logdir in the config,
     or if not found, check the reference folder.
     """
     ref_dir = "standard_metrics_ref"
     try:
-        save_path = get_path(configs, name)
+        save_path = get_path(config, name)
     except FileNotFoundError:
         save_path = ""
     if not os.path.exists(save_path):
@@ -62,7 +62,7 @@ def get_path_or_ref(configs, name):
             save_path = ref_path
     return save_path
     
-#g4_save_path = get_path_or_ref(configs, g4_name)
+#g4_save_path = get_path_or_ref(config, g4_name)
 
 #if not g4_save_path:
 #    print(f"Can't load g4 bins, recreate with create_standard_metrics.py or this doesn't really work...")
@@ -93,10 +93,10 @@ save_paths = {"CaloClouds previous":"/data/dust/user/dayhallh/point-cloud-diffus
                  "CaloClouds changed loss 3":"/data/dust/user/dayhallh/point-cloud-diffusion-logs/investigation2/binned_metrics/CaloClouds_changed_loss_3.npz",
                 }
 # model_names += [f"Wish-poly{poly_degree}" for poly_degree in range(1, 4)]
-configs.logdir = "/data/dust/user/dayhallh/point-cloud-diffusion-logs/investigation"
+config.logdir = "/data/dust/user/dayhallh/point-cloud-diffusion-logs/investigation"
 
 for model_name, save_path in save_paths.items():
-    #save_path = get_path_or_ref(configs, model_name)
+    #save_path = get_path_or_ref(config, model_name)
     #save_path = "/beegfs/desy/user/weberdun/6_PointCloudDiffusion/log/binned_metrics/CaloClouds_Duncan_gen0.npz"
     if not save_path:
         print(f"Can't load {model_name}, recreate with create_standard_metrics.py if required")
@@ -109,7 +109,7 @@ print(to_compare['CaloClouds previous'])
 print(binned_g4)
 # For only some of the distributions, we can also get data from the StatsAccumulator to compare;
 acc_name = "Geant 4 Accumulator"
-#acc_save_path = get_path_or_ref(configs, acc_name)
+#acc_save_path = get_path_or_ref(config, acc_name)
 #acc_save_path = "/beegfs/desy/user/weberdun/6_PointCloudDiffusion/log/binned_metrics/Geant_4_Accumulator.npz"
 acc_save_path = False
 if acc_save_path:

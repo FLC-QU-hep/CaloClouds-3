@@ -223,9 +223,9 @@ class Adaptor(Distribution):
     Including renormalising.
     """
 
-    def __init__(self, configs, base_dist=None):
-        self.configs = configs
-        self.metadata = Metadata(configs)
+    def __init__(self, config, base_dist=None):
+        self.config = config
+        self.metadata = Metadata(config)
         self.base_dist = base_dist
         if base_dist is None:
             # treat it as data

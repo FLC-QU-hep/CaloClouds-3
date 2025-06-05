@@ -365,20 +365,20 @@ class TestRead:
         shutil.rmtree(cls.tmpdir)
 
     def test_read_raw_regaxes_withcond(self):
-        configs = config_creator.make()
-        configs.dataset_path = self.paths["empty"]
-        configs.n_dataset_files = 0
-        configs.cond_features = ["energy", "points"]
-        configs.shower_flow_cond_features = ["energy"]
-        configs.event_padding_position = "back"
-        found_cond, found_events = conditioning.read_raw_regaxes_withcond(configs)
+        config = config_creator.make()
+        config.dataset_path = self.paths["empty"]
+        config.n_dataset_files = 0
+        config.cond_features = ["energy", "points"]
+        config.shower_flow_cond_features = ["energy"]
+        config.event_padding_position = "back"
+        found_cond, found_events = conditioning.read_raw_regaxes_withcond(config)
         assert len(found_cond["showerflow"]) == 0
         assert len(found_cond["diffusion"]) == 0
         assert len(found_events) == 0
-        configs.dataset_path = self.paths["one_event"]
+        config.dataset_path = self.paths["one_event"]
         for i in range(2):
-            configs.n_dataset_files = i
-            found_cond, found_events = conditioning.read_raw_regaxes_withcond(configs)
+            config.n_dataset_files = i
+            found_cond, found_events = conditioning.read_raw_regaxes_withcond(config)
             npt.assert_allclose(found_cond["showerflow"], [1.0])
             npt.assert_allclose(found_cond["diffusion"], [[1.0, 2.0]])
             npt.assert_allclose(
@@ -386,9 +386,9 @@ class TestRead:
             )
 
         # this should work without a defined padding position
-        del configs.event_padding_position
-        configs.dataset_path = self.paths["last_segment"]
-        found_cond, found_events = conditioning.read_raw_regaxes_withcond(configs)
+        del config.event_padding_position
+        config.dataset_path = self.paths["last_segment"]
+        found_cond, found_events = conditioning.read_raw_regaxes_withcond(config)
         npt.assert_allclose(found_cond["showerflow"], self.reg_energy1)
         npt.assert_allclose(found_cond["diffusion"][:, 0], self.reg_energy1)
         npt.assert_allclose(found_cond["diffusion"][:, 1], [1, 2, 1])
@@ -396,15 +396,15 @@ class TestRead:
         npt.assert_allclose(found_events, local_ax_1)
 
         # finally, the nine events should be fine
-        configs.dataset_path = self.paths["nine_events"]
-        configs.n_dataset_files = 1
-        found_cond, found_events = conditioning.read_raw_regaxes_withcond(configs)
+        config.dataset_path = self.paths["nine_events"]
+        config.n_dataset_files = 1
+        found_cond, found_events = conditioning.read_raw_regaxes_withcond(config)
         npt.assert_allclose(found_cond["showerflow"], self.reg_energy1)
         npt.assert_allclose(found_cond["diffusion"][:, 0], self.reg_energy1)
         npt.assert_allclose(found_cond["diffusion"][:, 1], [1, 2, 1])
         npt.assert_allclose(found_events, local_ax_1)
-        configs.n_dataset_files = 3
-        found_cond, found_events = conditioning.read_raw_regaxes_withcond(configs)
+        config.n_dataset_files = 3
+        found_cond, found_events = conditioning.read_raw_regaxes_withcond(config)
         npt.assert_allclose(found_cond["showerflow"], [2.0, 3.0, 4.0, 2.0, 3.0, 4.0, 2.0, 3.0, 4.0])
         npt.assert_allclose(found_cond["diffusion"][:, 0], [2.0, 3.0, 4.0, 2.0, 3.0, 4.0, 2.0, 3.0, 4.0])
         npt.assert_allclose(found_cond["diffusion"][:, 1], [1, 2, 1, 1, 2, 1, 1, 2, 1])
@@ -413,18 +413,18 @@ class TestRead:
     def test_read_raw_regaxes_weithcond_direction(self):
         # Again, but with the p_norm_local vector too
         # as we don't ask for points, we shouldn't need to know the padding
-        configs = config_creator.make()
-        configs.dataset_path = self.paths["empty"]
-        configs.n_dataset_files = 0
-        configs.shower_flow_cond_features = ["energy"]
-        configs.cond_features = ["energy", "p_norm_local"]
-        found_cond, found_events = conditioning.read_raw_regaxes_withcond(configs)
+        config = config_creator.make()
+        config.dataset_path = self.paths["empty"]
+        config.n_dataset_files = 0
+        config.shower_flow_cond_features = ["energy"]
+        config.cond_features = ["energy", "p_norm_local"]
+        found_cond, found_events = conditioning.read_raw_regaxes_withcond(config)
         assert len(found_cond["showerflow"]) == 0
         assert len(found_events) == 0
-        configs.dataset_path = self.paths["one_event"]
+        config.dataset_path = self.paths["one_event"]
         for i in range(2):
-            configs.n_dataset_files = i
-            found_cond, found_events = conditioning.read_raw_regaxes_withcond(configs)
+            config.n_dataset_files = i
+            found_cond, found_events = conditioning.read_raw_regaxes_withcond(config)
             npt.assert_allclose(found_cond["showerflow"], [1.0])
             npt.assert_allclose(found_cond["diffusion"], [[1.0, 10.0, 10.0, 10.0]])
             npt.assert_allclose(
@@ -432,8 +432,8 @@ class TestRead:
             )
 
         # this should work
-        configs.dataset_path = self.paths["last_segment"]
-        found_cond, found_events = conditioning.read_raw_regaxes_withcond(configs)
+        config.dataset_path = self.paths["last_segment"]
+        found_cond, found_events = conditioning.read_raw_regaxes_withcond(config)
         cond = np.hstack([self.reg_energy1[:, None], self.direction1[0]])
         npt.assert_allclose(found_cond["diffusion"], cond)
         npt.assert_allclose(found_cond["showerflow"], self.reg_energy1)
@@ -441,14 +441,14 @@ class TestRead:
         npt.assert_allclose(found_events, local_ax_1)
 
         # finally, the nine events should be fine
-        configs.dataset_path = self.paths["nine_events"]
-        configs.n_dataset_files = 1
-        found_cond, found_events = conditioning.read_raw_regaxes_withcond(configs)
+        config.dataset_path = self.paths["nine_events"]
+        config.n_dataset_files = 1
+        found_cond, found_events = conditioning.read_raw_regaxes_withcond(config)
         npt.assert_allclose(found_cond["diffusion"], cond)
         npt.assert_allclose(found_cond["showerflow"], self.reg_energy1)
         npt.assert_allclose(found_events, local_ax_1)
-        configs.n_dataset_files = 3
-        found_cond, found_events = conditioning.read_raw_regaxes_withcond(configs)
+        config.n_dataset_files = 3
+        found_cond, found_events = conditioning.read_raw_regaxes_withcond(config)
         cond = np.tile(cond, (3, 1))
         npt.assert_allclose(found_cond["diffusion"], cond)
         npt.assert_allclose(found_cond["showerflow"], cond[:, 0])

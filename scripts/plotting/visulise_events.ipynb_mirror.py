@@ -5,7 +5,7 @@
 # 
 # Viewing events produced by the model is mostly a sanity check.
 # 
-# ## Start with imports and configs
+# ## Start with imports and config
 import numpy as np
 import torch
 import matplotlib.pyplot as plt
@@ -28,22 +28,22 @@ def try_mkdir(dir_name):
 
 
 #%run visulise_data.py
-configs = Configs()
+config = Configs()
 
 
 try:
-    configs.device = "cuda"
-    incident_energies = torch.linspace(0.1, 1.0, 5)[:, None].to(configs.device)
+    config.device = "cuda"
+    incident_energies = torch.linspace(0.1, 1.0, 5)[:, None].to(config.device)
 except Exception as e:
-    configs.device = "cpu"
-    incident_energies = torch.linspace(0.1, 1.0, 5)[:, None].to(configs.device)
-configs.poly_degree = 1
-#configs.dataset_path_in_storage = False
-#configs.dataset_path = "../../../point-cloud-diffusion-data/even_batch_10k.h5"
-#configs.dataset_path = "../../../data_production/ILCsoftEvents/p22_r0_th90_ph90_en10-90_downsampled.h5"
-#configs.dataset_path = "/home/dayhallh/Data/p22_th90_ph90_en10-100_joined/p22_th90_ph90_en10-100_seed42_all_steps.hdf5"
-#configs.dataset_path_in_storage = True
-#configs._dataset_path = defaults._dataset_path
+    config.device = "cpu"
+    incident_energies = torch.linspace(0.1, 1.0, 5)[:, None].to(config.device)
+config.poly_degree = 1
+#config.dataset_path_in_storage = False
+#config.dataset_path = "../../../point-cloud-diffusion-data/even_batch_10k.h5"
+#config.dataset_path = "../../../data_production/ILCsoftEvents/p22_r0_th90_ph90_en10-90_downsampled.h5"
+#config.dataset_path = "/home/dayhallh/Data/p22_th90_ph90_en10-100_joined/p22_th90_ph90_en10-100_seed42_all_steps.hdf5"
+#config.dataset_path_in_storage = True
+#config._dataset_path = defaults._dataset_path
 # Grab some random events and plot one with a function from elsewhere.
 # ## Custom plot function
 # 
@@ -96,7 +96,7 @@ def plot_wish_model(energy_in, model, ax=None, flat=False):
 # high anomaly
 fig = plt.figure(figsize=(15, 5))
 use_events = [0, 2, 189]
-energies, events = read_raw_regaxes(configs, use_events)
+energies, events = read_raw_regaxes(config, use_events)
 for i, event_n in enumerate(use_events):
     ax = fig.add_subplot(131+i, projection='3d')
     
@@ -115,8 +115,8 @@ if False:
     accumulator_path = "../../../point-cloud-diffusion-logs/wish/dataset_accumulators/p22_th90_ph90_en10-100_accumulator.h5"
     # acaccumulator_path = "../../../point-cloud-diffusion-logs/wish/dataset_accumulators/10-90GeV_x36_grid_regular_524k_float32/from_10_0p25.h5"
     
-    configs.fit_attempts = 3
-    wish_model = Wish(configs)
+    config.fit_attempts = 3
+    wish_model = Wish(config)
     #wish_model = load_wish_from_accumulator(accumulator_path)
     #wish_model.save(wish_path)
     wish_model = Wish.load(wish_path)
@@ -136,8 +136,8 @@ for sf in ["new", "gen0"]:
     for cc in ["new", "gen0"]:
         cc_path = caloclouds if cc == "gen0" else new_caloclouds
 
-        cc_model, dist, showerflow_configs = get_caloclouds_models(caloclouds_paths=cc_path, showerflow_paths=sf_path, configs=configs)["CaloClouds3"]
-        batch = gen_cond_showers_batch(cc_model, dist, cond, config=showerflow_configs)
+        cc_model, dist, showerflow_config = get_caloclouds_models(caloclouds_paths=cc_path, showerflow_paths=sf_path, config=config)["CaloClouds3"]
+        batch = gen_cond_showers_batch(cc_model, dist, cond, config=showerflow_config)
 
 
 

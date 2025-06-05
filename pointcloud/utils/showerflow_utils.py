@@ -10,30 +10,30 @@ from .metadata import Metadata
 from ..data.conditioning import get_cond_features_names
 
 
-def get_data_dir(configs, last_resort="/home/{}/Data/"):
+def get_data_dir(config, last_resort="/home/{}/Data/"):
     user_name = os.getenv("USER", os.getenv("USERNAME", ""))
-    second_choice = os.path.join(configs.storage_base, "point-cloud-diffusion-data")
-    data_dir = getattr(configs, "shower_flow_data_dir", second_choice)
+    second_choice = os.path.join(config.storage_base, "point-cloud-diffusion-data")
+    data_dir = getattr(config, "shower_flow_data_dir", second_choice)
     if not os.path.exists(data_dir):
         data_dir = os.path.join(
-            configs.storage_base, user_name, "point-cloud-diffusion-data"
+            config.storage_base, user_name, "point-cloud-diffusion-data"
         )
     if not os.path.exists(data_dir):
         data_dir = last_resort.format(user_name)
     return data_dir
 
 
-def get_showerflow_dir(configs):
-    dataset_path = configs.dataset_path
-    base_path = get_data_dir(configs)
+def get_showerflow_dir(config):
+    dataset_path = config.dataset_path
+    base_path = get_data_dir(config)
     dataset_name_key = dataset_name_from_path(dataset_path)
 
     showerflow_dir = os.path.join(base_path, "showerFlow", dataset_name_key)
     return showerflow_dir
 
 
-def model_save_paths(configs, version, num_blocks, cut_inputs):
-    showerflow_dir = get_showerflow_dir(configs)
+def model_save_paths(config, version, num_blocks, cut_inputs):
+    showerflow_dir = get_showerflow_dir(config)
     max_input_dims = 65
     inputs_used = np.ones(max_input_dims, dtype=bool)
     cut_inputs = [int(i) for i in cut_inputs]
@@ -44,20 +44,20 @@ def model_save_paths(configs, version, num_blocks, cut_inputs):
     inputs_used_as_base10 = int(inputs_used_as_binary, 2)
     name_base = f"ShowerFlow_{version}_nb{num_blocks}_inputs{inputs_used_as_base10}"
     nice_name = f"{version}_nb{num_blocks}"
-    if getattr(configs, "shower_flow_fixed_input_norms", False):
+    if getattr(config, "shower_flow_fixed_input_norms", False):
         name_base += "_fnorms"
         nice_name += "_fnorms"
 
-    if getattr(configs, "shower_flow_train_base", False):
+    if getattr(config, "shower_flow_train_base", False):
         name_base += "_tbase"
         nice_name += "_tbase"
 
-    if getattr(configs, "shower_flow_detailed_history", False):
+    if getattr(config, "shower_flow_detailed_history", False):
         name_base += "_dhist"
         nice_name += "_dhist"
 
-    if getattr(configs, "shower_flow_weight_decay", 0):
-        wd_string = f"{configs.shower_flow_weight_decay:.1e}".replace(".", "p")
+    if getattr(config, "shower_flow_weight_decay", 0):
+        wd_string = f"{config.shower_flow_weight_decay:.1e}".replace(".", "p")
         name_base += f"_wd{wd_string}"
         nice_name += f"_wd{wd_string}"
 
@@ -70,28 +70,28 @@ def model_save_paths(configs, version, num_blocks, cut_inputs):
     return nice_name, best_model_path, best_data_path
 
 
-def get_cond_mask(configs):
+def get_cond_mask(config):
     max_cond_inputs = 4
     inputs_used = np.zeros(max_cond_inputs, dtype=bool)
-    names = get_cond_features_names(configs, "showerflow")
+    names = get_cond_features_names(config, "showerflow")
     inputs_used[0] = "energy" in names
     inputs_used[1:] = "p_norm_local" in names
     return inputs_used
 
 
-def get_input_mask(configs):
+def get_input_mask(config):
     max_input_dims = 65
     inputs_used = np.zeros(max_input_dims, dtype=bool)
-    if "total_clusters" in configs.shower_flow_inputs:
+    if "total_clusters" in config.shower_flow_inputs:
         inputs_used[0] = True
-    if "total_energy" in configs.shower_flow_inputs:
+    if "total_energy" in config.shower_flow_inputs:
         inputs_used[1] = True
     for c in "xyz":
-        if f"cog_{c}" in configs.shower_flow_inputs:
+        if f"cog_{c}" in config.shower_flow_inputs:
             inputs_used[2 + "xyz".index(c)] = True
-    if "clusters_per_layer" in configs.shower_flow_inputs:
+    if "clusters_per_layer" in config.shower_flow_inputs:
         inputs_used[5:35] = True
-    if "energy_per_layer" in configs.shower_flow_inputs:
+    if "energy_per_layer" in config.shower_flow_inputs:
         inputs_used[35:] = True
     return inputs_used
 
@@ -118,7 +118,7 @@ def input_mask_to_list(input_mask):
     return inputs
 
 
-def existing_models(configs):
+def existing_models(config):
     saved_models = {}
     saved_models["versions"] = []
     saved_models["names"] = []
@@ -135,12 +135,12 @@ def existing_models(configs):
     )
 
     for version, nb, ci in combinations:
-        name, model_path, data_path = model_save_paths(configs, version, nb, ci)
-        fixed_input_norms = getattr(configs, "shower_flow_fixed_input_norms", False)
-        weight_decay = getattr(configs, "shower_flow_weight_decay", 0)
+        name, model_path, data_path = model_save_paths(config, version, nb, ci)
+        fixed_input_norms = getattr(config, "shower_flow_fixed_input_norms", False)
+        weight_decay = getattr(config, "shower_flow_weight_decay", 0)
         if not os.path.exists(model_path):
             continue
-        cond_feature_names = get_cond_features_names(configs, "showerflow")
+        cond_feature_names = get_cond_features_names(config, "showerflow")
         saved_models["paths"].append(model_path)
         saved_models["names"].append(name)
         saved_models["versions"].append(version)
@@ -227,44 +227,44 @@ def config_params_from_showerflow_path(showerflow_path):
     return version, num_blocks, cut_inputs, inputs, fixed_input_norms
 
 
-def configs_from_showerflow_path(configs, showerflow_path):
+def config_from_showerflow_path(config, showerflow_path):
     # get existing models
-    saved_models = existing_models(configs)
+    saved_models = existing_models(config)
     # check if the path is in the list
     if showerflow_path in saved_models["paths"]:
         idx = saved_models["paths"].index(showerflow_path)
-        configs = construct_configs(configs, saved_models, idx)
-        return configs
+        config = construct_config(config, saved_models, idx)
+        return config
     # try just the base name
     base_name = os.path.basename(showerflow_path)
     found_base_names = [os.path.basename(p) for p in saved_models["paths"]]
     if found_base_names.count(base_name) == 1:  # unique match
         idx = found_base_names.index(base_name)
-        configs = construct_configs(configs, saved_models, idx)
-        return configs
+        config = construct_config(config, saved_models, idx)
+        return config
 
     warnings.warn(
         f"Did not generate the path {showerflow_path} when looking for existing models."
         " This may indicate there is something unusual about the path."
-        " Deducing the configs by processing the file name."
+        " Deducing the config by processing the file name."
     )
     version, num_blocks, cut_inputs, inputs, fixed_input_norms = (
         config_params_from_showerflow_path(showerflow_path)
     )
     # otherwise, we can guess from the path
-    configs = copy.deepcopy(configs)
-    configs.shower_flow_version = version
-    configs.shower_flow_num_blocks = num_blocks
-    configs.shower_flow_inputs = inputs
-    configs.shower_flow_fixed_input_norms = fixed_input_norms
-    return configs
+    config = copy.deepcopy(config)
+    config.shower_flow_version = version
+    config.shower_flow_num_blocks = num_blocks
+    config.shower_flow_inputs = inputs
+    config.shower_flow_fixed_input_norms = fixed_input_norms
+    return config
 
 
-def construct_configs(config_base, saved_models, idx):
-    configs = copy.deepcopy(config_base)
-    configs.model_name = "shower_flow"
-    configs.shower_flow_version = saved_models["versions"][idx]
-    configs.shower_flow_cond_features = saved_models["cond_features"][idx]
+def construct_config(config_base, saved_models, idx):
+    config = copy.deepcopy(config_base)
+    config.model_name = "shower_flow"
+    config.shower_flow_version = saved_models["versions"][idx]
+    config.shower_flow_cond_features = saved_models["cond_features"][idx]
     shower_flow_inputs = [
         "total_clusters",
         "total_energy",
@@ -278,10 +278,10 @@ def construct_configs(config_base, saved_models, idx):
     cut_ints = sorted(cut_ints)
     for c in cut_ints[::-1]:
         del shower_flow_inputs[c]
-    configs.shower_flow_inputs = shower_flow_inputs
-    configs.shower_flow_num_blocks = saved_models["num_blocks"][idx]
-    configs.shower_flow_fixed_input_norms = saved_models["fixed_input_norms"][idx]
-    return configs
+    config.shower_flow_inputs = shower_flow_inputs
+    config.shower_flow_num_blocks = saved_models["num_blocks"][idx]
+    config.shower_flow_fixed_input_norms = saved_models["fixed_input_norms"][idx]
+    return config
 
 
 def truescale_showerflow_output(samples, config):

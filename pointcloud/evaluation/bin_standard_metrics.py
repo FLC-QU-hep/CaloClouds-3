@@ -36,8 +36,8 @@ def try_mkdir(dir_name):
         pass
 
 
-configs = Configs()
-meta = Metadata(configs)
+config = Configs()
+meta = Metadata(config)
 floors, ceilings = detector_map.floors_ceilings(
     meta.layer_bottom_pos_hdf5, meta.cell_thickness_hdf5, 0
 )
@@ -72,6 +72,7 @@ class BinnedData:
         cell_thickness,
         gun_xyz_pos,
         hard_check=True,
+        no_box_cut=False,
     ):
         """Construct a BinnedData object.
 
@@ -150,6 +151,9 @@ class BinnedData:
 
         self.max_sample_events = 10
         self.sample_events = []
+
+        if no_box_cut:
+            self.box_cut = lambda events: None
 
     @staticmethod
     def sanity_layer_box(layer_bottom_pos, xyz_limits):
@@ -588,6 +592,7 @@ class DetectorBinnedData(BinnedData):
         cell_thickness,
         gun_xyz_pos,
         hard_check=True,
+        no_box_cut=False,
     ):
         """Construct a BinnedData object.
 
@@ -596,7 +601,7 @@ class DetectorBinnedData(BinnedData):
         name : str
             The name of the model, no mechanical significance.
         energy_scale : float
-            How much to divide the observed energy by before binning.
+            How much to divide the cluster energy by before projecting into the detector.
         MAP : list
             list of dictionaries, each containing the grid of cells for a layer
             in global coordinates
@@ -650,7 +655,7 @@ class DetectorBinnedData(BinnedData):
         self.add_hist("sum active cells", "layers", 1, 30, 30)
         self.add_hist("sum energy [MeV]", "layers", 1, 30, 30)
         self.add_hist("number of cells", "cell energy [MeV]", 0.000001, 1, 100, True)
-        self.add_hist("number of showers", "number of active cells", 0, 10000, 50)
+        self.add_hist("number of showers", "number of active cells", 0, 3000, 50)
         self.add_hist("number of showers", "energy sum [MeV]", 0, 10, 50)
         self.add_hist(
             "number of showers",
@@ -678,6 +683,9 @@ class DetectorBinnedData(BinnedData):
         self.max_sample_events = 10
         self.raw_sample_events = []
         self.sample_events = []
+
+        if no_box_cut:
+            self.box_cut = lambda events: None
 
     def radial_bins_for_cells(self):
         radial_locations = []
@@ -735,6 +743,7 @@ class DetectorBinnedData(BinnedData):
             return_cell_point_cloud=False,
             include_artifacts=False,
         )
+        detector_map.mip_cut(events_as_cells, self.energy_scale)
         self.add_events_as_cells(events_as_cells)
 
     def add_events_as_cells(self, events_as_cells):
@@ -804,7 +813,7 @@ class DetectorBinnedData(BinnedData):
                 axis=(1, 2),
             )
             energy_weighted_position[:, 2] += np.sum(
-                (self.layer_bottom_pos[l] + self.cell_thickness * 0.5) * cell_energies,
+                (l + 0.5) * cell_energies,
                 axis=(1, 2),
             )
 
@@ -844,13 +853,13 @@ class DetectorBinnedData(BinnedData):
         warnings.warn(error_message)
 
 
-def sample_g4(configs, binned, n_events):
+def sample_g4(config, binned, n_events):
     """
     Draw samples from the g4 data and add them to the binned data.
 
     Parameters
     ----------
-    configs : Configs
+    config : Configs
         The configuration used to find the dataset, etc.
     binned : BinnedData
         The binned data to add the samples to, modified inplace.
@@ -864,7 +873,7 @@ def sample_g4(configs, binned, n_events):
     for b, start in enumerate(batch_starts):
         print(f"{b/n_batches:.1%}", end="\r", flush=True)
         cond, events = read_raw_regaxes_withcond(
-            configs, pick_events=slice(start, start + batch_len)
+            config, pick_events=slice(start, start + batch_len)
         )
         binned.add_events(events)
     print()
@@ -872,13 +881,13 @@ def sample_g4(configs, binned, n_events):
     binned.recompute_mean_energies()
 
 
-def sample_model(configs, binned, n_events, model, shower_flow=None):
+def sample_model(config, binned, n_events, model, shower_flow=None):
     """
     Use a model to produce events and add them to the binned data.
 
     Parameters
     ----------
-    configs : Configs
+    config : Configs
         The configuration used to find the dataset, etc.
     binned : BinnedData
         The binned data to add the samples to, modified inplace.
@@ -903,12 +912,12 @@ def sample_model(configs, binned, n_events, model, shower_flow=None):
     if n_events == 0:
         return np.zeros(0), np.zeros((0, 0, 4))
     cond, _ = read_raw_regaxes_withcond(
-        configs,
+        config,
         total_size=n_events,
         for_model=["showerflow", "diffusion"],
     )
     events = conditioned_sample_model(
-        configs,
+        config,
         binned,
         cond,
         model,
@@ -917,13 +926,13 @@ def sample_model(configs, binned, n_events, model, shower_flow=None):
     return cond, events
 
 
-def conditioned_sample_model(model_configs, binned, cond, model, shower_flow=None):
+def conditioned_sample_model(model_config, binned, cond, model, shower_flow=None):
     """
     Use a model to produce events and add them to the binned data.
 
     Parameters
     ----------
-    model_configs : Configs
+    model_config : Configs
         The configuration used for model metadata
     binned : BinnedData or DetectorBinnedData
         The binned data to add the samples to, modified inplace.
@@ -949,7 +958,7 @@ def conditioned_sample_model(model_configs, binned, cond, model, shower_flow=Non
         n_events = len(cond)
     if n_events == 0:
         return np.zeros(0), np.zeros((0, 0, 4))
-    if model_configs.model_name in ["fish", "wish"]:
+    if model_config.model_name in ["fish", "wish"]:
         batch_len = min(1000, n_events)
     else:
         batch_len = min(100, n_events)
@@ -964,7 +973,7 @@ def conditioned_sample_model(model_configs, binned, cond, model, shower_flow=Non
         else:
             cond_here = cond[start : start + batch_len]
         events = gen_cond_showers_batch(
-            model, shower_flow, cond_here, bs=batch_len, config=model_configs
+            model, shower_flow, cond_here, bs=batch_len, config=model_config
         )
         binned.add_events(events)
     print()
@@ -973,14 +982,14 @@ def conditioned_sample_model(model_configs, binned, cond, model, shower_flow=Non
     return events
 
 
-def sample_accumulator(configs, binned, acc, n_events):
+def sample_accumulator(config, binned, acc, n_events):
     """
     For the values for which it's possible, create binned data from an
     accumulator object.
 
     Parameters
     ----------
-    configs : Configs
+    config : Configs
         The configuration used to find the dataset, etc.
     binned : BinnedData
         The binned data to add the samples to, modified inplace.
@@ -1027,13 +1036,13 @@ def sample_accumulator(configs, binned, acc, n_events):
     binned.recompute_mean_energies()
 
 
-def get_path(configs, name):
+def get_path(config, name, detector_projection=False):
     """
     Chose a path to save the binned data to.
 
     Parameters
     ----------
-    configs : Configs
+    config : Configs
         The configuration used to find the logdir.
     name : str
         Name of the binned data, will be used in the file name.
@@ -1043,7 +1052,11 @@ def get_path(configs, name):
     path : str
         The path to save the binned data to.
     """
-    log_dir = configs.logdir
+    if hasattr(config, "dataset_tag"):
+        name += "_" + config.dataset_tag
+    if detector_projection:
+        name += "_detectorProj"
+    log_dir = config.logdir
     binned_metrics_dir = os.path.join(log_dir, "binned_metrics")
     try_mkdir(binned_metrics_dir)
     file_name = name.replace(" ", "_") + ".npz"
@@ -1080,11 +1093,11 @@ def get_wish_models(
     """
     models = {}
     for poly_degree in range(1, n_poly_degrees + 1):
-        configs = WishConfigs()
-        configs.poly_degree = poly_degree
-        configs.device = device
+        config = WishConfigs()
+        config.poly_degree = poly_degree
+        config.device = device
         here = Wish.load(wish_path.format(poly_degree))
-        models[f"Wish-poly{poly_degree}"] = (here, None, configs)
+        models[f"Wish-poly{poly_degree}"] = (here, None, config)
     return models
 
 
@@ -1115,9 +1128,9 @@ def get_fish_models(
     # TODO fish isn't currently a torch Module
     # may need to change this
     # fish_model = fish_model.to(device)
-    configs = WishConfigs()
-    configs.model_name = "fish"
-    models["Fish"] = (fish_model, None, configs)
+    config = WishConfigs()
+    config.model_name = "fish"
+    models["Fish"] = (fish_model, None, config)
     return models
 
 
@@ -1140,7 +1153,7 @@ def get_caloclouds_models(
     device="cpu",
     caloclouds_names="CaloClouds3",
     showerflow_names="",
-    configs=None,
+    config=None,
 ):
     """
     Gather a set of models for evaluation. Currently just one.
@@ -1161,9 +1174,9 @@ def get_caloclouds_models(
     showerflow_names: list of str, optional
         The names of the models, by default empty
         or if multiple paths are given, the filenames will be used
-    configs : Configs, optional
+    config : Configs, optional
         The configuration used to create the models, by default
-        the files global configs is used.
+        the files global config is used.
 
     Returns
     -------
@@ -1173,10 +1186,10 @@ def get_caloclouds_models(
         configuration used to create the model.
     """
     models = {}
-    if configs is None:
-        configs = Configs()
-    configs.device = device
-    distillation = getattr(configs, "distillation", False)
+    if config is None:
+        config = Configs()
+    config.device = device
+    distillation = getattr(config, "distillation", False)
 
     if isinstance(caloclouds_paths, str):
         caloclouds_paths = [caloclouds_paths]
@@ -1191,7 +1204,7 @@ def get_caloclouds_models(
 
     for calocloud_name, calocloud_path in zip(caloclouds_names, caloclouds_paths):
         for showerflow_name, showerflow_path in zip(showerflow_names, showerflow_paths):
-            model = get_model_class(configs)(configs, distillation=distillation).to(
+            model = get_model_class(config)(config, distillation=distillation).to(
                 device
             )
             print(calocloud_path)
@@ -1202,20 +1215,20 @@ def get_caloclouds_models(
             )
             model.eval()
             try:
-                showerflow_configs = showerflow_utils.configs_from_showerflow_path(
-                    configs, showerflow_path
+                showerflow_config = showerflow_utils.config_from_showerflow_path(
+                    config, showerflow_path
                 )
             except AssertionError:
                 warnings.warn(
-                    f"Couldn't create configs from {showerflow_path}, using input configs"
+                    f"Couldn't create config from {showerflow_path}, using input config"
                 )
-                showerflow_configs = configs
-            input_mask = showerflow_utils.get_input_mask(showerflow_configs)
-            version = versions_dict[showerflow_configs.shower_flow_version]
+                showerflow_config = config
+            input_mask = showerflow_utils.get_input_mask(showerflow_config)
+            version = versions_dict[showerflow_config.shower_flow_version]
             flow_model, flow_dist, _ = version(
-                num_blocks=showerflow_configs.shower_flow_num_blocks,
+                num_blocks=showerflow_config.shower_flow_num_blocks,
                 num_inputs=np.sum(input_mask),
-                num_cond_inputs=get_cond_dim(showerflow_configs, "showerflow"),
+                num_cond_inputs=get_cond_dim(showerflow_config, "showerflow"),
                 device=device,
             )
             print(showerflow_path)
@@ -1230,6 +1243,6 @@ def get_caloclouds_models(
                 if showerflow_name
                 else calocloud_name
             )
-            models[name] = (model, flow_dist, showerflow_configs)
+            models[name] = (model, flow_dist, showerflow_config)
 
     return models

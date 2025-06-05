@@ -24,22 +24,22 @@ from matplotlib import pyplot as plt
 from pointcloud.config_varients.wish import Configs
 from pointcloud.models import fish
 import torch
-configs = Configs()
+config = Configs()
 
-fish_dir = os.path.join(configs.logdir, "fish")
+fish_dir = os.path.join(config.logdir, "fish")
 os.makedirs(fish_dir, exist_ok=True)
 fish_path = os.path.join(fish_dir, "fish.npz")
-acc_path = os.path.join(configs.logdir, "dataset_accumulators/p22_th90_ph90_en10-1/p22_th90_ph90_en10-100_seedAll_alignMean.h5")
+acc_path = os.path.join(config.logdir, "dataset_accumulators/p22_th90_ph90_en10-1/p22_th90_ph90_en10-100_seedAll_alignMean.h5")
 
 if os.path.exists(fish_path) and not redo_model:
     model = fish.Fish.load(fish_path)
 else:
     print("Creating model")
-    model = fish.load_fish_from_accumulator(accumulator=acc_path, config=configs)
+    model = fish.load_fish_from_accumulator(accumulator=acc_path, config=config)
     model.save(fish_path)
 # The model is loaded, let's just plot a couple of events to see it in comparison to the data.
 from pointcloud.data.read_write import read_raw_regaxes
-energies, events = read_raw_regaxes(configs, total_size=100)
+energies, events = read_raw_regaxes(config, total_size=100)
 
 def plot_event(event_n, energy_in, use_event, energy_scale=100., x_scale=1, ax=None):
     energy = use_event[:, 3]

@@ -90,7 +90,7 @@ def test_get_optimiser_schedular():
 
 
 def test_get_pretrained():
-    for config_type in ["wish", "configs_calotransf"]:
+    for config_type in ["wish", "config_calotransf"]:
         config = config_creator.make(config_type)
         if config_type == "wish":
             model = wish.Wish(config)

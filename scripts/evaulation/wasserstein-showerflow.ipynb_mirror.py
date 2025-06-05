@@ -11,39 +11,39 @@ from pointcloud.utils.plotting import RatioPlots, nice_hex
 from matplotlib import pyplot as plt
 
 
-configs = caloclouds_3_simple_shower.Configs()
+config = caloclouds_3_simple_shower.Configs()
 if torch.cuda.is_available():
-    configs.device = "cuda"
+    config.device = "cuda"
 else:
-    configs.device = "cpu"
-if os.path.exists(os.path.dirname(configs.dataset_path)):
-    print(f"Found dataset at {configs.dataset_path}")
+    config.device = "cpu"
+if os.path.exists(os.path.dirname(config.dataset_path)):
+    print(f"Found dataset at {config.dataset_path}")
     
 # Get the generator models we will be comparing with, and check their data has been generated.
-discriminator.create_g4_data_files(configs)
+discriminator.create_g4_data_files(config)
 existing_list = []
 for weight_decay in [0., 0.0001, 0.1]:
-    configs.shower_flow_weight_decay = weight_decay
+    config.shower_flow_weight_decay = weight_decay
     for dhist in [True, False]:
-        configs.shower_flow_detailed_history = dhist
+        config.shower_flow_detailed_history = dhist
         for fnorm in [True, False]:
-            configs.shower_flow_fixed_input_norms = fnorm
+            config.shower_flow_fixed_input_norms = fnorm
             for tbase in [True, False]:
-                configs.shower_flow_train_base = tbase
-                found_here = showerflow_utils.existing_models(configs)
-                existing_list.append(showerflow_utils.existing_models(configs))
+                config.shower_flow_train_base = tbase
+                found_here = showerflow_utils.existing_models(config)
+                existing_list.append(showerflow_utils.existing_models(config))
 existing_models = {
     key: sum([model[key] for model in existing_list], []) for key in existing_list[0]
 }
-existing_models["configs"] = []
+existing_models["config"] = []
 
 for i, path in enumerate(existing_models["paths"]):
-    model_configs = showerflow_utils.construct_configs(configs, existing_models, i)
+    model_config = showerflow_utils.construct_config(config, existing_models, i)
     try:
-        discriminator.create_showerflow_data_files(model_configs, path)
+        discriminator.create_showerflow_data_files(model_config, path)
     except Exception:
         print(path)
-    existing_models["configs"].append(model_configs)
+    existing_models["config"].append(model_config)
 
 print(f"Total models found: {len(existing_models['names'])}")
         
@@ -67,13 +67,13 @@ existing_models.keys()
 # ## data fetching
 # 
 # The same libraries as were used to train the discriminator make it easy to get Wasserstein distances.
-g4_data_folder = discriminator.locate_g4_data(configs)
+g4_data_folder = discriminator.locate_g4_data(config)
 print(f"g4 data in {g4_data_folder}")
 def gen_training(model_idx, settings="settings12"):
     model_name = existing_models["names"][model_idx]
-    model_configs = existing_models["configs"][model_idx]
+    model_config = existing_models["config"][model_idx]
     model_path = existing_models["paths"][model_idx]
-    model_data_folder = discriminator.locate_model_data(model_configs, model_path)
+    model_data_folder = discriminator.locate_model_data(model_config, model_path)
     feature_mask = discriminator.feature_masks[settings]
     if not os.path.exists(g4_data_folder):
         os.makedirs(g4_data_folder)
@@ -104,7 +104,7 @@ n_es_layers = 30
 if training.state_dict["feature_mask"] is not None:
     n_es_layers = np.sum(training.state_dict["feature_mask"][33:])
 from scipy.stats import wasserstein_distance
-save_name = os.path.join(showerflow_utils.get_showerflow_dir(configs), "wasserstein.npz")
+save_name = os.path.join(showerflow_utils.get_showerflow_dir(config), "wasserstein.npz")
 if os.path.exists(save_name):
     redo = False
     loaded = np.load(save_name)
@@ -163,7 +163,7 @@ if redo:
     np.savez(save_name, **existing_models)
     redo = False
 print(existing_models.keys())
-save_name = os.path.join(showerflow_utils.get_showerflow_dir(configs), "sliced_wasserstein.npz")
+save_name = os.path.join(showerflow_utils.get_showerflow_dir(config), "sliced_wasserstein.npz")
 working = [i for i in range(len(existing_models["names"])) if distances_1d[i][0] > 0]
 n_working = len(working)
 if os.path.exists(save_name):
@@ -624,10 +624,10 @@ from pointcloud.data.conditioning import get_cond_dim
 
 def get_loaded_flow(i):
     constructor = shower_flow.versions_dict[existing_models['versions'][i]]
-    configs_here = existing_models['configs'][i]
-    num_inputs = np.sum(showerflow_utils.get_input_mask(configs_here))
-    num_cond = get_cond_dim("showerflow", configs_here)
-    model, flow_dist, transforms = constructor(configs_here.shower_flow_num_blocks, num_inputs, num_cond, 'cpu')
+    config_here = existing_models['config'][i]
+    num_inputs = np.sum(showerflow_utils.get_input_mask(config_here))
+    num_cond = get_cond_dim("showerflow", config_here)
+    model, flow_dist, transforms = constructor(config_here.shower_flow_num_blocks, num_inputs, num_cond, 'cpu')
     return flow_dist, num_cond
     
 flow, inputs = get_loaded_flow(0)
