@@ -300,8 +300,9 @@ def construct_dsf(
     MAP, _ = detector_map.create_map(config=config)
     shifted_MAP = MAP[:]
     for layer in shifted_MAP:
-        layer["xedges"] -= 50
-        layer["zedges"] -= 50
+        layer["xedges"] -= 30
+        #layer["xedges"] -= 50
+        #layer["zedges"] -= 50
     floors, ceilings = detector_map.floors_ceilings(
         meta.layer_bottom_pos_hdf5, meta.cell_thickness_hdf5, 0
     )

@@ -129,9 +129,7 @@ def get_gun_direction(config, showerflow_dir, redo=False, local_batch_size=10_00
     return direction_path
 
 
-def get_clusters_per_layer(
-    config, showerflow_dir, redo=False, local_batch_size=10_000
-):
+def get_clusters_per_layer(config, showerflow_dir, redo=False, local_batch_size=10_000):
     """
     Save and return the number of clusters in each layer for all showers
     in the dataset. If found on disk, will just return.
@@ -309,7 +307,84 @@ def get_cog(config, showerflow_dir, redo=False, local_batch_size=10_000):
     return cog_path, cog_batch
 
 
-def train_ds_function_factory(
+def _train_ds_function_factory_args(*args, **kwargs):
+    input_args = {
+        "pointsE_path": None,  # optional
+        "cog_path": None,  # optional
+        "clusters_per_layer_path": None,  # optional
+        "energy_per_layer_path": None,  # optional
+        "config": None,  # required
+        "direction_path": None,  # optional
+        "showerflow_dir": None,  # required if we miss the paths
+    }
+    status = f"args given: {args}, kwargs given: {kwargs}"
+    for key in kwargs:
+        if key in input_args:
+            input_args[key] = kwargs[key]
+        else:
+            raise TypeError(f"{status}; Got unexpected keyword argument {key}")
+    for i, key in enumerate(input_args):
+        if not key.endswith("_path"):
+            break
+        if len(args) <= i or not isinstance(args[i], str):
+            break  # no longer a path
+        assert input_args[key] is None, status
+        input_args[key] = args[i]
+    if input_args["config"] is None:
+        if len(args) < i:
+            raise ValueError(
+                f"{status}; Must provide a config, either as a kwarg or as a positional arg"
+            )
+        assert not isinstance(args[i], str), f"{status}; {i} Expected a config object"
+        input_args["config"] = args[i]
+        i += 1
+    if input_args["direction_path"] is None:
+        if len(args) > i:
+            assert isinstance(args[i], str), f"{status}; {i} Expected a path"
+            input_args["direction_path"] = args[i]
+            i += 1
+    if input_args["showerflow_dir"] is None:
+        if len(args) > i:
+            assert isinstance(args[i], str), f"{status}; {i} Expected a path"
+            input_args["showerflow_dir"] = args[i]
+        elif None in [
+            input_args["pointsE_path"],
+            input_args["cog_path"],
+            input_args["clusters_per_layer_path"],
+            input_args["energy_per_layer_path"],
+        ]:
+            raise ValueError(
+                f"{status}; Must provide a showerflow_dir, either as a kwarg or as a positional"
+                " arg, or provide paths to all of pointsE_path, cog_path, "
+                "clusters_per_layer_path, and energy_per_layer_path"
+            )
+    return input_args
+
+
+def train_ds_function_factory(*args, **kwargs):
+    input_args = _train_ds_function_factory_args(*args, **kwargs)
+    config = input_args["config"]
+    showerflow_dir = input_args["showerflow_dir"]
+    if input_args["pointsE_path"] is None:
+        input_args["pointsE_path"] = get_incident_npts_visible(config, showerflow_dir)
+    if input_args["cog_path"] is None:
+        input_args["cog_path"], _ = get_cog(config, showerflow_dir)
+    if input_args["clusters_per_layer_path"] is None:
+        input_args["clusters_per_layer_path"] = get_clusters_per_layer(
+            config, showerflow_dir
+        )
+    if input_args["energy_per_layer_path"] is None:
+        input_args["energy_per_layer_path"] = get_energy_per_layer(
+            config, showerflow_dir
+        )
+    if input_args["direction_path"] is None and showerflow_dir is not None:
+        input_args["direction_path"] = get_gun_direction(config, showerflow_dir)
+    del input_args["showerflow_dir"]
+
+    return _train_ds_function_factory(**input_args)
+
+
+def _train_ds_function_factory(
     pointsE_path,
     cog_path,
     clusters_per_layer_path,
@@ -368,6 +443,9 @@ def train_ds_function_factory(
         config, "showerflow"
     )
 
+    min_cond_energy = config.shower_flow_min_cond_energy
+    min_event_points = config.shower_flow_min_train_points
+
     def make_train_ds(start_idx, end_idx):
         my_slice = slice(start_idx, end_idx)
         # mem-map the files to avoid loading all data
@@ -375,8 +453,14 @@ def train_ds_function_factory(
 
         # for conditioning
         output = []
+        energy = torch.tensor(pointE["energy"][my_slice])
+        num_points = torch.tensor(pointE["num_points"][my_slice])
+        if min_cond_energy or min_event_points:
+            mask = energy > min_cond_energy and num_points >= min_event_points
+            energy = energy[mask]
+            my_slice = [i for i, m in enumerate(mask, start_idx) if m]
         if condition_energy:
-            energy = torch.tensor(pointE["energy"][my_slice]) / meta.incident_rescale
+            energy = energy / meta.incident_rescale
             energy = energy.view(-1, 1).to(device).float()
             output.append(energy)
         if condition_direction:
@@ -388,7 +472,7 @@ def train_ds_function_factory(
         # for predicted values
         if "total_clusters" in config.shower_flow_inputs:
             num_points = (
-                torch.tensor(pointE["num_points"][my_slice]) / meta.n_pts_rescale
+                num_points / meta.n_pts_rescale
             )
             num_points = num_points.view(-1, 1).to(device).float()
             output.append(num_points)

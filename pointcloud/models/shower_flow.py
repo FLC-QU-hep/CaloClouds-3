@@ -44,6 +44,27 @@ def get_gauss_basis(num_inputs, device, **kwargs):
     return base_dist
 
 
+class SafeExpTransform(T.Transform):
+    domain = torch.distributions.constraints.real
+    codomain = torch.distributions.constraints.nonnegative
+    bijective = True
+    sign = +1
+
+    def __init__(self, eps=1e-6, cache_size=1):
+        super().__init__(cache_size=cache_size)
+        self.eps = eps
+
+    def _call(self, x):
+        return torch.exp(x) - self.eps
+
+    def _inverse(self, y):
+        return torch.log(y + self.eps)
+
+    def log_abs_det_jacobian(self, x, y):
+        return x
+
+
+
 class HybridTanH_factory:
     def __init__(self, num_inputs, num_cond_inputs, device):
         self.num_inputs = num_inputs
@@ -81,6 +102,16 @@ class HybridTanH_factory:
         ctf = T.ConditionalSpline(hypernet, self.num_inputs, count_bins).to(self.device)
         self.trainables.append(ctf)
         self.transforms.append(ctf)
+
+    def add_partial_log(self, **kwargs):
+        # Log transform the last 60 numbers
+        log_len = 60
+        prefix_len = self.num_inputs - log_len
+        exp_transform = SafeExpTransform()
+        transform = T.CatTransform(
+            [T.identity_transform, exp_transform], dim=-1, lengths=[prefix_len, log_len]
+        )
+        self.transforms.append(transform)
 
     def add_repeat(self, transform_pattern, transform_args):
         for trans in transform_pattern:
@@ -205,6 +236,34 @@ def compile_HybridTanH_alt1(num_blocks, num_inputs, num_cond_inputs, device):
     return model, flow_dist, transforms
 
 
+def compile_HybridTanH_log1(num_blocks, num_inputs, num_cond_inputs, device):
+    factory = HybridTanH_factory(num_inputs, num_cond_inputs, device)
+
+    transform_pattern = [
+        "affine_coupling",
+        "permutation",
+        "affine_coupling",
+        "permutation",
+        "affine_coupling",
+        "permutation",
+        "spline_coupling",
+        "permutation",
+        "affine_coupling",
+        "permutation",
+        "affine_coupling",
+        "permutation",
+        "affine_coupling",
+        "permutation",
+    ]
+    transform_pattern = transform_pattern * num_blocks
+    transform_pattern += ["partial_log"]
+
+    model, flow_dist, transforms = factory.create(
+        1, transform_pattern, count_bins=8
+    )
+    return model, flow_dist, transforms
+
+
 def compile_HybridTanH_alt2(num_blocks, num_inputs, num_cond_inputs, device):
     factory = HybridTanH_factory(num_inputs, num_cond_inputs, device)
 
@@ -232,5 +291,6 @@ def compile_HybridTanH_alt2(num_blocks, num_inputs, num_cond_inputs, device):
 versions_dict = {
     "original": compile_HybridTanH_model,
     "alt1": compile_HybridTanH_alt1,
+    "log1": compile_HybridTanH_log1,
     "alt2": compile_HybridTanH_alt2,
 }

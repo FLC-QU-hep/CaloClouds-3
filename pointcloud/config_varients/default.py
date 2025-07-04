@@ -57,6 +57,10 @@ class Configs:
         self.shower_flow_num_blocks = 10
         self.shower_flow_cond_features = ["energy"]
         self.shower_flow_weight_decay = 0.
+        self.shower_flow_min_cond_energy = 0.
+        self.shower_flow_min_train_points = 0
+        self.shower_flow_optimiser_on_nan = 'best'
+        self.shower_flow_log_convert = False
 
         # Data
         self.storage_base = "/beegfs/desy/user/"

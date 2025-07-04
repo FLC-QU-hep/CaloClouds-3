@@ -20,18 +20,25 @@ from pointcloud.config_varients import (
     wish,
     wish_maxwell,
     caloclouds_2,
+    caloclouds_2_v2,
+    caloclouds_2_v3,
+    caloclouds_2_v4,
     caloclouds_3,
     caloclouds_3_simple_shower,
+    caloclouds_3_v_simple_shower,
 )
 from pointcloud.data.read_write import get_n_events
 from pointcloud.data.conditioning import get_cond_dim
 from pointcloud.utils import showerflow_training, showerflow_utils
 from pointcloud.utils.metadata import Metadata
-from pointcloud.models.shower_flow import (
-    compile_HybridTanH_model,
-    compile_HybridTanH_alt1,
-    compile_HybridTanH_alt2,
-)
+from pointcloud.models import shower_flow
+
+def should_save(epoch):
+    if epoch < 10:
+        return False
+    str_epoch = str(epoch)
+    return set(str_epoch[1:]) == {"0"}
+
 
 
 def main(config, batch_size=2048, total_epochs=1_000_000_000, shuffle=True):
@@ -39,12 +46,7 @@ def main(config, batch_size=2048, total_epochs=1_000_000_000, shuffle=True):
     """
     Really this is a script, but for ease of testing, it's the main function.
     """
-    versions = {
-        "original": compile_HybridTanH_model,
-        "alt1": compile_HybridTanH_alt1,
-        "alt2": compile_HybridTanH_alt2,
-    }
-    shower_flow_compiler = versions[config.shower_flow_version]
+    shower_flow_compiler = shower_flow.versions_dict[config.shower_flow_version]
 
     cond_dim = get_cond_dim(config, "showerflow")
     inputs_used = showerflow_utils.get_input_mask(config)
@@ -292,10 +294,16 @@ def main(config, batch_size=2048, total_epochs=1_000_000_000, shuffle=True):
                     torch.load(best_model_path, weights_only=False)["model"]
                 )
                 optimizer = optim.Adam(model.parameters(), lr=lr, weight_decay=weight_decay)
-                # optimizer.load_state_dict(torch.load(latest_model_path)['optimizer'])
-                optimizer.load_state_dict(
-                    torch.load(best_model_path, weights_only=False)["optimizer"]
-                )
+                if config.shower_flow_optimiser_on_nan == 'best':
+                    optimizer.load_state_dict(
+                        torch.load(best_model_path, weights_only=False)["optimizer"]
+                    )
+                elif config.shower_flow_optimiser_on_nan == 'blank':
+                    pass
+                else:
+                    raise NotImplementedError(
+                        f"Unknown optimiser_on_nan {config.shower_flow_optimiser_on_nan}"
+                    )
                 # change the seed so we don't get back to the same nan
                 torch.manual_seed(time.time())
                 # print(f'model from {epoch-3} epoch reloaded')
@@ -337,6 +345,16 @@ def main(config, batch_size=2048, total_epochs=1_000_000_000, shuffle=True):
                 },
                 latest_model_path,
             )
+
+            if should_save(epoch):
+                epoch_path = latest_model_path.replace("_latest.pth", f"_{epoch:07d}.pth")
+                torch.save(
+                    {
+                        "model": model.state_dict(),
+                        "optimizer": optimizer.state_dict(),
+                    },
+                    epoch_path,
+                )
 
             # save best model based on loss
             if mean_loss <= best_loss:
@@ -721,8 +739,12 @@ if __name__ == "__main__":
         "wish": wish,
         "wish_maxwell": wish_maxwell,
         "caloclouds_2": caloclouds_2,
+        "caloclouds_2_v2": caloclouds_2_v2,
+        "caloclouds_2_v3": caloclouds_2_v3,
+        "caloclouds_2_v4": caloclouds_2_v4,
         "caloclouds_3": caloclouds_3,
         "caloclouds_3_simple_shower": caloclouds_3_simple_shower,
+        "caloclouds_3_v_simple_shower": caloclouds_3_v_simple_shower,
     }
     while chosen not in config_choices:
         chosen = input(f"Choose a version from {list(config_choices.keys())}:")

@@ -17,6 +17,10 @@ mamba activate /data/dust/user/dayhallh/envs/calogpu
 gun_henry_path=\
 "/data/dust/user/dayhallh/data/ILCsoftEvents/p22_th90_ph90_en10-100_joined"\
 "/p22_th90_ph90_en10-100_seed{}_all_steps.hdf5"
+gun_henry_path_2=\
+"/data/dust/user/dayhallh/data/ILCsoftEvents/highGran_g40_p22_th90_ph90_en10-100.hdf5"
+gun_henry_path_3=\
+"/data/dust/user/dayhallh/data/ILCsoftEvents/highGran_g40_bb_p22_th90_ph90_en10-100.hdf5"
 anatolli_data=\
 "/data/dust/user/akorol/data/AngularShowers_RegularDetector/"\
 "hdf5_for_CC/sim-E1261AT600AP180-180_file_{}slcio.hdf5"
@@ -26,15 +30,26 @@ calchal_10k=\
 calchal=\
 "/data/dust/user/akorol/data/CaloClouds/hdf5/high_granular_grid/train"\
 "/10-90GeV_x36_grid_regular_524k_float32.hdf5"
+paper_cc2=\
+"/data/dust/group/ilc/sft-ml/datasets/10-90GeV_x36_grid_regular_524k_float32"\
+"/10-90GeV_x36_grid_regular_524k_float32.hdf5"
 
-config_name=caloclouds_2
 
-dataset_path=$gun_henry_path
+#config_name=caloclouds_3_simple_shower
+config_name=caloclouds_2_v3
+
+#dataset_path=$anatolli_data
+dataset_path=$gun_henry_path_2
+
 n_dataset_files=10
 shower_flow_version=original
 shower_flow_num_blocks=10
-shower_flow_detailed_history=False
+shower_flow_detailed_history=True
 shower_flow_weight_decay=0.0
+shower_flow_tag="try8"
+shower_flow_min_cond_energy=0
+shower_flow_min_train_points=0
+shower_flow_optimiser_on_nan='best'
 
 #config_name=caloclouds_3_simple_shower
 
@@ -46,10 +61,19 @@ echo python3 scripts/ShowerFlow.py $config_name dataset_path=$dataset_path \
     n_dataset_files=$n_dataset_files shower_flow_version=$shower_flow_version \
     shower_flow_num_blocks=$shower_flow_num_blocks \
     shower_flow_detailed_history=$shower_flow_detailed_history \
-    shower_flow_weight_decay=$shower_flow_weight_decay
+    shower_flow_weight_decay=$shower_flow_weight_decay \
+    shower_flow_tag=$shower_flow_tag \
+    shower_flow_min_cond_energy=$shower_flow_min_cond_energy \
+    shower_flow_min_train_points=$shower_flow_min_train_points \
+    shower_flow_optimiser_on_nan=$shower_flow_optimiser_on_nan
+
 python3 scripts/ShowerFlow.py $config_name dataset_path=$dataset_path \
     n_dataset_files=$n_dataset_files shower_flow_version=$shower_flow_version \
     shower_flow_num_blocks=$shower_flow_num_blocks \
     shower_flow_detailed_history=$shower_flow_detailed_history \
-    shower_flow_weight_decay=$shower_flow_weight_decay
+    shower_flow_weight_decay=$shower_flow_weight_decay \
+    shower_flow_tag=$shower_flow_tag \
+    shower_flow_min_cond_energy=$shower_flow_min_cond_energy \
+    shower_flow_min_train_points=$shower_flow_min_train_points \
+    shower_flow_optimiser_on_nan=$shower_flow_optimiser_on_nan
 

@@ -61,6 +61,10 @@ def model_save_paths(config, version, num_blocks, cut_inputs):
         name_base += f"_wd{wd_string}"
         nice_name += f"_wd{wd_string}"
 
+    if getattr(config, "shower_flow_tag", ""):
+        name_base += f"_{config.shower_flow_tag}"
+        nice_name += f"_{config.shower_flow_tag}"
+
     best_model_path = os.path.join(showerflow_dir, f"{name_base}_best.pth")
     best_data_path = os.path.join(showerflow_dir, f"{name_base}_best_data.txt")
 
@@ -316,12 +320,15 @@ def truescale_showerflow_output(samples, config):
     cogs = []
     for i in range(3):
         if inputs_mask[2 + i]:
-            cog = (samples[:, reached] * metadata.std_cog[i]) + metadata.mean_cog[i]
+            cog = (samples[:, reached] * metadata.std_cog[i]) - metadata.mean_cog[i]
             cogs.append(cog)
             reached += 1
         else:
             cogs.append(None)
     cog_x, cog_y, cog_z = cogs
+    # TODO remove this....
+    cog_x -= 40
+    cog_y += 0.7436180240850283
 
     n_layers = len(metadata.layer_bottom_pos_hdf5)
     cluster_start = np.sum(inputs_mask[:5])

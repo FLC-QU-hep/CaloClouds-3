@@ -7,7 +7,7 @@ from .metadata import Metadata
 from ..configs import Configs
 
 from .showerflow_utils import truescale_showerflow_output
-from ..data.conditioning import get_cond_features_names, normalise_cond_feats, is_cc2_diffusion
+from ..data.conditioning import get_cond_features_names, normalise_cond_feats, is_cc2_diffusion, feature_lengths
 
 
 def get_cog(x, y, z, e):
@@ -460,19 +460,29 @@ def gen_v1_inner_batch(
     metadata = Metadata(config)
     bs = cond_batch.size(0)
 
-    # sample from shower flow
-    samples = (
-        shower_flow.condition(showerflow_cond)
-        .sample(
+    conditioned_flow = shower_flow.condition(showerflow_cond)
+    samples = conditioned_flow.sample(
+        torch.Size(
+            [
+                bs,
+            ]
+        )
+    ).cpu().numpy()
+    problems = (samples[:, -30:] < 0).sum(axis=1) > 7
+    while problems.any():
+        n_problems = problems.sum()
+        conditioned_flow = shower_flow.condition(
+            showerflow_cond[problems]
+        )
+        replacement_samples = conditioned_flow.sample(
             torch.Size(
                 [
-                    bs,
+                    n_problems,
                 ]
             )
-        )
-        .cpu()
-        .numpy()
-    )
+        ).cpu().numpy()
+        samples[problems] = replacement_samples
+        problems[problems] = (replacement_samples[:, -30:] < 0).sum(axis=1) > 7
 
     (
         num_clusters,
@@ -510,11 +520,15 @@ def gen_v1_inner_batch(
     # scale relative clusters per layer to actual number of clusters per layer
     # and same for energy
     if config.shower_flow_fixed_input_norms:
-        clusters_per_layer_gen = (clusters_per_layer_gen * scale_factor[:, None]).astype(int)
-        if num_clusters is not None:
-            num_clusters = (num_clusters * scale_factor).astype(int)  # B,1
+        clusters_per_layer_gen = (clusters_per_layer_gen * scale_factor[:, None])
+        num_clusters = clusters_per_layer_gen.sum(axis=1)
+        reductions = np.clip(config.max_points/num_clusters, 0, 1)
+        num_clusters = num_clusters * reductions
+        clusters_per_layer_gen = clusters_per_layer_gen * reductions[:, None]
+        clusters_per_layer_gen = clusters_per_layer_gen.astype(int)
+        num_clusters = num_clusters.astype(int)
     else:
-        num_clusters = (num_clusters * scale_factor).astype(int)  # B,1
+        num_clusters = np.clip((num_clusters * scale_factor).astype(int), 1, config.max_points)
         clusters_per_layer_gen = (
             clusters_per_layer_gen
             / clusters_per_layer_gen.sum(axis=1, keepdims=True)
@@ -527,8 +541,28 @@ def gen_v1_inner_batch(
             e_per_layer_gen / e_per_layer_gen.sum(axis=1, keepdims=True) * energies
         )  # B,30
 
-    max_num_clusters = clusters_per_layer_gen.sum(axis=1).max()
 
+    max_num_clusters = num_clusters.max()
+
+    diffusion_feature_names = get_cond_features_names(config, "diffusion")
+    if "points" in diffusion_feature_names:
+        diffusion_feature_names[diffusion_feature_names.index("points")] = "n_points"
+    cheat = getattr(config, "cheat", False)
+    if "n_points" in diffusion_feature_names and not cheat:
+        index = 0
+        for name in diffusion_feature_names:
+            if name == "n_points":
+                break
+            index += feature_lengths[name]
+        if config.dataset == "calo_challenge":
+            n = torch.log((num_clusters + 1) / config.min_points) / torch.log(
+                config.max_points / config.min_points
+            )
+        else:
+            n = (num_clusters / config.max_points) * 2 - 1
+            #n = (num_clusters / 6_000) * 2 - 1
+        cond_batch[:, index] = torch.tensor(n.flatten())
+    
     fake_showers = get_shower(
         model,
         max_num_clusters,

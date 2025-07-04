@@ -35,7 +35,7 @@ from pointcloud.evaluation.bin_standard_metrics import (
 from pointcloud.evaluation.calculate_scale_factors import get_path as factor_get_path
 
 
-detector_projection = True
+detector_projection = False
 scale_e_n = False
 
 # Gather the models to evaluate
@@ -51,8 +51,10 @@ log_base = "/data/dust/user/dayhallh/point-cloud-diffusion-logs"
 data_base = "/data/dust/user/dayhallh/point-cloud-diffusion-data/"
 torch.set_default_dtype(torch.float32)
 
-static_dataset = "/data/dust/user/dayhallh/data/ILCsoftEvents/p22_th90_ph90_en10-100_joined/p22_th90_ph90_en10-100_seed{}_all_steps.hdf5"
-static_n_files = 10
+#static_dataset = "/data/dust/user/dayhallh/data/ILCsoftEvents/p22_th90_ph90_en10-100_joined/p22_th90_ph90_en10-100_seed{}_all_steps.hdf5"
+#static_n_files = 10
+static_dataset = "/data/dust/user/dayhallh/data/ILCsoftEvents/highGran_g40_p22_th90_ph90_en10-100.hdf5"
+static_n_files = 1
 
 static_stats = np.load("/data/dust/user/dayhallh/data/ILCsoftEvents/p22_th90_ph90_en10-100_joined/stats.npz")
 
@@ -89,7 +91,7 @@ except FileNotFoundError as e:
 try:
     pass
     if True:  # new a1 model
-        model_name = "CaloClouds3-ShowerFlow_a1_fnorms_2"
+        model_name = "CaloClouds3-ShowerFlow_l1_fnorms_3"
         config = caloclouds_3_simple_shower.Configs()
         config.dataset_tag = "p22_th90_ph90_en10-100"
         config.device = 'cpu'
@@ -101,19 +103,21 @@ try:
         if scale_e_n:
             config.shower_flow_n_scaling = True
             loaded = np.load(factor_get_path(config, model_name), allow_pickle=True)
-            #config.shower_flow_coef_real = loaded['final_n_coeff']
-            config.shower_flow_coef_real = np.zeros(2)
-            config.shower_flow_coef_real[0] =  0.64
+            config.shower_flow_coef_real = loaded['final_n_coeff']
+            #config.shower_flow_coef_real = np.zeros(2)
+            #config.shower_flow_coef_real[0] =  0.7
         else:
             config.shower_flow_n_scaling = False
 
         caloclouds_paths = ["/data/dust/group/ilc/sft-ml/model_weights/CaloClouds/CC3/ckpt_0.000000_6135000.pt"]
         #showerflow_paths = ["/data/dust/group/ilc/sft-ml/model_weights/CaloClouds/CC3/ShowerFlow_alt1_nb2_inputs8070450532247928831_fnorms_dhist_best.pth"]
-        showerflow_paths = ["/data/dust/group/ilc/sft-ml/model_weights/CaloClouds/CC3/ShowerFlow_alt1_nb2_inputs8070450532247928831_fnorms_best.pth"]
+        #showerflow_paths = ["/data/dust/group/ilc/sft-ml/model_weights/CaloClouds/CC3/ShowerFlow_alt1_nb2_inputs8070450532247928831_fnorms_best.pth"]
+        showerflow_paths = ["/data/dust/user/dayhallh/point-cloud-diffusion-data/showerFlow/sim-E1261AT600AP180-180/ShowerFlow_log1_nb2_inputs8070450532247928831_fnorms_dhist_try6_0000200.pth"]
+        config.shower_flow_version = "log1"
 
 
         caloclouds = get_caloclouds_models(
-            caloclouds_paths=caloclouds_paths, showerflow_paths=showerflow_paths, caloclouds_names=["CaloClouds3"], showerflow_names=["ShowerFlow_a1_fnorms_2"],
+            caloclouds_paths=caloclouds_paths, showerflow_paths=showerflow_paths, caloclouds_names=["CaloClouds3"], showerflow_names=["ShowerFlow_l1_fnorms_3"],
             config=config
         )
 
@@ -158,7 +162,7 @@ try:
         print(repr(meta_here))
         print('\n~~~~~~~~\n')
 
-        caloclouds["CaloClouds3-ShowerFlow_a1_fnorms_2"][2].metadata = meta_here
+        caloclouds["CaloClouds3-ShowerFlow_l1_fnorms_3"][2].metadata = meta_here
 
         models.update(caloclouds)
 
@@ -208,7 +212,8 @@ try:
             config.shower_flow_n_scaling = False
 
         #showerflow_paths = ["/data/dust/group/ilc/sft-ml/model_weights/CaloClouds/CC2/220714_cog_e_layer_ShowerFlow_best.pth"]
-        showerflow_paths = ["/data/dust/user/dayhallh/point-cloud-diffusion-data/showerFlow/p22_th90_ph90_en10-100/ShowerFlow_original_nb10_inputs36893488147419103231_dhist_best.pth"]
+        #showerflow_paths = ["/data/dust/user/dayhallh/point-cloud-diffusion-data/showerFlow/p22_th90_ph90_en10-100/ShowerFlow_original_nb10_inputs36893488147419103231_dhist_best.pth"]
+        showerflow_paths = ["/data/dust/user/dayhallh/point-cloud-diffusion-data/showerFlow/highGran_g40_p22_th90_ph90_en10-100/ShowerFlow_original_nb10_inputs36893488147419103231_dhist_best.pth"]
         caloclouds_paths = ["/data/dust/group/ilc/sft-ml/model_weights/CaloClouds/CC2/ckpt_0.000000_1000000.pt"]
 
 
@@ -352,6 +357,7 @@ def main(
         sample_g4(config, binned_g4, n_g4_events)
         binned_g4.save(g4_save_path)
     else:
+        print(f"Found binned data for {g4_name} in {g4_save_path}")
         if detector_projection:
             binned_g4 = DetectorBinnedData.load(g4_save_path)
         else:
@@ -393,7 +399,7 @@ def main(
             if detector_projection:
                 if scale_e_n:
                     energy_correction = np.load(scale_factor_save_path, allow_pickle=True)["final_e_coeff"]
-                    #rescale_energy /= energy_correction[-2]
+                    rescale_energy /= energy_correction[-2]
                     #rescale_energy /= 0.9880121837394529
                     pass
                 if "3" in model_name:
@@ -457,6 +463,7 @@ def main(
             print(f"Saving {model_name} to {save_path}")
             binned.save(save_path)
         else:
+            print(f"Found binned data for {model_name} in {save_path}")
             if detector_projection:
                 binned = DetectorBinnedData.load(save_path)
             else:
@@ -472,9 +479,9 @@ if __name__ == "__main__":
     config.n_dataset_files = static_n_files
     #config._dataset_path = angular_dataset
     #config.n_dataset_files = angular_n_files
-    if scale_e_n:
-        config.dataset_tag = "p22_th90_ph90_en10-100"
-    else:
-        config.dataset_tag = "p22_th90_ph90_en10-100_noFactor"
     #config.dataset_tag = "sim-E1261AT600AP180-180"
+    #config.dataset_tag = "p22_th90_ph90_en10-100"
+    config.dataset_tag = "highGran_p22_th90_ph90_en10-100"
+    if not scale_e_n:
+        config.dataset_tag += "_noFactor"
     main(config)
