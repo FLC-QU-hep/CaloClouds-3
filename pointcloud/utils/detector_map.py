@@ -542,12 +542,56 @@ def get_projections(
     return events, cell_point_clouds
 
 
-def mip_cut(events_as_cells, energy_scale=1.):
+def projected_events_to_dict(events, start_idx=0, step=1, idxs=None):
+    """
+    Once events have been projected, they no longer have a regular array structure.
+    Each layer is the same shape though,
+    so we take advantage of this to get them into a format that is easier to save
+    The output dict can be saved with np.savez
+    """
+    save_dict = {}
+    if idxs is None:
+        n_events = len(events)
+        idxs = list(range(start_idx, start_idx + (n_events * step), step))
+    save_dict = {
+        f"{layer_idx}": np.array(layer) for layer_idx, layer in enumerate(zip(*events))
+    }
+    save_dict["idxs"] = idxs
+    return save_dict
+
+
+def dict_to_projected_events(save_dict, max_events=np.inf, idxs=None, n_layers=30):
+    """
+    Return the event dictionary created with projected_events_to_dict
+    to a ragged list of lists
+    """
+    found_idxs = list(save_dict["idxs"])
+
+    if idxs is None:
+        idxs = found_idxs
+    if np.isfinite(max_events):
+        idxs = idxs[:max_events]
+
+    local_idxs = [found_idxs.index(i) for i in idxs]
+
+    events = []
+    events = list(
+        zip(
+            *[
+                save_dict[f"{layer_idx}"][local_idxs]
+                for layer_idx in tqdm(range(n_layers))
+            ]
+        )
+    )
+    return idxs, events
+
+
+def mip_cut(events_as_cells, energy_scale=1.0):
     """
     The mip peak is 0.2 MeV. Anything with less than half that
     Should be zeroed.
     """
-    half_mip = 0.5*2e-4*energy_scale
+    half_mip = 0.5 * 2e-4 * energy_scale
     for event in events_as_cells:
         for layer in event:
             layer[layer < half_mip] = 0

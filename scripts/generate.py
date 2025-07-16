@@ -15,7 +15,7 @@ from pointcloud.config_varients import (
     caloclouds_3_simple_shower,
     caloclouds_3,
     default,
-    caloclouds_2,
+    caloclouds_2_v3,
 )
 
 
@@ -147,8 +147,10 @@ def make_cond(model_config, min_energy, max_energy, n_events):
     else:
         cond["showerflow"] = cond_E
     dif_dim = get_cond_dim(model_config, "diffusion")
-    if dif_dim > 1:
+    if dif_dim > 2:
         cond["diffusion"] = torch.hstack([cond_E, direction])
+    elif dif_dim > 1:
+        cond["diffusion"] = torch.hstack([cond_E, torch.zeros(n_events, 1)])
     else:
         cond["diffusion"] = cond_E
     return cond
@@ -232,7 +234,7 @@ def main(
             np.savez(save_path, **model_save_dict)
 
 
-scale_n = True
+scale_n = False
 scale_e = False
 
 # Gather the models to evaluate
@@ -261,7 +263,7 @@ angular_dataset = caloclouds_3_simple_shower.Configs().dataset_path
 angular_n_files = caloclouds_3_simple_shower.Configs().n_dataset_files
 try:
     pass
-    if True:  # new a1 model
+    if False:  # new a1 model
         model_name = "CaloClouds3-ShowerFlow_a1_fnorms_7"
         config = caloclouds_3_simple_shower.Configs()
         config.dataset_tag = "high_gran_g40_p22_th90_ph90_en10-100"
@@ -310,7 +312,7 @@ try:
 
         # generate some custom metadata that will allow comparison between this model and the old model
         train_dataset_meta = Metadata(caloclouds_3_simple_shower.Configs())
-        meta_here = Metadata(caloclouds_2.Configs())
+        meta_here = Metadata(caloclouds_2_v3.Configs())
 
         meta_here.incident_rescale = 127
         meta_here.n_pts_rescale = train_dataset_meta.n_pts_rescale
@@ -349,10 +351,10 @@ try:
 
         models.update(caloclouds)
 
-    if False:
-        model_name = "CaloClouds2-ShowerFlow_CC2"
-        config = caloclouds_2.Configs()
-        config.dataset_tag = "p22_th90_ph90_en10-100"
+    if True:
+        model_name = "CaloClouds2-ShowerFlow_CC2_8"
+        config = caloclouds_2_v3.Configs()
+        config.dataset_tag = "highGran_g40_p22_th90_ph90_en10-100"
         config.device = "cpu"
         config.cond_features = (
             2  # number of conditioning features (i.e. energy+points=2)
@@ -381,8 +383,11 @@ try:
 
         # showerflow_paths = ["/data/dust/group/ilc/sft-ml/model_weights/CaloClouds/CC2/220714_cog_e_layer_ShowerFlow_best.pth"]
         # showerflow_paths = ["/data/dust/user/dayhallh/point-cloud-diffusion-data/showerFlow/p22_th90_ph90_en10-100/ShowerFlow_original_nb10_inputs36893488147419103231_dhist_best.pth"]
+        #showerflow_paths = [
+        #    "/data/dust/user/dayhallh/point-cloud-diffusion-data/showerFlow/highGran_g40_p22_th90_ph90_en10-100/ShowerFlow_original_nb10_inputs36893488147419103231_dhist_best.pth"
+        #]
         showerflow_paths = [
-            "/data/dust/user/dayhallh/point-cloud-diffusion-data/showerFlow/highGran_g40_p22_th90_ph90_en10-100/ShowerFlow_original_nb10_inputs36893488147419103231_dhist_best.pth"
+            "/data/dust/user/dayhallh/point-cloud-diffusion-data/showerFlow/highGran_g40_p22_th90_ph90_en10-100/ShowerFlow_original_nb10_inputs36893488147419103231_dhist_try8_best.pth"
         ]
         caloclouds_paths = [
             "/data/dust/group/ilc/sft-ml/model_weights/CaloClouds/CC2/ckpt_0.000000_1000000.pt"
@@ -392,7 +397,7 @@ try:
             caloclouds_paths=caloclouds_paths,
             showerflow_paths=showerflow_paths,
             caloclouds_names=["CaloClouds2"],
-            showerflow_names=["ShowerFlow_CC2"],
+            showerflow_names=["ShowerFlow_CC2_8"],
             config=config,
         )
 
@@ -412,10 +417,10 @@ try:
         print("\n~~~~~~~~\n")
         print("CC2")
         print(repr(meta_here))
-        print(caloclouds["CaloClouds2-ShowerFlow_CC2"][2].max_points)
+        print(caloclouds["CaloClouds2-ShowerFlow_CC2_8"][2].max_points)
         print("\n~~~~~~~~\n")
 
-        caloclouds["CaloClouds2-ShowerFlow_CC2"][2].metadata = meta_here
+        caloclouds["CaloClouds2-ShowerFlow_CC2_8"][2].metadata = meta_here
 
         models.update(caloclouds)
 except FileNotFoundError as e:

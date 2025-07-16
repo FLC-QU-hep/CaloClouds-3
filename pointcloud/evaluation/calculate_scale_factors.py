@@ -12,6 +12,8 @@ from pointcloud.data.conditioning import (
 )
 
 
+
+
 def get_path(config, name):
     base = _base_get_path(config, name, detector_projection=True)
     path = base.replace("_detectorProj", "_scaleFactor")
@@ -108,6 +110,9 @@ class DetectorScaleFactors:
             cell_thickness,
             model_gun_xyz_pos,
         )
+        self.n_retained = 1_000
+        self.retain_at = ""
+        self.retain_dict = {}
         self.MAP = MAP
         self.half_cell_size_global = half_cell_size_global
         self.cell_thickness = cell_thickness
@@ -119,6 +124,16 @@ class DetectorScaleFactors:
         self.cond = None
         self.g4_detector_n = None
         self.g4_detector_e = None
+
+    def retain(self, values):
+        if self.retain_at not in self.retain_dict:
+            self.retain_dict[self.retain_at] = []
+        currently_held = self.retain_dict[self.retain_at]
+        if len(currently_held) > self.n_retained:
+            return
+        else:
+            for value in values[: self.n_retained - len(currently_held)]:
+                currently_held.append(value)
 
     def add_events(self, cond, g4_events):
         """
@@ -137,6 +152,13 @@ class DetectorScaleFactors:
                 for k in self.cond.keys()
             }
 
+        self.retain_at = "g4_events"
+        self.retain(g4_events)
+        for k in self.cond.keys():
+            self.retain_at = "cond_" + k
+            self.retain(self.cond[k])
+
+        self.retain_at = "g4_projected"
         g4_n, g4_e = self.get_projected_values(g4_events, self.g4_binner)
         if self.g4_detector_n is None:
             self.g4_detector_n = g4_n
@@ -157,7 +179,10 @@ class DetectorScaleFactors:
             return_cell_point_cloud=False,
             include_artifacts=False,
         )
+        self.retain(events_as_cells)
         detector_map.mip_cut(events_as_cells)
+        self.retain_at = self.retain_at + "_postMip"
+        self.retain(events_as_cells)
         n = np.fromiter(
             (np.sum(np.sum(l > 0) for l in event) for event in events_as_cells),
             dtype=int,
@@ -190,10 +215,15 @@ class DetectorScaleFactors:
             bs=len(cond_idxs),
             config=self.model_config,
         )
+        self.retain_at = "raw_model_events"
+        self.retain(model_events)
         if e_coeff is not None:
             model_events[:, :, 3] = np.poly1d(e_coeff)(model_events[:, :, 3])
         model_events[model_events[:, :, 3] <= 0] = 0
+        self.retain_at = "model_events"
+        self.retain(model_events)
 
+        self.retain_at = "model_projected"
         n, e = self.get_projected_values(model_events, self.model_binner)
         return n, e
 
@@ -225,6 +255,14 @@ class DetectorScaleFactors:
             if hasattr(self.model_binner, model_trim):
                 save_items[name] = getattr(self.model_binner, model_trim)
                 continue
+        for key in self.retain_dict.keys():
+            if "_projected" in key:
+                projected = self.retain_dict[key]
+                projected_dict = detector_map.projected_events_to_dict(projected)
+                for k in projected_dict.keys():
+                    save_items[key + "__" + k] = projected_dict[k]
+            else:
+                save_items["retain_" + key] = self.retain_dict[key]
         return save_items
 
     def save(self, path):
@@ -236,6 +274,8 @@ class DetectorScaleFactors:
         data = np.load(path, allow_pickle=True)
         init_arguments = {}
         to_set = {}
+        retain_dict = {}
+        projected_events = {}
         for key in data.keys():
             value = data[key]
             try:
@@ -244,9 +284,22 @@ class DetectorScaleFactors:
                 pass
             if key in cls.arguments:
                 init_arguments[key] = value
+            elif "_projected" in key:
+                key1, key2 = key.split("__")
+                if key1 not in projected_events:
+                    projected_events[key1] = {}
+                projected_events[key1][key2] = value
+            elif key.startswith("retain_"):
+                retain_dict[key[7:]] = value
             else:
                 to_set[key] = value
+        for key1 in projected_events.keys():
+            proj = detector_map.dict_to_projected_events(
+                projected_events[key1]
+            )[1]
+            retain_dict[key1] = proj
         new_dsf = cls(**init_arguments)
+        new_dsf.retain_dict = retain_dict
         for key in to_set:
             setattr(new_dsf, key, to_set[key])
         return new_dsf
@@ -294,7 +347,10 @@ def construct_dsf(
     model_config,
     model,
     shower_flow,
-    max_g4_events=10_000,
+    #max_g4_events=10_000,
+    max_g4_events=100,
+    g4_gun_pos=None,
+    model_gun_pos=None,
 ):
     meta = Metadata(config)
     MAP, _ = detector_map.create_map(config=config)
@@ -323,7 +379,8 @@ def construct_dsf(
         [meta.Xmin_global, meta.Xmax_global],
         [raw_floors[0], raw_ceilings[-1]],
     ]
-    g4_gun_pos = np.array([-50, 0, 0])
+    if g4_gun_pos is None:
+        g4_gun_pos = np.array([-50, 0, 0])
     g4_layer_bottom_pos = meta.layer_bottom_pos_hdf5
     g4_energy_scale = 1.0
     cc_floors, cc_ceilings = detector_map.floors_ceilings(
@@ -336,10 +393,11 @@ def construct_dsf(
     ]
     model_layer_bottom_pos = meta.layer_bottom_pos_global
     model_rescale_energy = 1e3
-    if "3" in model_name:
-        model_gun_pos = np.array([0, 0, 0])
-    else:
-        model_gun_pos = np.array([-50, 0, 0])
+    if model_gun_pos is None:
+        if "3" in model_name:
+            model_gun_pos = np.array([0, 0, 0])
+        else:
+            model_gun_pos = np.array([-50, 0, 0])
     dsf = DetectorScaleFactors(
         g4_xyz_limits,
         model_xyz_limits,

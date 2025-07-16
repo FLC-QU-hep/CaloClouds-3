@@ -35,18 +35,18 @@ paper_cc2=\
 "/10-90GeV_x36_grid_regular_524k_float32.hdf5"
 
 
-#config_name=caloclouds_3_simple_shower
-config_name=caloclouds_2_v3
+config_name=caloclouds_3_simple_shower
+#config_name=caloclouds_2_v3
 
-#dataset_path=$anatolli_data
-dataset_path=$gun_henry_path_2
+dataset_path=$anatolli_data
+#dataset_path=$gun_henry_path_2
 
-n_dataset_files=10
-shower_flow_version=original
-shower_flow_num_blocks=10
+n_dataset_files=88
+shower_flow_version=alt1
+shower_flow_num_blocks=2
 shower_flow_detailed_history=True
 shower_flow_weight_decay=0.0
-shower_flow_tag="try8"
+shower_flow_tag="try9"
 shower_flow_min_cond_energy=0
 shower_flow_min_train_points=0
 shower_flow_optimiser_on_nan='best'
