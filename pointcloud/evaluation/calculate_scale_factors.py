@@ -12,8 +12,6 @@ from pointcloud.data.conditioning import (
 )
 
 
-
-
 def get_path(config, name):
     base = _base_get_path(config, name, detector_projection=True)
     path = base.replace("_detectorProj", "_scaleFactor")
@@ -110,7 +108,7 @@ class DetectorScaleFactors:
             cell_thickness,
             model_gun_xyz_pos,
         )
-        self.n_retained = 1_000
+        self.n_retained = 100
         self.retain_at = ""
         self.retain_dict = {}
         self.MAP = MAP
@@ -124,6 +122,9 @@ class DetectorScaleFactors:
         self.cond = None
         self.g4_detector_n = None
         self.g4_detector_e = None
+        self.trim_edges = getattr(
+            self.model_config, "trim_projected_edges", np.zeros(4, dtype=int)
+        )
 
     def retain(self, values):
         if self.retain_at not in self.retain_dict:
@@ -179,6 +180,14 @@ class DetectorScaleFactors:
             return_cell_point_cloud=False,
             include_artifacts=False,
         )
+        if np.any(self.trim_edges):
+            for event in events_as_cells:
+                for layer in event:
+                    layer[:self.trim_edges[0]] = 0
+                    layer[-self.trim_edges[1] :] = 0
+                    layer[:, : self.trim_edges[2]] = 0
+                    layer[:, -self.trim_edges[3] :] = 0
+        
         self.retain(events_as_cells)
         detector_map.mip_cut(events_as_cells)
         self.retain_at = self.retain_at + "_postMip"
@@ -228,8 +237,10 @@ class DetectorScaleFactors:
         return n, e
 
     def divergance(self, n_events, n_coeff, e_coeff=None, fake_n_coeff=None):
-        #self.cond_idxs = np.random.choice(len(self.cond["energy"]), n_events)
-        self.cond_idxs = np.linspace(0, len(self.cond["energy"])-1, n_events, dtype=int)
+        # self.cond_idxs = np.random.choice(len(self.cond["energy"]), n_events)
+        self.cond_idxs = np.linspace(
+            0, len(self.cond["energy"]) - 1, n_events, dtype=int
+        )
 
         g4_n = self.g4_detector_n[self.cond_idxs]
         g4_e = self.g4_detector_e[self.cond_idxs]
@@ -267,7 +278,18 @@ class DetectorScaleFactors:
 
     def save(self, path):
         save_items = self.save_dict()
-        np.savez(path, **save_items)
+        try:
+            np.savez(path, **save_items)
+        except ValueError:
+            print("Saving failed")
+            for key, item in save_items.items():
+                try:
+                    np.array(item)
+                except Exception:
+                    print(key)
+            import ipdb
+
+            ipdb.set_trace()
 
     @classmethod
     def load(cls, path):
@@ -294,9 +316,7 @@ class DetectorScaleFactors:
             else:
                 to_set[key] = value
         for key1 in projected_events.keys():
-            proj = detector_map.dict_to_projected_events(
-                projected_events[key1]
-            )[1]
+            proj = detector_map.dict_to_projected_events(projected_events[key1])[1]
             retain_dict[key1] = proj
         new_dsf = cls(**init_arguments)
         new_dsf.retain_dict = retain_dict
@@ -347,7 +367,7 @@ def construct_dsf(
     model_config,
     model,
     shower_flow,
-    #max_g4_events=10_000,
+    # max_g4_events=10_000,
     max_g4_events=100,
     g4_gun_pos=None,
     model_gun_pos=None,
@@ -357,8 +377,8 @@ def construct_dsf(
     shifted_MAP = MAP[:]
     for layer in shifted_MAP:
         layer["xedges"] -= 30
-        #layer["xedges"] -= 50
-        #layer["zedges"] -= 50
+        # layer["xedges"] -= 50
+        # layer["zedges"] -= 50
     floors, ceilings = detector_map.floors_ceilings(
         meta.layer_bottom_pos_hdf5, meta.cell_thickness_hdf5, 0
     )
