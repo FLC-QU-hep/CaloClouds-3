@@ -744,7 +744,7 @@ class DetectorBinnedData(BinnedData):
             include_artifacts=False,
         )
         detector_map.mip_cut(events_as_cells, self.energy_scale)
-        self.add_events_as_cells(events_as_cells)
+        return self.add_events_as_cells(events_as_cells)
 
     def add_events_as_cells(self, events_as_cells):
         """
@@ -826,7 +826,8 @@ class DetectorBinnedData(BinnedData):
                 self.counts[7 + i] += np.histogram(cog, self.bins[7 + i])[0]
 
         if len(events_as_cells) < 4:
-            return  # no point checking with too few events.
+            # no point checking with too few events.
+            return
 
         # sanity check 2
         percent_populated = np.fromiter(
@@ -851,6 +852,7 @@ class DetectorBinnedData(BinnedData):
         if self.hard_check:
             raise ValueError(error_message)
         warnings.warn(error_message)
+        return
 
 
 def sample_g4(config, binned, n_events):
@@ -976,10 +978,10 @@ def conditioned_sample_model(model_config, binned, cond, model, shower_flow=None
             model, shower_flow, cond_here, bs=batch_len, config=model_config
         )
         binned.add_events(events)
+
     print()
     print("Done")
     binned.recompute_mean_energies()
-    return events
 
 
 def sample_accumulator(config, binned, acc, n_events):

@@ -299,7 +299,7 @@ def truescale_showerflow_output(samples, config):
     if inputs_mask[0]:
         num_clusters = np.clip(
             (samples[:, 0] * metadata.n_pts_rescale).reshape(bs, 1),
-            1,
+            0,
             config.max_points,
         )
         reached += 1

@@ -7,7 +7,12 @@ from .metadata import Metadata
 from ..configs import Configs
 
 from .showerflow_utils import truescale_showerflow_output
-from ..data.conditioning import get_cond_features_names, normalise_cond_feats, is_cc2_diffusion, feature_lengths
+from ..data.conditioning import (
+    get_cond_features_names,
+    normalise_cond_feats,
+    is_cc2_diffusion,
+    feature_lengths,
+)
 
 
 def get_cog(x, y, z, e):
@@ -368,6 +373,8 @@ def cond_batcher(batch_size, cond, showerflow_cond=None):
     mask = mask.cpu().numpy()
     mask = np.atleast_1d(mask)
     cond = cond[mask]
+    if showerflow_cond is not None:
+        showerflow_cond = showerflow_cond[mask]
     num = cond.size(0)
     for evt_id in range(0, num, batch_size):
         cond_batch = {"diffusion": cond[evt_id : evt_id + batch_size]}
@@ -461,26 +468,32 @@ def gen_v1_inner_batch(
     bs = cond_batch.size(0)
 
     conditioned_flow = shower_flow.condition(showerflow_cond)
-    samples = conditioned_flow.sample(
-        torch.Size(
-            [
-                bs,
-            ]
+    samples = (
+        conditioned_flow.sample(
+            torch.Size(
+                [
+                    bs,
+                ]
+            )
         )
-    ).cpu().numpy()
+        .cpu()
+        .numpy()
+    )
     problems = (samples[:, -30:] < 0).sum(axis=1) > 7
     while problems.any():
         n_problems = problems.sum()
-        conditioned_flow = shower_flow.condition(
-            showerflow_cond[problems]
-        )
-        replacement_samples = conditioned_flow.sample(
-            torch.Size(
-                [
-                    n_problems,
-                ]
+        conditioned_flow = shower_flow.condition(showerflow_cond[problems])
+        replacement_samples = (
+            conditioned_flow.sample(
+                torch.Size(
+                    [
+                        n_problems,
+                    ]
+                )
             )
-        ).cpu().numpy()
+            .cpu()
+            .numpy()
+        )
         samples[problems] = replacement_samples
         problems[problems] = (replacement_samples[:, -30:] < 0).sum(axis=1) > 7
 
@@ -520,15 +533,17 @@ def gen_v1_inner_batch(
     # scale relative clusters per layer to actual number of clusters per layer
     # and same for energy
     if config.shower_flow_fixed_input_norms:
-        clusters_per_layer_gen = (clusters_per_layer_gen * scale_factor[:, None])
+        clusters_per_layer_gen = clusters_per_layer_gen * scale_factor[:, None]
         num_clusters = clusters_per_layer_gen.sum(axis=1)
-        reductions = np.clip(config.max_points/num_clusters, 0, 1)
+        reductions = np.clip(config.max_points / num_clusters, 0, 1)
         num_clusters = num_clusters * reductions
         clusters_per_layer_gen = clusters_per_layer_gen * reductions[:, None]
         clusters_per_layer_gen = clusters_per_layer_gen.astype(int)
         num_clusters = num_clusters.astype(int)
     else:
-        num_clusters = np.clip((num_clusters * scale_factor).astype(int), 1, config.max_points)
+        num_clusters = np.clip(
+            (num_clusters * scale_factor).astype(int), 0, config.max_points
+        )
         clusters_per_layer_gen = (
             clusters_per_layer_gen
             / clusters_per_layer_gen.sum(axis=1, keepdims=True)
@@ -540,7 +555,6 @@ def gen_v1_inner_batch(
         e_per_layer_gen = (
             e_per_layer_gen / e_per_layer_gen.sum(axis=1, keepdims=True) * energies
         )  # B,30
-
 
     max_num_clusters = num_clusters.max()
 
@@ -559,10 +573,11 @@ def gen_v1_inner_batch(
                 config.max_points / config.min_points
             )
         else:
-            n = (num_clusters / config.max_points) * 2 - 1
-            #n = (num_clusters / 6_000) * 2 - 1
+            # n = (num_clusters / config.max_points) * 2 - 1
+            n = (num_clusters / 6_000) * 2 - 1
         cond_batch[:, index] = torch.tensor(n.flatten())
-    
+        # and here
+
     fake_showers = get_shower(
         model,
         max_num_clusters,
@@ -574,9 +589,11 @@ def gen_v1_inner_batch(
     fake_showers = fake_showers.detach().cpu().numpy()
     if is_cc2_diffusion(config):
         fake_showers = rotate_cc2_diffusion_output(fake_showers)
-    else: # its CC3 and we need to un-log the energy
-        fake_showers[:, :, 3] = np.exp(fake_showers[:, :, 3]*metadata.log_incident_std*2 + metadata.log_incident_mean)
-
+    else:  # its CC3 and we need to un-log the energy
+        fake_showers[:, :, 3] = np.exp(
+            fake_showers[:, :, 3] * metadata.log_incident_std * 2
+            + metadata.log_incident_mean
+        )
 
     # if np.isnan(fake_showers).sum() != 0:
     #       return fake_showers
