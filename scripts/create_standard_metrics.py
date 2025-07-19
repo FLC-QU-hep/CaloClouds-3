@@ -41,7 +41,7 @@ from pointcloud.evaluation.calculate_scale_factors import get_path as factor_get
 
 
 detector_projection = True
-scale_e_n = False
+scale_e_n = True
 
 # Gather the models to evaluate
 # the dict has the format {model_name: (model, shower_flow, config)}
@@ -78,7 +78,10 @@ try:
 
         if scale_e_n:
             config.shower_flow_n_scaling = True
-            loaded = np.load(factor_get_path(config, model_name), allow_pickle=True)
+            #factor_file_name = factor_get_path(config, model_name)
+            factor_file_name = '/data/dust/user/dayhallh/point-cloud-diffusion-logs/binned_metrics/CaloClouds3-ShowerFlow_a1_fnorms_2_p22_th90_ph90_en10-100_scaleFactor.npz'
+            loaded = np.load(factor_file_name, allow_pickle=True)
+            print(factor_file_name)
             config.shower_flow_coef_real = loaded["final_n_coeff"]
             # config.shower_flow_coef_real = np.zeros(2)
             # config.shower_flow_coef_real[0] =  0.7
@@ -112,6 +115,7 @@ try:
         meta_here.vis_eng_rescale = 3.4
 
         # try as in interance
+        #meta_here.mean_cog[:] = [-4.06743696e-03, 0.321829, 1.10137465e01]
         meta_here.mean_cog[:] = [-4.06743696e-03, 0.321829, 1.10137465e01]
         meta_here.mean_cog[0] -= 40
         meta_here.std_cog[:] = [1.24559791, 0.95357278, 2.59475371]
@@ -162,12 +166,10 @@ try:
 
         if scale_e_n:
             config.shower_flow_n_scaling = True
-            loaded = np.load(factor_get_path(config, model_name), allow_pickle=True)
+            factor_file_name = '/data/dust/user/dayhallh/point-cloud-diffusion-logs/binned_metrics/CaloClouds2-ShowerFlow_CC2_p22_th90_ph90_en10-100_scaleFactor.npz'
+            loaded = np.load(factor_file_name, allow_pickle=True)
             config.shower_flow_coef_real = loaded["real_coeff"]
-            #config.shower_flow_coef_fake = loaded["fake_coeff"]
-            coeff_path = "/data/dust/user/dayhallh/CC2-out/nhits_rescale_cc2_try8_unscaled_3.npz"
-            #config.shower_flow_coef_real = np.load(coeff_path)['coef_real']
-            config.shower_flow_coef_fake = np.load(coeff_path)['coef_fake']
+            config.shower_flow_coef_fake = loaded["fake_coeff"]
         else:
             config.shower_flow_n_scaling = False
 

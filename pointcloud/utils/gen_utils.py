@@ -364,17 +364,20 @@ def cond_batcher(batch_size, cond, showerflow_cond=None):
         The batch of incident energies to condition the showers on.
 
     """
-    # sort by energies for better batching and faster inference
-    if len(cond.shape) > 1:
-        mask = torch.argsort(cond[..., -1].squeeze())
-    else:
-        mask = torch.argsort(cond)
-    # change torch tensor to numpyarray
-    mask = mask.cpu().numpy()
-    mask = np.atleast_1d(mask)
-    cond = cond[mask]
-    if showerflow_cond is not None:
-        showerflow_cond = showerflow_cond[mask]
+    # if the conds are actually the same object, we only need to sort one
+    #identical_conds = cond is showerflow_cond
+    ## sort by energies for better batching and faster inference
+    #if len(cond.shape) > 1:
+    #    mask = torch.argsort(cond[..., -1].squeeze())
+    #else:
+    #    mask = torch.argsort(cond)
+    ## change torch tensor to numpyarray
+    #mask = mask.cpu().numpy()
+    #mask = np.atleast_1d(mask)
+    #cond[:] = cond[mask]
+    #
+    #if not identical_conds and showerflow_cond is not None:
+    #    showerflow_cond = showerflow_cond[mask]
     num = cond.size(0)
     for evt_id in range(0, num, batch_size):
         cond_batch = {"diffusion": cond[evt_id : evt_id + batch_size]}

@@ -108,7 +108,7 @@ class DetectorScaleFactors:
             cell_thickness,
             model_gun_xyz_pos,
         )
-        self.n_retained = 100
+        self.n_retained = 1000
         self.retain_at = ""
         self.retain_dict = {}
         self.MAP = MAP
