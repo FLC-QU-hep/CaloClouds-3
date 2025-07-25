@@ -685,13 +685,14 @@ def gen_v1_inner_batch(
             f"Global orientation {global_ori} not supported for local orientation {local_ori}"
         )
 
-    # CoG calibration
-    cog = get_cog(
-        fake_showers[:, :, 0],
-        fake_showers[:, :, 1],
-        fake_showers[:, :, 2],
-        fake_showers[:, :, 3],
-    )
-    fake_showers[:, :, 0] -= (cog[0] - cog_x)[:, None]
-    fake_showers[:, :, 1] -= (cog[1] - cog_y)[:, None]
-    destination_array[first_index : first_index + bs] = fake_showers
+    if getattr(config, "cog_calibration", True):
+        # CoG calibration
+        cog = get_cog(
+            fake_showers[:, :, 0],
+            fake_showers[:, :, 1],
+            fake_showers[:, :, 2],
+            fake_showers[:, :, 3],
+        )
+        fake_showers[:, :, 0] -= (cog[0] - cog_x)[:, None]
+        fake_showers[:, :, 1] -= (cog[1] - cog_y)[:, None]
+        destination_array[first_index : first_index + bs] = fake_showers

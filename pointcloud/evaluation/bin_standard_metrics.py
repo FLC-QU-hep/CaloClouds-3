@@ -54,6 +54,7 @@ class BinnedData:
         [meta.Zmin_global, meta.Zmax_global],
         [floors[0], ceilings[-1]],
     ]
+    event_center = np.array([-80, -50, 0, 0])
     arg_names = [
         "name",
         "xyz_limits",
@@ -124,10 +125,10 @@ class BinnedData:
         self.add_hist("sum clusters", "layers", 1, 30, 30)
         self.add_hist("sum energy [MeV]", "layers", 1, 30, 30)
         self.add_hist(
-            "number of clusters", "cluster energy [MeV]", 0.000001, 1, 100, True
+            "number of clusters", "cluster energy [MeV]", 0.001, 100, 100, True
         )
         self.add_hist("number of showers", "number of clusters", 0, 10000, 50)
-        self.add_hist("number of showers", "energy sum [MeV]", 0, 10, 50)
+        self.add_hist("number of showers", "energy sum [MeV]", 0, 10000, 50)
         self.add_hist(
             "number of showers",
             "center of gravity X [mm]",
@@ -350,20 +351,21 @@ class BinnedData:
         """
         rescaled = np.copy(events)
         rescaled[:, :, 3] /= self.energy_scale
-        for dim in range(3):
-            # for dim in [0, 2]:  # skip the y rescale
-            raw = events[:, :, dim]
-            unit = (raw - self.xyz_limits[dim][0]) / (
-                self.xyz_limits[dim][1] - self.xyz_limits[dim][0]
-            )
-            # assert np.all(unit <= 1.), \
-            # f"Dim {dim}, limits {self.xyz_limits[dim]}, "\
-            # f"Raw min {np.min(raw)}, max {np.max(raw)}, unit {unit}"
-            # Models can generate data outside of the range
-            rescaled[:, :, dim] = (
-                unit * (self.true_xyz_limits[dim][1] - self.true_xyz_limits[dim][0])
-                + self.true_xyz_limits[dim][0]
-            )
+        if False:  # TODO: fix
+            for dim in range(3):
+                # for dim in [0, 2]:  # skip the y rescale
+                raw = events[:, :, dim]
+                unit = (raw - self.xyz_limits[dim][0]) / (
+                    self.xyz_limits[dim][1] - self.xyz_limits[dim][0]
+                )
+                # assert np.all(unit <= 1.), \
+                # f"Dim {dim}, limits {self.xyz_limits[dim]}, "\
+                # f"Raw min {np.min(raw)}, max {np.max(raw)}, unit {unit}"
+                # Models can generate data outside of the range
+                rescaled[:, :, dim] = (
+                    unit * (self.true_xyz_limits[dim][1] - self.true_xyz_limits[dim][0])
+                    + self.true_xyz_limits[dim][0]
+                )
         return rescaled
 
     def add_events(self, events):
@@ -399,7 +401,8 @@ class BinnedData:
 
         energy = rescaled[:, :, 3][mask]
         gun_shifted = rescaled - self.gun_shift
-        radius = np.sqrt(gun_shifted[:, :, 0] ** 2 + gun_shifted[:, :, 1] ** 2)[mask]
+        centered = gun_shifted - self.event_center
+        radius = np.sqrt(centered[:, :, 0] ** 2 + centered[:, :, 1] ** 2)[mask]
 
         self.counts[0] += np.histogram(radius, self.bins[0])[0]
         self.counts[1] += np.histogram(radius, self.bins[1], weights=energy)[0]
@@ -500,6 +503,15 @@ class BinnedData:
         total_showers = np.sum(self.counts[hist_idx])
         return counts / total_showers
 
+    def make_save_dict(self):
+        to_save = {}
+        for name in self.arg_names:
+            to_save[name] = getattr(self, name)
+        for i, counts in enumerate(self.counts):
+            to_save[f"counts_{i}"] = counts
+        to_save["sample_events"] = np.array(self.sample_events)
+        return to_save
+
     def save(self, path):
         """
         Save the binned data to a file.
@@ -509,13 +521,38 @@ class BinnedData:
         path : str
             The path to save the binned data to.
         """
-        to_save = {}
-        for name in self.arg_names:
-            to_save[name] = getattr(self, name)
-        for i, counts in enumerate(self.counts):
-            to_save[f"counts_{i}"] = counts
-        to_save["sample_events"] = np.array(self.sample_events)
+        to_save = self.make_save_dict()
+        if "sample_projected_idxs" in to_save:
+            print("Saving with projections")
+        else:
+            print("Saving without projections")
         np.savez(path, **to_save)
+
+    @classmethod
+    def from_save_dict(cls, save_dict, **kwargs):
+        args = {name: save_dict[name] for name in cls.arg_names if name in save_dict}
+        for key in kwargs:
+            if key not in cls.arg_names:
+                raise ValueError(f"Unknown argument {key}")
+            if key not in args:
+                print(f"Adding {key} to file data")
+                args[key] = kwargs[key]
+            else:
+                print(f"{key} already in file data")
+        # don't hard check when loading, the data exists already
+        args["hard_check"] = False
+        this = cls(**args)
+        for i in range(len(this)):
+            try:
+                this.counts[i] = save_dict[f"counts_{i}"]
+            except KeyError:
+                print(f"No saved data for counts {i}")
+        this.recompute_mean_energies()
+        try:
+            this.sample_events = save_dict["sample_events"]
+        except KeyError:
+            print("No saved sample events")
+        return this
 
     @classmethod
     def load(cls, path, **kwargs):
@@ -534,29 +571,7 @@ class BinnedData:
             The loaded binned data.
         """
         saved = np.load(path, allow_pickle=True)
-        args = {name: saved[name] for name in cls.arg_names if name in saved}
-        for key in kwargs:
-            if key not in cls.arg_names:
-                raise ValueError(f"Unknown argument {key}")
-            if key not in args:
-                print(f"Adding {key} to file data")
-                args[key] = kwargs[key]
-            else:
-                print(f"{key} already in file data")
-        # don't hard check when loading, the data exists already
-        args["hard_check"] = False
-        this = cls(**args)
-        for i in range(len(this)):
-            try:
-                this.counts[i] = saved[f"counts_{i}"]
-            except KeyError:
-                print(f"No saved data for counts {i}")
-        this.recompute_mean_energies()
-        try:
-            this.sample_events = saved["sample_events"]
-        except KeyError:
-            print("No saved sample events")
-        return this
+        return cls.from_save_dict(saved, **kwargs)
 
 
 class DetectorBinnedData(BinnedData):
@@ -591,8 +606,8 @@ class DetectorBinnedData(BinnedData):
         half_cell_size_global,
         cell_thickness,
         gun_xyz_pos,
-        hard_check=True,
-        no_box_cut=False,
+        hard_check=False,
+        no_box_cut=True,
     ):
         """Construct a BinnedData object.
 
@@ -635,6 +650,9 @@ class DetectorBinnedData(BinnedData):
         self.perpendicular_cell_centers = detector_map.perpendicular_cell_centers(
             self.MAP, self.half_cell_size_global
         )
+        for xs, ys in self.perpendicular_cell_centers:
+            xs -= BinnedData.event_center[0]
+            ys -= BinnedData.event_center[1]
         radial_min, radial_max, n_radial_bins, self.radial_cell_allocations = (
             self.radial_bins_for_cells()
         )
@@ -654,9 +672,9 @@ class DetectorBinnedData(BinnedData):
         )
         self.add_hist("sum active cells", "layers", 1, 30, 30)
         self.add_hist("sum energy [MeV]", "layers", 1, 30, 30)
-        self.add_hist("number of cells", "cell energy [MeV]", 0.000001, 1, 100, True)
+        self.add_hist("number of cells", "cell energy [MeV]", 0.01, 1100, 100, True)
         self.add_hist("number of showers", "number of active cells", 0, 3000, 50)
-        self.add_hist("number of showers", "energy sum [MeV]", 0, 10, 50)
+        self.add_hist("number of showers", "energy sum [MeV]", 0, 10000, 50)
         self.add_hist(
             "number of showers",
             "center of gravity X [mm]",
@@ -683,6 +701,7 @@ class DetectorBinnedData(BinnedData):
         self.max_sample_events = 10
         self.raw_sample_events = []
         self.sample_events = []
+        self.sample_projections = []
 
         if no_box_cut:
             self.box_cut = lambda events: None
@@ -732,8 +751,8 @@ class DetectorBinnedData(BinnedData):
                 raise ValueError(error_message)
             warnings.warn(error_message)
 
-        # rescaled = self.rescaled_events(events)
-        gun_shifted = events - self.gun_shift
+        rescaled = self.rescaled_events(events)
+        gun_shifted = rescaled - self.gun_shift
         events_as_cells = detector_map.get_projections(
             gun_shifted,
             self.MAP,
@@ -743,7 +762,15 @@ class DetectorBinnedData(BinnedData):
             return_cell_point_cloud=False,
             include_artifacts=False,
         )
-        detector_map.mip_cut(events_as_cells, self.energy_scale)
+        detector_map.mip_cut(events_as_cells)
+
+        if len(self.sample_projections) < self.max_sample_events:
+            from_batch = list(
+                events_as_cells[
+                    : (self.max_sample_events - len(self.sample_projections))
+                ]
+            )
+            self.sample_projections.extend(from_batch)
         return self.add_events_as_cells(events_as_cells)
 
     def add_events_as_cells(self, events_as_cells):
@@ -772,7 +799,7 @@ class DetectorBinnedData(BinnedData):
 
         # things can be batch processed if we swap the inner and outer lists
         # and stack the layers
-        layers = [np.stack(l) / self.energy_scale for l in zip(*events_as_cells)]
+        layers = [np.stack(l) for l in zip(*events_as_cells)]
 
         hits_per_shower = np.zeros(len(events_as_cells), dtype=int)
         energy_per_shower = np.zeros(len(events_as_cells))
@@ -853,6 +880,28 @@ class DetectorBinnedData(BinnedData):
             raise ValueError(error_message)
         warnings.warn(error_message)
         return
+
+    def make_save_dict(self):
+        save_dict = super().make_save_dict()
+        save_dict["raw_sample_events"] = np.array(self.raw_sample_events)
+        projected_dict = detector_map.projected_events_to_dict(self.sample_projections)
+        for key in projected_dict:
+            save_dict["sample_projected_" + key] = projected_dict[key]
+        return save_dict
+
+    @classmethod
+    def from_save_dict(cls, save_dict, **kwargs):
+        this = super().from_save_dict(save_dict, **kwargs)
+        projected_dict = {
+            key[len("sample_projected_") :]: save_dict[key]
+            for key in save_dict
+            if key.startswith("sample_projected_")
+        }
+        this.raw_sample_events = save_dict["raw_sample_events"]
+        this.sample_projections = detector_map.dict_to_projected_events(
+            projected_dict
+        )[1]
+        return this
 
 
 def sample_g4(config, binned, n_events):
@@ -980,60 +1029,6 @@ def conditioned_sample_model(model_config, binned, cond, model, shower_flow=None
         binned.add_events(events)
 
     print()
-    print("Done")
-    binned.recompute_mean_energies()
-
-
-def sample_accumulator(config, binned, acc, n_events):
-    """
-    For the values for which it's possible, create binned data from an
-    accumulator object.
-
-    Parameters
-    ----------
-    config : Configs
-        The configuration used to find the dataset, etc.
-    binned : BinnedData
-        The binned data to add the samples to, modified inplace.
-    acc : pointcloud.utils.stats_accumulator.StatsAccumulator
-        The accumulator to take the data from.
-    n_events : int
-        Not actually used, but kept for consistency with the other sampling functions.
-    """
-    for i in range(len(binned)):
-        binned.counts[i][:] = np.nan
-
-    x_bin_centers, y_bin_centers, z_bin_centers = acc._get_bin_centers()
-    n_x_bins = len(x_bin_centers)
-    n_y_bins = len(y_bin_centers)
-    n_z_bins = len(z_bin_centers)
-    fake_events = np.ones((1, np.max([n_x_bins, n_y_bins, n_z_bins]), 4))
-    fake_events[0, :n_x_bins, 0] = x_bin_centers
-    fake_events[0, :n_y_bins, 1] = y_bin_centers
-    fake_events[0, :n_z_bins, 2] = z_bin_centers
-    rescaled = binned.rescaled_events(fake_events)
-    x_bin_centers = rescaled[0, :n_x_bins, 0]
-    y_bin_centers = rescaled[0, :n_y_bins, 1]
-    z_bin_centers = rescaled[0, :n_z_bins, 2]
-
-    gun_shift = binned.get_gunshift()
-    x_bin_centers -= gun_shift[0, 0, 0]
-    y_bin_centers -= gun_shift[0, 0, 1]
-    bin_radii = np.sqrt(
-        x_bin_centers[:, np.newaxis] ** 2 + y_bin_centers[np.newaxis, :] ** 2
-    )
-    flat_radii = bin_radii.flatten()
-    flat_hits = np.sum(acc.counts_hist, axis=(0, 1)).flatten()
-    flat_energy = np.sum(acc.energy_hist / 1000, axis=(0, 1)).flatten()
-
-    binned.counts[0] = np.histogram(flat_radii, binned.bins[0], weights=flat_hits)[0]
-    binned.counts[1] = np.histogram(flat_radii, binned.bins[1], weights=flat_energy)[0]
-
-    layers_hits = np.sum(acc.counts_hist, axis=(0, 2, 3))
-    binned.counts[2][:] = layers_hits
-    layers_energy = np.sum(acc.energy_hist / 1000, axis=(0, 2, 3))
-    binned.counts[3][:] = layers_energy
-
     print("Done")
     binned.recompute_mean_energies()
 

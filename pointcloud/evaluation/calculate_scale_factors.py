@@ -68,30 +68,6 @@ class DetectorScaleFactors:
         model,
         shower_flow,
     ):
-        """Construct a BinnedData object.
-
-        Parameters
-        ----------
-        energy_scale : float
-            How much to divide the observed energy by before binning.
-        MAP : list
-            list of dictionaries, each containing the grid of cells for a layer
-            in global coordinates
-            As returned by detector_map.create_map
-            Should be already offset, such that the gun fires at the origin.
-        layer_bottom_pos : np.array
-            The y positions of the bottom of each layer, in the coordinates
-            the data is given in.
-        half_cell_size_global : float
-            Half the size of the cells in the detector,
-            perpendicular to the radial direction
-        cell_thickness: float
-            The thickness in the y direction of each cell, in the coordinates
-            the data is given in.
-        gun_xyz_pos : np.array
-            The x, y and z positions of the gun, in the coordinates the data is
-            given in. The data is shifted so that the gun is at the origin.
-        """
         self.g4_binner = BinnedData(
             "G4",
             g4_xyz_limits,
