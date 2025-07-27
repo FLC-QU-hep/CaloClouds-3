@@ -145,8 +145,8 @@ class DetectorScaleFactors:
             self.g4_detector_e = np.concatenate((self.g4_detector_e, g4_e), axis=0)
 
     def get_projected_values(self, events, binner):
-        # binner.rescaled_events(events)
-        gun_shifted = events - binner.gun_shift
+        rescaled = binner.rescaled_events(events)
+        gun_shifted = rescaled - binner.gun_shift
         events_as_cells = detector_map.get_projections(
             gun_shifted,
             self.MAP,
@@ -344,9 +344,9 @@ def construct_dsf(
     model,
     shower_flow,
     # max_g4_events=10_000,
-    max_g4_events=100,
-    g4_gun_pos=None,
-    model_gun_pos=None,
+    max_g4_events,
+    g4_gun_pos,
+    model_gun_pos,
 ):
     meta = Metadata(config)
     MAP, _ = detector_map.create_map(config=config)
@@ -375,10 +375,8 @@ def construct_dsf(
         [meta.Xmin_global, meta.Xmax_global],
         [raw_floors[0], raw_ceilings[-1]],
     ]
-    if g4_gun_pos is None:
-        g4_gun_pos = np.array([-50, 0, 0])
     g4_layer_bottom_pos = meta.layer_bottom_pos_hdf5
-    g4_energy_scale = 1.0
+    g4_energy_scale = 1e-3
     cc_floors, cc_ceilings = detector_map.floors_ceilings(
         meta.layer_bottom_pos_global, meta.cell_thickness_global, 0
     )
@@ -388,12 +386,7 @@ def construct_dsf(
         [cc_floors[0], cc_ceilings[-1]],
     ]
     model_layer_bottom_pos = meta.layer_bottom_pos_global
-    model_rescale_energy = 1e3
-    if model_gun_pos is None:
-        if "3" in model_name:
-            model_gun_pos = np.array([0, 0, 0])
-        else:
-            model_gun_pos = np.array([-50, 0, 0])
+    model_rescale_energy = 1
     dsf = DetectorScaleFactors(
         g4_xyz_limits,
         model_xyz_limits,

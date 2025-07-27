@@ -327,8 +327,8 @@ def truescale_showerflow_output(samples, config):
             cogs.append(None)
     cog_x, cog_y, cog_z = cogs
     # TODO remove this....
-    cog_x -= 40
-    cog_y += 0.7436180240850283
+    #cog_x -= 40
+    #cog_y += 0.7436180240850283
 
     n_layers = len(metadata.layer_bottom_pos_hdf5)
     cluster_start = np.sum(inputs_mask[:5])

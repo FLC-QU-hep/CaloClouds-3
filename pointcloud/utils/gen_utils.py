@@ -695,4 +695,4 @@ def gen_v1_inner_batch(
         )
         fake_showers[:, :, 0] -= (cog[0] - cog_x)[:, None]
         fake_showers[:, :, 1] -= (cog[1] - cog_y)[:, None]
-        destination_array[first_index : first_index + bs] = fake_showers
+    destination_array[first_index : first_index + bs] = fake_showers

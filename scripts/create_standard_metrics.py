@@ -40,11 +40,11 @@ from pointcloud.evaluation.calculate_scale_factors import get_path as factor_get
 
 
 if len(sys.argv) > 1:
-    detector_projection = sys.argv[1].strip().lower()=="true"
+    detector_projection = sys.argv[1].strip().lower() == "true"
 else:
     detector_projection = True
 if len(sys.argv) > 2:
-    scale_e_n = sys.argv[2].strip().lower()=="true"
+    scale_e_n = sys.argv[2].strip().lower() == "true"
 else:
     scale_e_n = False
 
@@ -82,33 +82,43 @@ try:
     if True:  # new a1 model
         config = caloclouds_3_simple_shower.Configs()
         config.dataset_tag = "p22_th90_ph90_en10-100"
-        config.device = 'cpu'
+        config.device = "cpu"
         config.cond_features = 4
         config.diffusion_pointwise_hidden_l1 = 32
         config.distillation = True
         config.cond_features_names = ["energy", "p_norm_local"]
-        caloclouds_paths = ["/data/dust/group/ilc/sft-ml/model_weights/CaloClouds/CC3/ckpt_0.000000_6135000.pt"]
-        #showerflow_paths = ["/data/dust/group/ilc/sft-ml/model_weights/CaloClouds/CC3/ShowerFlow_alt1_nb2_inputs8070450532247928831_fnorms_dhist_best.pth"]
-        showerflow_paths = ["/data/dust/group/ilc/sft-ml/model_weights/CaloClouds/CC3/ShowerFlow_alt1_nb2_inputs8070450532247928831_fnorms_best.pth"]
+        caloclouds_paths = [
+            "/data/dust/group/ilc/sft-ml/model_weights/CaloClouds/CC3/ckpt_0.000000_6135000.pt"
+        ]
+        # showerflow_paths = ["/data/dust/group/ilc/sft-ml/model_weights/CaloClouds/CC3/ShowerFlow_alt1_nb2_inputs8070450532247928831_fnorms_dhist_best.pth"]
+        showerflow_paths = [
+            "/data/dust/group/ilc/sft-ml/model_weights/CaloClouds/CC3/ShowerFlow_alt1_nb2_inputs8070450532247928831_fnorms_best.pth"
+        ]
 
         model_name = "CaloClouds3-ShowerFlow_a1_fnorms_2"
         if scale_e_n:
+            config.shower_flow_n_scaling = True
             factor_path = factor_get_path(config, model_name)
+            print(f"CC3 factor path: {factor_path}")
             loaded = np.load(factor_path, allow_pickle=True)
-            config.shower_flow_coef_real = loaded['final_n_coeff']
-            config.shower_flow_scale_e = loaded['final_e_coeff'][-2]
+            config.shower_flow_coef_real = loaded["final_n_coeff"]
+            print(f"CC3 real coeff: {config.shower_flow_coef_real}")
+            config.shower_flow_scale_e = loaded["final_e_coeff"][-2]
+            print(f"CC3 e coeff: {config.shower_flow_scale_e}")
         else:
+            config.shower_flow_n_scaling = False
             config.shower_flow_coef_fake = None
             config.shower_flow_coef_real = None
             config.shower_flow_scale_e = None
         config.cog_calibration = cog_calibration
 
-
         caloclouds = get_caloclouds_models(
-            caloclouds_paths=caloclouds_paths, showerflow_paths=showerflow_paths, caloclouds_names=["CaloClouds3"], showerflow_names=["ShowerFlow_a1_fnorms_2"],
-            config=config
+            caloclouds_paths=caloclouds_paths,
+            showerflow_paths=showerflow_paths,
+            caloclouds_names=["CaloClouds3"],
+            showerflow_names=["ShowerFlow_a1_fnorms_2"],
+            config=config,
         )
-
 
         # generate some custom metadata that will allow comparison between this model and the old model
         train_dataset_meta = Metadata(caloclouds_3_simple_shower.Configs())
@@ -118,8 +128,12 @@ try:
         meta_here.n_pts_rescale = train_dataset_meta.n_pts_rescale
         meta_here.vis_eng_rescale = 3.5
 
-        #meta_here.mean_cog[:] = [-4.06743696e-03, -2.27790998e-01,  1.10137465e+01]
-        meta_here.mean_cog[:] = [-4.06743696e-03, 0.321829,  1.10137465e+01]
+        # meta_here.mean_cog[:] = [-4.06743696e-03, -2.27790998e-01,  1.10137465e+01]
+        meta_here.mean_cog[:] = [-4.06743696e-03, 0.321829, 1.10137465e01]
+        # CoG x offset
+        meta_here.mean_cog[0] -= 0.1
+        # CoG Y offset
+        meta_here.mean_cog[1] -= 0.7
         meta_here.std_cog[:] = [1.24559791, 0.95357278, 2.59475371]
 
         meta_here.log_incident_mean = train_dataset_meta.log_incident_mean
@@ -132,71 +146,86 @@ try:
         # to get the scaling needed
         Xmean, Ymean, Zmean = -0.0074305227, -0.21205868, 12.359252
         Xstd, Ystd, Zstd = 22.4728036, 23.65837968, 5.305082
-        meta_here.Xmax_global = 2*Ymean
-        meta_here.Xmin_global = 2*(2*Ystd - Ymean)
-        meta_here.Zmax_global = 2*Xmean
-        meta_here.Zmin_global = 2*(2*Xstd - Xmean)
-    
-        print('\n~~~~~~~~\n')
+        meta_here.Xmax_global = 2 * Ymean
+        meta_here.Xmin_global = 2 * (2 * Ystd - Ymean)
+        meta_here.Zmax_global = 2 * Xmean
+        meta_here.Zmin_global = 2 * (2 * Xstd - Xmean)
+
+        print("\n~~~~~~~~\n")
         print(repr(meta_here))
-        print('\n~~~~~~~~\n')
+        print("\n~~~~~~~~\n")
 
         caloclouds[model_name][2].metadata = meta_here
 
         models.update(caloclouds)
 
-
     if True:
         config = caloclouds_2_v3.Configs()
         config.dataset_tag = "p22_th90_ph90_en10-100"
-        config.device = 'cpu'
-        config.cond_features = 2  # number of conditioning features (i.e. energy+points=2)
+        config.device = "cpu"
+        config.cond_features = (
+            2  # number of conditioning features (i.e. energy+points=2)
+        )
         config.cond_features_names = ["energy", "points"]
         config.shower_flow_cond_features = ["energy"]
         config.n_dataset_files = static_n_files
         config.dataset_path_in_storage = False
         config.dataset_path = static_dataset
         config.shower_flow_roll_xyz = True
-        config.distillation = True 
-        #config.max_points = 6_000
-        #config.max_points = 30_000
-        #showerflow_paths = ["/data/dust/group/ilc/sft-ml/model_weights/CaloClouds/CC2/220714_cog_e_layer_ShowerFlow_best.pth"]
-        #showerflow_paths = ["/data/dust/user/dayhallh/point-cloud-diffusion-data/showerFlow/p22_th90_ph90_en10-100/ShowerFlow_original_nb10_inputs36893488147419103231_dhist_best.pth"]
-        showerflow_paths = ["/data/dust/user/dayhallh/point-cloud-diffusion-data/showerFlow/highGran_g40_p22_th90_ph90_en10-100/ShowerFlow_original_nb10_inputs36893488147419103231_dhist_try8_best.pth"]
+        config.distillation = True
+        # config.max_points = 6_000
+        # config.max_points = 30_000
+        # showerflow_paths = ["/data/dust/group/ilc/sft-ml/model_weights/CaloClouds/CC2/220714_cog_e_layer_ShowerFlow_best.pth"]
+        # showerflow_paths = ["/data/dust/user/dayhallh/point-cloud-diffusion-data/showerFlow/p22_th90_ph90_en10-100/ShowerFlow_original_nb10_inputs36893488147419103231_dhist_best.pth"]
+        showerflow_paths = [
+            "/data/dust/user/dayhallh/point-cloud-diffusion-data/showerFlow/highGran_g40_p22_th90_ph90_en10-100/ShowerFlow_original_nb10_inputs36893488147419103231_dhist_try8_best.pth"
+        ]
 
-        caloclouds_paths = ["/data/dust/group/ilc/sft-ml/model_weights/CaloClouds/CC2/ckpt_0.000000_1000000.pt"]
+        caloclouds_paths = [
+            "/data/dust/group/ilc/sft-ml/model_weights/CaloClouds/CC2/ckpt_0.000000_1000000.pt"
+        ]
         model_name = "CaloClouds2-ShowerFlow_CC2"
 
         if scale_e_n:
+            config.shower_flow_n_scaling = True
             factor_path = factor_get_path(config, model_name)
+            print(f"CC2 factor path: {factor_path}")
             loaded = np.load(factor_path, allow_pickle=True)
             config.shower_flow_coef_fake = loaded["fake_coeff"]
+            print(f"CC2 fake coeff: {config.shower_flow_coef_fake}")
             config.shower_flow_coef_real = loaded["real_coeff"]
-            config.shower_flow_scale_e = loaded['final_e_coeff'][-2]
+            print(f"CC2 real coeff: {config.shower_flow_coef_real}")
+            config.shower_flow_scale_e = loaded["final_e_coeff"][-2]
+            print(f"CC2 e coeff: {config.shower_flow_scale_e}")
         else:
+            config.shower_flow_n_scaling = False
             config.shower_flow_coef_fake = None
             config.shower_flow_coef_real = None
             config.shower_flow_scale_e = None
         config.cog_calibration = cog_calibration
 
         caloclouds = get_caloclouds_models(
-            caloclouds_paths=caloclouds_paths, showerflow_paths=showerflow_paths, caloclouds_names=["CaloClouds2"], showerflow_names=["ShowerFlow_CC2"],
-            config=config
+            caloclouds_paths=caloclouds_paths,
+            showerflow_paths=showerflow_paths,
+            caloclouds_names=["CaloClouds2"],
+            showerflow_names=["ShowerFlow_CC2"],
+            config=config,
         )
-
 
         train_dataset_meta = Metadata(config)
         meta_here = Metadata(config)
-        meta_here.mean_cog[:] = [-40.2, 0, 40]
-        #meta_here.mean_cog[:] = 0
-        #meta_here.std_cog[:] = [1, 1, 0.5]
-        meta_here.std_cog[:] = [0.53/0.38, 1., 0.52/0.85]
+        meta_here.mean_cog[:] = [-40, 0, 40]
+        meta_here.mean_cog[0] -= 0.3
+        #meta_here.mean_cog[1] += 0.2
+        # meta_here.mean_cog[:] = 0
+        # meta_here.std_cog[:] = [1, 1, 0.5]
+        meta_here.std_cog[:] = [0.53 / 0.38, 1.0, 0.52 / 0.85]
 
-        print('\n~~~~~~~~\n')
+        print("\n~~~~~~~~\n")
         print("CC2")
         print(repr(meta_here))
         print(caloclouds[model_name][2].max_points)
-        print('\n~~~~~~~~\n')
+        print("\n~~~~~~~~\n")
 
         caloclouds[model_name][2].metadata = meta_here
 
@@ -207,26 +236,37 @@ except FileNotFoundError as e:
 
 
 config = caloclouds_3_simple_shower.Configs()
-config.device = 'cpu'
+config.device = "cpu"
 config.dataset_path_in_storage = False
 config._dataset_path = static_dataset
 config.n_dataset_files = static_n_files
-#config._dataset_path = angular_dataset
-#config.n_dataset_files = angular_n_files
+# config._dataset_path = angular_dataset
+# config.n_dataset_files = angular_n_files
 config.dataset_tag = "p22_th90_ph90_en10-100"
-#config.dataset_tag = "sim-E1261AT600AP180-180"
+# config.dataset_tag = "sim-E1261AT600AP180-180"
 model_name = "CaloClouds2-ShowerFlow_CC2"
 save_name = get_path(config, model_name)
 g4_gun = np.array([40, 50, 0])
 
+# off by -40, -50
+#cc2_model_gun = np.array([40, 50, 0])
+# off by -100 -50
+#cc2_model_gun = np.array([0, 0, 0])
+# off by -50 -50
+#cc2_model_gun = np.array([0, 50, 0])
+cc2_model_gun = np.array([40, 90, 0])
+# off by -80, 0
+#cc3_model_gun = np.array([0, 50, 0])
+# fixed
+cc3_model_gun = np.array([80, 50, 0])
 
 
 def main(
     config,
     redo_g4_data=True,
     redo_model_data=True,
-    max_g4_events=10_000,
-    max_model_events=10_000,
+    max_g4_events=1_000,
+    max_model_events=1_000,
     models=models,
 ):
     """
@@ -343,15 +383,13 @@ def main(
             xyz_limits = [[-1, 1], [-1, 1], [0, 29]]
             layer_bottom_pos = np.linspace(-0.1, 28.9, 30)
             cell_thickness_global = 0.5
-            rescale_energy = 1.
+            rescale_energy = 1.0
             if detector_projection:
                 if scale_e_n:
                     energy_correction = model_config.shower_flow_scale_e
                     print(f"Energy correction: {energy_correction}")
                     rescale_energy /= energy_correction
                     # rescale_energy /= 0.9880121837394529
-            gun_pos = g4_gun
-            print(f"{model_name} gun pos: {gun_pos}")
 
             if "caloclouds" in model_name.lower():  # this model unnorms itself.
 
@@ -364,10 +402,15 @@ def main(
                 xyz_limits = [
                     [meta.Zmin_global, meta.Zmax_global],
                     [meta.Xmin_global, meta.Xmax_global],
-                    #[cc_floors[0], cc_ceilings[-1]],
+                    # [cc_floors[0], cc_ceilings[-1]],
                     [raw_floors[0], raw_ceilings[-1]],
                 ]
                 layer_bottom_pos = meta.layer_bottom_pos_global
+                if "3" in model_name:
+                    gun_pos = cc3_model_gun
+                else:
+                    gun_pos = cc2_model_gun
+            print(f"{model_name} gun pos: {gun_pos}")
 
             if detector_projection:
                 binned = DetectorBinnedData(
@@ -404,7 +447,7 @@ def main(
 
 
 if __name__ == "__main__":
-    #config = caloclouds_3_simple_shower.Configs()
+    # config = caloclouds_3_simple_shower.Configs()
     config.device = "cpu"
     config.dataset_path_in_storage = False
     config._dataset_path = static_dataset

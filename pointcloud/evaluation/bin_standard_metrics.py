@@ -674,7 +674,7 @@ class DetectorBinnedData(BinnedData):
         self.add_hist("sum energy [MeV]", "layers", 1, 30, 30)
         self.add_hist("number of cells", "cell energy [MeV]", 0.01, 1100, 100, True)
         self.add_hist("number of showers", "number of active cells", 0, 3000, 50)
-        self.add_hist("number of showers", "energy sum [MeV]", 0, 10000, 50)
+        self.add_hist("number of showers", "energy sum [MeV]", 0, 4000, 50)
         self.add_hist(
             "number of showers",
             "center of gravity X [mm]",
