@@ -49,12 +49,16 @@ else:
     scale_e_n = False
 
 if len(sys.argv) > 3:
+    cog_calibration = sys.argv[3].strip().lower() == "true"
+else:
+    cog_calibration = True
+
+if len(sys.argv) > 4:
     seed = int(sys.argv[3])
     seed_all(seed)
 else:
     seed = None
 
-cog_calibration = True
 
 redo = True
 # Gather the models to evaluate
@@ -216,9 +220,6 @@ try:
         meta_here = Metadata(config)
         meta_here.mean_cog[:] = [-40, 0, 40]
         meta_here.mean_cog[0] -= 0.3
-        #meta_here.mean_cog[1] += 0.2
-        # meta_here.mean_cog[:] = 0
-        # meta_here.std_cog[:] = [1, 1, 0.5]
         meta_here.std_cog[:] = [0.53 / 0.38, 1.0, 0.52 / 0.85]
 
         print("\n~~~~~~~~\n")
@@ -248,25 +249,40 @@ model_name = "CaloClouds2-ShowerFlow_CC2"
 save_name = get_path(config, model_name)
 g4_gun = np.array([40, 50, 0])
 
-# off by -40, -50
-#cc2_model_gun = np.array([40, 50, 0])
-# off by -100 -50
-#cc2_model_gun = np.array([0, 0, 0])
-# off by -50 -50
-#cc2_model_gun = np.array([0, 50, 0])
-cc2_model_gun = np.array([40, 90, 0])
-# off by -80, 0
-#cc3_model_gun = np.array([0, 50, 0])
-# fixed
-cc3_model_gun = np.array([80, 50, 0])
+if cog_calibration:
+    cc2_model_gun = np.array([40, 90, 0])
+    cc3_model_gun = np.array([80, 50, 0])
+else:
+    # +50 x, perfect z
+    #cc2_model_gun = np.array([40, 90, 0])
+    # +50 x -50 z
+    #cc2_model_gun = np.array([40, 40, 0])
+    # +100 x perfect z
+    #cc2_model_gun = np.array([90, 90, 0])
+    # near perfect x, perfect z
+    #cc2_model_gun = np.array([0, 90, 0])
+    # -0.5, -0.5
+    cc2_model_gun = np.array([-10, 90, 0])
+    cc2_model_gun = np.array([-10.3, 89.7, 0])
+    # +50 x +50 z
+    #cc3_model_gun = np.array([80, 50, 0])
+    # +100x +100z
+    #cc3_model_gun = np.array([30, 0, 0])
+    # -40 x near perfect z
+    #cc3_model_gun = np.array([90, 90, 0])
+    # -20x perfect z
+    #cc3_model_gun = np.array([100, 100, 0])
+
+    # 5, -3
+    cc3_model_gun = np.array([125.2, 97.2, 0])
 
 
 def main(
     config,
     redo_g4_data=True,
     redo_model_data=True,
-    max_g4_events=1_000,
-    max_model_events=1_000,
+    max_g4_events=10_000,
+    max_model_events=10_000,
     models=models,
 ):
     """
@@ -460,7 +476,7 @@ if __name__ == "__main__":
     if not scale_e_n:
         config.dataset_tag += "_noFactor"
     if not cog_calibration:
-        config.dataset_tag = "_noCoGCalebration"
+        config.dataset_tag += "_noCoGCalebration"
         config.cog_calibration = False
     if seed is not None:
         config.dataset_tag += f"_seed{seed}"

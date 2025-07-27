@@ -695,4 +695,15 @@ def gen_v1_inner_batch(
         )
         fake_showers[:, :, 0] -= (cog[0] - cog_x)[:, None]
         fake_showers[:, :, 1] -= (cog[1] - cog_y)[:, None]
+    else:
+        cog_x_shift = metadata.mean_cog[0]
+        cog_y_shift = metadata.mean_cog[1]
+        cog_z_shift = metadata.mean_cog[2]
+        if getattr(config, "shower_flow_roll_xyz", False):
+            cog_x_shift, cog_y_shift, cog_z_shift = cog_z_shift, cog_x_shift, cog_y_shift
+        # Still need to apply centering
+        fake_showers[:, :, 0] -= cog_x_shift
+        fake_showers[:, :, 1] -= cog_y_shift
+
+
     destination_array[first_index : first_index + bs] = fake_showers
