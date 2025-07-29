@@ -280,7 +280,7 @@ else:
 def main(
     config,
     redo_g4_data=True,
-    redo_model_data=True,
+    redo_model_data=False,
     max_g4_events=10_000,
     max_model_events=10_000,
     models=models,
@@ -472,12 +472,16 @@ if __name__ == "__main__":
     # config.n_dataset_files = angular_n_files
     # config.dataset_tag = "sim-E1261AT600AP180-180"
     # config.dataset_tag = "p22_th90_ph90_en10-100"
-    config.dataset_tag = "p22_th90_ph90_en10-100"
-    if not scale_e_n:
-        config.dataset_tag += "_noFactor"
-    if not cog_calibration:
-        config.dataset_tag += "_noCoGCalebration"
-        config.cog_calibration = False
-    if seed is not None:
-        config.dataset_tag += f"_seed{seed}"
-    main(config)
+    # for seed in range(100):
+    if True:
+        config.dataset_tag = "p22_th90_ph90_en10-100"
+        if not scale_e_n:
+            config.dataset_tag += "_noFactor"
+        if not cog_calibration:
+            config.dataset_tag += "_noCoGCalebration"
+            config.cog_calibration = False
+        if seed is not None:
+            config.dataset_tag += f"_seed{seed}"
+        # Only do g4 once
+        redo_g4 = seed==0 or seed is None
+        main(config, redo_g4)

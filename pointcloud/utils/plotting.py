@@ -1596,6 +1596,37 @@ def plot_line_with_devation(
     ax.fill_between(xs, ys_low, ys_high, color=colour, alpha=0.2)
 
 
+def plot_hist_with_devation(
+        ax, colour, bins, counts, errors_up, errors_down=None,
+        clip_to_zero=False, **hist_kwargs):
+    bin_centers = 0.5 * (bins[:-1] + bins[1:])
+
+    reduced_args = hist_kwargs.copy()
+    for key in ['color', 'histtype', 'weights']:
+        if key in reduced_args:
+            del reduced_args[key]
+    ax.hist(
+        bin_centers, bins=bins, color=colour, weights=counts,
+        histtype='step', **reduced_args)
+    
+    if errors_down is None:
+        errors_down = errors_up
+
+    lower = counts - errors_down
+    upper = counts + errors_up
+
+    lower = np.repeat(lower, 2)
+    upper = np.repeat(upper, 2)
+
+    if clip_to_zero:
+        lower = np.maximum(lower, 0)
+        upper = np.maximum(upper, 0)
+
+    bin_corners = np.repeat(bins, 2)[1:-1]
+
+    ax.fill_between(bin_corners, lower, upper, color=colour, alpha=0.2)
+
+
 def heatmap(
     arr,
     x_spec,
@@ -1959,3 +1990,4 @@ class RatioPlots:
             main_ax = self.axes[row * 2, col]
             main_ax.set_xlim(self.bins[i][0], self.bins[i][-1])
         self.fig.tight_layout()
+

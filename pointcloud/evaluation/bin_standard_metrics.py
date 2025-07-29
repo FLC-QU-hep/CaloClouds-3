@@ -43,6 +43,69 @@ floors, ceilings = detector_map.floors_ceilings(
 )
 
 
+class BinnedErrors:
+    def __init__(self, binned_data_list):
+        self.binned_data_list = binned_data_list
+        events_binned = np.zeros(len(binned_data_list), dtype=int)
+        for b, binned_data in enumerate(binned_data_list):
+            hist_idx = next(
+                i
+                for i, x_label in enumerate(binned_data.x_labels)
+                if x_label == "center of gravity Y [mm]"
+            )
+            total = np.sum(binned_data.counts[hist_idx])
+            events_binned[b] = total
+        mean_total = np.mean(events_binned)
+        max_total = np.max(events_binned)
+        max_divergance = np.max(np.abs(events_binned - mean_total))
+        if max_divergance > (0.01 * max_total):
+            idx_max_divergance = np.argmax(np.abs(events_binned - mean_total))
+            raise ValueError(
+                "Binned data contians differeing numbers of events;"
+                f"Max divergence: {max_divergance};"
+                f"from binned data {idx_max_divergance};"
+                f"Mean total: {mean_total};"
+                f"Max total: {max_total}."
+            )
+        self.events_per_binned = max_total
+        self.get_mean_error()
+
+    def get_mean_error(self):
+        self.y_labels = []
+        self.x_labels = []
+        self.bins = []
+        self.counts = []
+        self.errors = []
+        for h, x_label in enumerate(self.binned_data_list[0].x_labels):
+            y_label = self.binned_data_list[0].y_labels[h]
+            bins = self.binned_data_list[0].bins[h]
+            self.y_labels.append(y_label)
+            self.x_labels.append(x_label)
+            self.bins.append(bins)
+            count_varients = []
+            for b, binned in enumerate(self.binned_data_list):
+                hidx = binned.hist_idx(y_label, x_label)
+                count_varients.append(binned.counts[hidx])
+            self.counts.append(np.mean(count_varients, axis=0))
+            self.errors.append(np.std(count_varients, axis=0))
+
+    @classmethod
+    def load(cls, binned_data_paths):
+        if "proj" in binned_data_paths[0].lower():
+            print(f"Loading detector binned data")
+            binned_class = DetectorBinnedData
+        else:
+            print(f"Loading binned data")
+            binned_class = BinnedData
+        binned_data_list = []
+        for binned_data_path in binned_data_paths:
+            binned_data_list.append(binned_class.load(binned_data_path))
+        return cls(binned_data_list)
+
+
+
+
+
 class BinnedData:
     """
     Agrigate key metrics for calorimeter models
@@ -898,9 +961,9 @@ class DetectorBinnedData(BinnedData):
             if key.startswith("sample_projected_")
         }
         this.raw_sample_events = save_dict["raw_sample_events"]
-        this.sample_projections = detector_map.dict_to_projected_events(
-            projected_dict
-        )[1]
+        this.sample_projections = detector_map.dict_to_projected_events(projected_dict)[
+            1
+        ]
         return this
 
 
