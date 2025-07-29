@@ -49,7 +49,7 @@ def time_model_fixed(
     half_cell_size_global=None,
     cell_thickness=None,
 ):
-    model_config.device='cpu'
+    model_config.device = "cpu"
     batch_size = 100
     results = {"batch_size": [], "energy": [], "time": []}
     cond, _ = read_raw_regaxes_withcond(
@@ -72,7 +72,7 @@ def time_model_fixed(
             events = gen_cond_showers_batch(
                 model, shower_flow, cond, bs=batch_size, config=model_config
             )
-            events_as_cells = detector_map.get_projections(
+            detector_map.get_projections(
                 events,
                 MAP,
                 layer_bottom_pos=layer_bottom_pos,
@@ -91,7 +91,7 @@ def time_model_fixed(
             )
             end_time = time.time()
             del events
-        if not energy_here<10:
+        if not energy_here < 10:
             results["batch_size"].append(batch_size)
             results["energy"].append(energy_here)
             results["time"].append(end_time - start_time)
@@ -120,7 +120,7 @@ def time_model(
     cell_thickness=None,
     total_test_time=60 * 60,
 ):
-    model_config.device='cpu'
+    model_config.device = "cpu"
     test_end = time.time() + total_test_time
     n_cond = 10_000
     cond, _ = read_raw_regaxes_withcond(
@@ -136,7 +136,7 @@ def time_model(
     print()
     i = 0
     while now < test_end:
-        i +=1 
+        i += 1
         if i > 10:
             i = 0
             print(f"{test_end-now} seconds remaining", end="\r")
@@ -146,18 +146,18 @@ def time_model(
             first_pull = False
         else:
             batch_size = np.random.randint(smallest_batch, largest_batch)
-        cond_idx = np.random.randint(0, n_cond-1)
+        cond_idx = np.random.randint(0, n_cond - 1)
         if len(cond["showerflow"].shape) > 1:
             energy_here = cond["showerflow"][cond_idx, 0]
         else:
             energy_here = cond["showerflow"][cond_idx]
-        cond_here = {k:cond[k][[cond_idx] * batch_size] for k in cond.keys()}
+        cond_here = {k: cond[k][[cond_idx] * batch_size] for k in cond.keys()}
         if detector_projection:
             start_time = time.time()
             events = gen_cond_showers_batch(
                 model, shower_flow, cond_here, bs=batch_size, config=model_config
             )
-            events_as_cells = detector_map.get_projections(
+            detector_map.get_projections(
                 events,
                 MAP,
                 layer_bottom_pos=layer_bottom_pos,
@@ -195,8 +195,8 @@ def save_results(config, model_name, results):
     np.savez(path, **results)
 
 
-#time_model = time_model_fixed
-#save_results = save_results_fixed
+# time_model = time_model_fixed
+# save_results = save_results_fixed
 
 # Gather the models to evaluate
 # the dict has the format {model_name: (model, shower_flow, config)}
@@ -425,7 +425,6 @@ except FileNotFoundError as e:
     print(e)
 
 
-
 def main(
     config,
     models=models,
@@ -449,19 +448,22 @@ def main(
         print(f"{model_name}")
 
         if "caloclouds" in model_name.lower():  # this model unnorms itself.
-
             layer_bottom_pos = meta.layer_bottom_pos_global
         elif "fish" in model_name.lower():
             layer_bottom_pos = np.linspace(-0.75, 0.75, 30)
             cell_thickness = layer_bottom_pos[1] - layer_bottom_pos[0]
 
         meta = Metadata(config)
-        results = time_model(model_config, model, shower_flow,
-                             MAP, layer_bottom_pos, meta.half_cell_size_global,
-                             meta.cell_thickness_global)
+        results = time_model(
+            model_config,
+            model,
+            shower_flow,
+            MAP,
+            layer_bottom_pos,
+            meta.half_cell_size_global,
+            meta.cell_thickness_global,
+        )
         save_results(config, model_name, results)
-
-
 
 
 if __name__ == "__main__":

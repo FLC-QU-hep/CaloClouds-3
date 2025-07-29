@@ -67,7 +67,7 @@ echo python3 scripts/ShowerFlow.py $config_name dataset_path=$dataset_path \
     shower_flow_min_train_points=$shower_flow_min_train_points \
     shower_flow_optimiser_on_nan=$shower_flow_optimiser_on_nan
 
-python3 scripts/ShowerFlow.py $config_name dataset_path=$dataset_path \
+python3 scripts/training/ShowerFlow.py $config_name dataset_path=$dataset_path \
     n_dataset_files=$n_dataset_files shower_flow_version=$shower_flow_version \
     shower_flow_num_blocks=$shower_flow_num_blocks \
     shower_flow_detailed_history=$shower_flow_detailed_history \
