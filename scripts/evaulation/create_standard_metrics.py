@@ -254,24 +254,24 @@ if cog_calibration:
     cc3_model_gun = np.array([80, 50, 0])
 else:
     # +50 x, perfect z
-    #cc2_model_gun = np.array([40, 90, 0])
+    # cc2_model_gun = np.array([40, 90, 0])
     # +50 x -50 z
-    #cc2_model_gun = np.array([40, 40, 0])
+    # cc2_model_gun = np.array([40, 40, 0])
     # +100 x perfect z
-    #cc2_model_gun = np.array([90, 90, 0])
+    # cc2_model_gun = np.array([90, 90, 0])
     # near perfect x, perfect z
-    #cc2_model_gun = np.array([0, 90, 0])
+    # cc2_model_gun = np.array([0, 90, 0])
     # -0.5, -0.5
     cc2_model_gun = np.array([-10, 90, 0])
     cc2_model_gun = np.array([-10.3, 89.7, 0])
     # +50 x +50 z
-    #cc3_model_gun = np.array([80, 50, 0])
+    # cc3_model_gun = np.array([80, 50, 0])
     # +100x +100z
-    #cc3_model_gun = np.array([30, 0, 0])
+    # cc3_model_gun = np.array([30, 0, 0])
     # -40 x near perfect z
-    #cc3_model_gun = np.array([90, 90, 0])
+    # cc3_model_gun = np.array([90, 90, 0])
     # -20x perfect z
-    #cc3_model_gun = np.array([100, 100, 0])
+    # cc3_model_gun = np.array([100, 100, 0])
 
     # 5, -3
     cc3_model_gun = np.array([125.2, 97.2, 0])
@@ -408,7 +408,6 @@ def main(
                     # rescale_energy /= 0.9880121837394529
 
             if "caloclouds" in model_name.lower():  # this model unnorms itself.
-
                 cc_floors, cc_ceilings = detector_map.floors_ceilings(
                     meta.layer_bottom_pos_global, meta.cell_thickness_global, 0
                 )
@@ -483,5 +482,5 @@ if __name__ == "__main__":
         if seed is not None:
             config.dataset_tag += f"_seed{seed}"
         # Only do g4 once
-        redo_g4 = seed==0 or seed is None
+        redo_g4 = seed == 0 or seed is None
         main(config, redo_g4)

@@ -1,5 +1,6 @@
 import os
 
+
 def dataset_name_from_path(dataset_path):
     dataset_name_key = ".".join(os.path.basename(dataset_path).split(".")[:-1])
     if "{" in dataset_name_key:

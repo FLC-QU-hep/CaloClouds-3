@@ -33,6 +33,7 @@ from pointcloud.utils import showerflow_training, showerflow_utils
 from pointcloud.utils.metadata import Metadata
 from pointcloud.models import shower_flow
 
+
 def should_save(epoch):
     if epoch < 10:
         return False
@@ -40,9 +41,8 @@ def should_save(epoch):
     return set(str_epoch[1:]) == {"0"}
 
 
-
 def main(config, batch_size=2048, total_epochs=1_000_000_000, shuffle=True):
-#def main(config, batch_size=64, total_epochs=1_000_000_000, shuffle=True):
+    # def main(config, batch_size=64, total_epochs=1_000_000_000, shuffle=True):
     """
     Really this is a script, but for ease of testing, it's the main function.
     """
@@ -208,14 +208,14 @@ def main(config, batch_size=2048, total_epochs=1_000_000_000, shuffle=True):
     # optimizer.load_state_dict(torch.load(outpath+f'ShowerFlow_{epoch_load}.pth')['optimizer'])
     if os.path.exists(best_model_path) and not start_over:
         model.load_state_dict(
-            torch.load(
-                best_model_path, map_location=config.device, weights_only=False
-            )["model"]
+            torch.load(best_model_path, map_location=config.device, weights_only=False)[
+                "model"
+            ]
         )
         optimizer.load_state_dict(
-            torch.load(
-                best_model_path, map_location=config.device, weights_only=False
-            )["optimizer"]
+            torch.load(best_model_path, map_location=config.device, weights_only=False)[
+                "optimizer"
+            ]
         )
 
         # load best_loss
@@ -293,12 +293,14 @@ def main(config, batch_size=2048, total_epochs=1_000_000_000, shuffle=True):
                 model.load_state_dict(
                     torch.load(best_model_path, weights_only=False)["model"]
                 )
-                optimizer = optim.Adam(model.parameters(), lr=lr, weight_decay=weight_decay)
-                if config.shower_flow_optimiser_on_nan == 'best':
+                optimizer = optim.Adam(
+                    model.parameters(), lr=lr, weight_decay=weight_decay
+                )
+                if config.shower_flow_optimiser_on_nan == "best":
                     optimizer.load_state_dict(
                         torch.load(best_model_path, weights_only=False)["optimizer"]
                     )
-                elif config.shower_flow_optimiser_on_nan == 'blank':
+                elif config.shower_flow_optimiser_on_nan == "blank":
                     pass
                 else:
                     raise NotImplementedError(
@@ -322,7 +324,9 @@ def main(config, batch_size=2048, total_epochs=1_000_000_000, shuffle=True):
             loss_list.append(loss.item())
             if detailed_history:
                 epoch_nums.append(epoch)
-                parameter_list = torch.concatenate([p.flatten() for p in model.parameters()])
+                parameter_list = torch.concatenate(
+                    [p.flatten() for p in model.parameters()]
+                )
                 mean_parameter.append(torch.mean(parameter_list).item())
                 max_parameter.append(torch.max(parameter_list).item())
 
@@ -347,7 +351,9 @@ def main(config, batch_size=2048, total_epochs=1_000_000_000, shuffle=True):
             )
 
             if should_save(epoch):
-                epoch_path = latest_model_path.replace("_latest.pth", f"_{epoch:07d}.pth")
+                epoch_path = latest_model_path.replace(
+                    "_latest.pth", f"_{epoch:07d}.pth"
+                )
                 torch.save(
                     {
                         "model": model.state_dict(),

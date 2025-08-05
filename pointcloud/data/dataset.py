@@ -73,7 +73,9 @@ class PointCloudDataset(Dataset):
                 self._roll_axis = True
                 break
         else:
-            warnings.warn("Can't find xyze axis in data on disk, assuming it's the last axis")
+            warnings.warn(
+                "Can't find xyze axis in data on disk, assuming it's the last axis"
+            )
         self._prior_event_axes = self._get_prior_event_axes()
 
         self.max_ds_seq_len = max_ds_seq_len
@@ -164,7 +166,7 @@ class PointCloudDataset(Dataset):
         file_0 = self.open_files[0]
         n_events_in_file0 = file_0[self.keys_to_include["event"]].shape[0]
         axes = {
-            name: [slice(None)]*file_0[key].shape.index(n_events_in_file0)
+            name: [slice(None)] * file_0[key].shape.index(n_events_in_file0)
             for name, key in self.keys_to_include.items()
             if key is not None
         }
@@ -172,7 +174,9 @@ class PointCloudDataset(Dataset):
 
     def _is_front_padded(self, check_file=0):
         event_key = self.keys_to_include["event"]
-        padding = padding_position(self.open_files[check_file][event_key], self._roll_axis)
+        padding = padding_position(
+            self.open_files[check_file][event_key], self._roll_axis
+        )
         if padding == "front":
             is_front_padded = True
         elif padding == "back":
@@ -502,7 +506,6 @@ class PointCloudAngular(PointCloudDataset):
         event[..., 2] = (
             (event[..., 2] - cls.Zmean) / cls.Zstd / 2
         )  # z coordinate normalization
-        
 
 
 class CaloChallangeDataset(Dataset):

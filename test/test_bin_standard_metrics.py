@@ -165,9 +165,7 @@ def test_BinnedData(tmpdir):
     # test load
     new_binned = BinnedData.load(save_path)
     npt.assert_allclose(new_binned.true_xyz_limits, binned.true_xyz_limits)
-    npt.assert_allclose(
-        new_binned.layer_bottom_pos, binned.layer_bottom_pos
-    )
+    npt.assert_allclose(new_binned.layer_bottom_pos, binned.layer_bottom_pos)
     for i in range(len(expected_hists)):
         npt.assert_allclose(new_binned.counts[i], binned.counts[i])
         npt.assert_allclose(new_binned.bins[i], binned.bins[i])

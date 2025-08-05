@@ -44,15 +44,15 @@ class Configs(default.Configs):
 
         # only use if projecting into a detector
         self.shower_flow_n_scaling = False
-        #self.shower_flow_coef_real = [
+        # self.shower_flow_coef_real = [
         #    2.42091454e-09,
         #    -2.72191705e-05,
         #    2.95613817e-01,
         #    4.88328360e01,
-        #]
-        #self.shower_flow_coef_fake = [
+        # ]
+        # self.shower_flow_coef_fake = [
         #    -9.02997505e-07,
         #    2.82747963e-03,
         #    1.01417267e00,
         #    1.64829018e02,
-        #]
+        # ]

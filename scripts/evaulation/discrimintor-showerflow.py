@@ -45,10 +45,10 @@ for detailed_history in [True, False]:
     config.shower_flow_detailed_history = detailed_history
     for fixed_input_norms in [True, False]:
         config.shower_flow_fixed_input_norms = fixed_input_norms
-        for weight_decay in [0., 0.1, 0.0001]:
+        for weight_decay in [0.0, 0.1, 0.0001]:
             config.shower_flow_weight_decay = weight_decay
             stack.append(showerflow_utils.existing_models(config))
-        
+
 existing_models = {key: sum([s[key] for s in stack], []) for key in stack[0]}
 
 existing_models["config"] = []
@@ -110,16 +110,16 @@ while so_far < n_epochs:
 
 # make some auc plots
 existing_models["auc"] = [None for _ in existing_models["names"]]
-for start in range(0,len(existing_models["names"]), 5):
+for start in range(0, len(existing_models["names"]), 5):
     fig, ax = plt.subplots()
-    for plot_for in range(start, start+5):
+    for plot_for in range(start, start + 5):
         try:
             name, training = gen_training(plot_for)
             training.reload()
             labels, predictions = training.predict_test()
         except filenotfounderror:
             continue
-        
+
         fpr, tpr, threasholds = metrics.roc_curve(labels, predictions)
         auc = metrics.roc_auc_score(labels, predictions)
         if auc < 0.501:
@@ -129,20 +129,25 @@ for start in range(0,len(existing_models["names"]), 5):
     ax.set_xlabel("false positive rate")
     ax.set_ylabel("true positive rate")
     ax.legend()
-    save_to = os.path.join(training.state_dict["generator_data_folder"], f"../auc_{start}.png")
+    save_to = os.path.join(
+        training.state_dict["generator_data_folder"], f"../auc_{start}.png"
+    )
     fig.savefig(save_to)
     print(f"saved to {save_to}")
     plt.close()
 
 
-
 for start in range(0, len(existing_models["names"]), 5):
     fig, axes = plt.subplots(1, 2, figsize=(15, 5))
-    for plot_for in range(start, start+5):
+    for plot_for in range(start, start + 5):
         try:
             name, training = gen_training(plot_for)
             training.reload()
-            training.plots(axes, colour=nice_hex[int(plot_for/5)%5][plot_for%5], legend_name=name)
+            training.plots(
+                axes,
+                colour=nice_hex[int(plot_for / 5) % 5][plot_for % 5],
+                legend_name=name,
+            )
         except FileNotFoundError:
             continue
     axes[0].semilogy()
@@ -150,7 +155,9 @@ for start in range(0, len(existing_models["names"]), 5):
     axes[1].semilogy()
     axes[0].legend()
     axes[1].legend()
-    save_to = os.path.join(training.state_dict["generator_data_folder"], f"../loss_{start}.png")
+    save_to = os.path.join(
+        training.state_dict["generator_data_folder"], f"../loss_{start}.png"
+    )
     fig.savefig(save_to)
     print(f"Saved to {save_to}")
     plt.close()

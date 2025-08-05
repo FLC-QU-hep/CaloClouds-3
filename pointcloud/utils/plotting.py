@@ -8,7 +8,6 @@ from scipy.stats import binned_statistic
 from ..utils import metrics
 
 
-
 nice_hex = [
     ["#00E5E3", "#8DD7BF", "#FF96C5", "#FF5768", "#FFBF65"],
     ["#FC6238", "#FFD872", "#F2D4CC", "#E77577", "#6C88C4"],
@@ -1587,18 +1586,30 @@ def plot_line_with_devation(
 
 
 def plot_hist_with_devation(
-        ax, colour, bins, counts, errors_up, errors_down=None,
-        clip_to_zero=False, **hist_kwargs):
+    ax,
+    colour,
+    bins,
+    counts,
+    errors_up,
+    errors_down=None,
+    clip_to_zero=False,
+    **hist_kwargs,
+):
     bin_centers = 0.5 * (bins[:-1] + bins[1:])
 
     reduced_args = hist_kwargs.copy()
-    for key in ['color', 'histtype', 'weights']:
+    for key in ["color", "histtype", "weights"]:
         if key in reduced_args:
             del reduced_args[key]
     ax.hist(
-        bin_centers, bins=bins, color=colour, weights=counts,
-        histtype='step', **reduced_args)
-    
+        bin_centers,
+        bins=bins,
+        color=colour,
+        weights=counts,
+        histtype="step",
+        **reduced_args,
+    )
+
     if errors_down is None:
         errors_down = errors_up
 
@@ -1810,8 +1821,8 @@ def plot_event(
     formated_conditioning = ", ".join(f"{f:.2f}" for f in cond_features)
     ax.set_title(
         f"Evt: {event_n}, $n_{{pts}}$: {n_points}, conditioning: "
-        + formated_conditioning +
-        f"$E_{{vis}}$: {observed_energy:.2f}"
+        + formated_conditioning
+        + f"$E_{{vis}}$: {observed_energy:.2f}"
     )
     return ax
 
@@ -1980,4 +1991,3 @@ class RatioPlots:
             main_ax = self.axes[row * 2, col]
             main_ax.set_xlim(self.bins[i][0], self.bins[i][-1])
         self.fig.tight_layout()
-

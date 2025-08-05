@@ -279,7 +279,7 @@ try:
                 "/data/dust/user/dayhallh/CC2-out/nhits_rescale_cc3_unscaled_2.npz"
             )
             config.shower_flow_coef_real = np.zeros(2)
-            #config.shower_flow_coef_real[0] = np.mean(loaded["single_factor"])
+            # config.shower_flow_coef_real[0] = np.mean(loaded["single_factor"])
             config.shower_flow_coef_real[0] = 0.65
         else:
             config.shower_flow_n_scaling = False
@@ -383,9 +383,9 @@ try:
 
         # showerflow_paths = ["/data/dust/group/ilc/sft-ml/model_weights/CaloClouds/CC2/220714_cog_e_layer_ShowerFlow_best.pth"]
         # showerflow_paths = ["/data/dust/user/dayhallh/point-cloud-diffusion-data/showerFlow/p22_th90_ph90_en10-100/ShowerFlow_original_nb10_inputs36893488147419103231_dhist_best.pth"]
-        #showerflow_paths = [
+        # showerflow_paths = [
         #    "/data/dust/user/dayhallh/point-cloud-diffusion-data/showerFlow/highGran_g40_p22_th90_ph90_en10-100/ShowerFlow_original_nb10_inputs36893488147419103231_dhist_best.pth"
-        #]
+        # ]
         showerflow_paths = [
             "/data/dust/user/dayhallh/point-cloud-diffusion-data/showerFlow/highGran_g40_p22_th90_ph90_en10-100/ShowerFlow_original_nb10_inputs36893488147419103231_dhist_try8_best.pth"
         ]

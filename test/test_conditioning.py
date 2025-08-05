@@ -80,19 +80,22 @@ def test_get_cond_feats():
     # play with naming of n_points
     config.cond_features = ["energy", "n_points"]
     config.shower_flow_cond_features = ["energy"]
-    batch = {"energy": torch.tensor([1.0, 2.0, 3.0])[None, :, None],
-             "points": torch.tensor([10, 20, 30])[None, :, None]}
+    batch = {
+        "energy": torch.tensor([1.0, 2.0, 3.0])[None, :, None],
+        "points": torch.tensor([10, 20, 30])[None, :, None],
+    }
     found = conditioning.get_cond_feats(config, batch, "showerflow")
     npt.assert_allclose(found, [[1.0], [2.0], [3.0]])
     found = conditioning.get_cond_feats(config, batch, "diffusion")
     npt.assert_allclose(found, [[1.0, 10], [2.0, 20], [3.0, 30]])
     # reverse
-    batch = {"energy": torch.tensor([1.0, 2.0, 3.0])[None, :, None],
-             "n_points": torch.tensor([10, 20, 30])[None, :, None]}
+    batch = {
+        "energy": torch.tensor([1.0, 2.0, 3.0])[None, :, None],
+        "n_points": torch.tensor([10, 20, 30])[None, :, None],
+    }
     config.cond_features = ["energy", "points"]
     found = conditioning.get_cond_feats(config, batch, "diffusion")
     npt.assert_allclose(found, [[1.0, 10], [2.0, 20], [3.0, 30]])
-    
 
 
 def test_normalise_cond_feats():
@@ -109,17 +112,17 @@ def test_normalise_cond_feats():
     # normalise diffusion
     config.norm_cond = True
     found = conditioning.normalise_cond_feats(config, cond, "diffusion")
-    npt.assert_allclose( (original_cond[:, 0] / 100)*2 - 1, found[:, 0])
-    npt.assert_allclose( (original_cond[:, 1] / config.max_points)*2 - 1, found[:, 1])
-    npt.assert_allclose( original_cond[:, 2:], found[:, 2:])
+    npt.assert_allclose((original_cond[:, 0] / 100) * 2 - 1, found[:, 0])
+    npt.assert_allclose((original_cond[:, 1] / config.max_points) * 2 - 1, found[:, 1])
+    npt.assert_allclose(original_cond[:, 2:], found[:, 2:])
     npt.assert_allclose(cond, original_cond)
     assert found is not cond
     # normalise showerflow
     meta = Metadata(config)
     found = conditioning.normalise_cond_feats(config, cond, "showerflow")
-    npt.assert_allclose( (original_cond[:, 0]/meta.incident_rescale), found[:, 0])
-    npt.assert_allclose( (original_cond[:, 1] / config.max_points)*2 - 1, found[:, 1])
-    npt.assert_allclose( original_cond[:, 2:], found[:, 2:])
+    npt.assert_allclose((original_cond[:, 0] / meta.incident_rescale), found[:, 0])
+    npt.assert_allclose((original_cond[:, 1] / config.max_points) * 2 - 1, found[:, 1])
+    npt.assert_allclose(original_cond[:, 2:], found[:, 2:])
     npt.assert_allclose(cond, original_cond)
     assert found is not cond
 
@@ -157,7 +160,9 @@ def test_has_n_points(tmpdir):
 
 
 def test_padding_position():
-    events = torch.tensor([[[1, 2, 3, 4], [5, 6, 7, 8], [9, 10, 11, 12], [13, 14, 15, 16]]])
+    events = torch.tensor(
+        [[[1, 2, 3, 4], [5, 6, 7, 8], [9, 10, 11, 12], [13, 14, 15, 16]]]
+    )
     found = conditioning.padding_position(events, True)
     assert found == "unknown"
     found = conditioning.padding_position(events, False)
@@ -206,12 +211,6 @@ def test_calculate_n_points_from_events():
     events[0, -1, 3] = 0
     found = conditioning.calculate_n_points_from_events(events)
     npt.assert_allclose(found, np.array([2, 2, 3])[:, None])
-
-
-
-
-
-
 
 
 class TestRead:
@@ -405,8 +404,12 @@ class TestRead:
         npt.assert_allclose(found_events, local_ax_1)
         config.n_dataset_files = 3
         found_cond, found_events = conditioning.read_raw_regaxes_withcond(config)
-        npt.assert_allclose(found_cond["showerflow"], [2.0, 3.0, 4.0, 2.0, 3.0, 4.0, 2.0, 3.0, 4.0])
-        npt.assert_allclose(found_cond["diffusion"][:, 0], [2.0, 3.0, 4.0, 2.0, 3.0, 4.0, 2.0, 3.0, 4.0])
+        npt.assert_allclose(
+            found_cond["showerflow"], [2.0, 3.0, 4.0, 2.0, 3.0, 4.0, 2.0, 3.0, 4.0]
+        )
+        npt.assert_allclose(
+            found_cond["diffusion"][:, 0], [2.0, 3.0, 4.0, 2.0, 3.0, 4.0, 2.0, 3.0, 4.0]
+        )
         npt.assert_allclose(found_cond["diffusion"][:, 1], [1, 2, 1, 1, 2, 1, 1, 2, 1])
         npt.assert_allclose(found_events, np.tile(local_ax_1, (3, 1, 1)))
 

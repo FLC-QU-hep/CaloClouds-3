@@ -35,7 +35,7 @@ def get_hover_labels(dataframe):
     return labels
 
 
-#def get_color_map(dataframe):
+# def get_color_map(dataframe):
 #    unique_names = sorted(dataframe["Name"].unique())
 #    color_map = {
 #        name: px.colors.qualitative.Plotly[i] for i, name in enumerate(unique_names)
@@ -43,7 +43,7 @@ def get_hover_labels(dataframe):
 #    return color_map
 #
 #
-#def get_symbol_map(dataframe):
+# def get_symbol_map(dataframe):
 #    unique_parts = sorted(dataframe["Part"].unique())
 #    symbols = ["circle", "square", "diamond", "cross", "x", "circle-open", "square-open", "diamond-open"]
 #    symbol_map = {
@@ -52,7 +52,7 @@ def get_hover_labels(dataframe):
 #    return symbol_map
 #
 #
-#def get_scatter_trace(dataframe, use_MC, particle_name, **kwargs):
+# def get_scatter_trace(dataframe, use_MC, particle_name, **kwargs):
 #    matching = dataframe.loc[dataframe["Name"] == particle_name]
 #    if use_MC:
 #        matching = matching.loc[matching["Part"] == "MCParticles"]
@@ -101,13 +101,13 @@ def simple_scatter(dataframe, **kwargs):
 
 def scatter_data(dataframe, x_limits, y_limits, z_limits, **kwargs):
     fig = simple_scatter(dataframe, **kwargs)
-    #traces = []
+    # traces = []
     # particle_names = dataframe["Name"].unique()
-    #for name in particle_names:
+    # for name in particle_names:
     #    traces.append(get_scatter_trace(dataframe, True, name, **kwargs))
     #    traces.append(get_scatter_trace(dataframe, False, name, **kwargs))
 
-    #fig = go.Figure(data=traces)
+    # fig = go.Figure(data=traces)
 
     # make the background black
     # and fix the axis ranges
@@ -189,11 +189,11 @@ def lines(relationships, event_number):
         keep_all = intrested_in(pdg[next_idx], energy[next_idx])
         for parent in these_parents[:-1]:
             if keep_all or intrested_in(pdg[parent], energy[parent]):
-                #print(f"Adding {pdg[parent]}, {energy[parent]} keep_all={keep_all}")
+                # print(f"Adding {pdg[parent]}, {energy[parent]} keep_all={keep_all}")
                 add_to_line(parent)
                 break_line()
         if keep_all or intrested_in(pdg[these_parents[-1]], energy[these_parents[-1]]):
-            #print(f"Adding {pdg[these_parents[-1]]}, {energy[these_parents[-1]]} keep_all={keep_all}")
+            # print(f"Adding {pdg[these_parents[-1]]}, {energy[these_parents[-1]]} keep_all={keep_all}")
             add_to_line(these_parents[-1])
         next_idx = these_parents[-1]
     return lines

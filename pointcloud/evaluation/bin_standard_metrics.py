@@ -103,9 +103,6 @@ class BinnedErrors:
         return cls(binned_data_list)
 
 
-
-
-
 class BinnedData:
     """
     Agrigate key metrics for calorimeter models
@@ -716,9 +713,12 @@ class DetectorBinnedData(BinnedData):
         for xs, ys in self.perpendicular_cell_centers:
             xs -= BinnedData.event_center[0]
             ys -= BinnedData.event_center[1]
-        radial_min, radial_max, n_radial_bins, self.radial_cell_allocations = (
-            self.radial_bins_for_cells()
-        )
+        (
+            radial_min,
+            radial_max,
+            n_radial_bins,
+            self.radial_cell_allocations,
+        ) = self.radial_bins_for_cells()
         self.layer_bins = np.concatenate([buffed_floors, buffed_ceilings[[-1]]])
         self.gun_shift = self.get_gunshift()
 

@@ -144,7 +144,9 @@ def normalise_cond_feats(config, cond_feats, for_model):
         if "energy" in names:
             idx = start_positions[names.index("energy")]
             if for_model == "diffusion" and is_cc2_diffusion(config):
-                cond_feats[:, idx] = (cond_feats[:, idx] / meta.incident_rescale) * 2 - 1
+                cond_feats[:, idx] = (
+                    cond_feats[:, idx] / meta.incident_rescale
+                ) * 2 - 1
             else:
                 cond_feats[:, idx] /= torch.tensor(meta.incident_rescale)
         if "n_points" in names:

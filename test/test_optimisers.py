@@ -27,7 +27,6 @@ def test_get_p0_n_bounds():
     npt.assert_allclose(found_lower_bound, [])
     npt.assert_allclose(found_upper_bound, [])
 
-
     # try with full information
     (
         found_p0,
@@ -63,16 +62,15 @@ def test_get_p0_n_bounds():
     npt.assert_allclose(found_upper_bound, [10, 5])
 
 
-
-
-
 def test_evaluator_factory():
     # start with the simplest case of a callable with no additional arguments
     evaluator = optimisers.evaluator_factory(simple_callable, np.ones(1), np.ones(1))
     # should always return 0
     npt.assert_allclose(evaluator([]), 0)
     # or if teh x data cannot match the y data
-    evaluator = optimisers.evaluator_factory(simple_callable, np.ones(1), np.ones(1)*2)
+    evaluator = optimisers.evaluator_factory(
+        simple_callable, np.ones(1), np.ones(1) * 2
+    )
     npt.assert_allclose(evaluator([]), 1)
     # now try with params
     perfect_a = 2

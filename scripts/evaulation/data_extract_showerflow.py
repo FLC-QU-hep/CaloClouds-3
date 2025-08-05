@@ -202,7 +202,6 @@ def main(
     model_path,
     n_showerflow_events=100_000,
 ):
-
     done, input_save_path, output_save_path = get_save_paths(config, model_path)
     if done:
         print("Already done")
@@ -234,7 +233,6 @@ def main(
 
 
 if __name__ == "__main__":
-
     # check user input
     # and if not given get it from the user
     cc_version = 3
@@ -243,7 +241,7 @@ if __name__ == "__main__":
         config.dataset_path = "/data/dust/group/ilc/sft-ml/datasets/sim-E1261AT600AP180-180/sim-E1261AT600AP180-180_file_{}.slcio.hdf5"
         config.n_dataset_files = 88
         config.shower_flow_version = "alt1"
-        #config.shower_flow_version = "log1"
+        # config.shower_flow_version = "log1"
         config.shower_flow_num_blocks = 2
         config.shower_flow_detailed_history = True
         config.shower_flow_weight_decay = 0.0
@@ -262,13 +260,13 @@ if __name__ == "__main__":
 
     print(config.max_energy)
 
-    #model_path_base1 = "/data/dust/user/dayhallh/point-cloud-diffusion-data/showerFlow/sim-E1261AT600AP180-180/ShowerFlow_alt1_nb2_inputs8070450532247928831_fnorms_dhist_try3_*.pth"
-    #model_path_base2 = "/data/dust/user/dayhallh/point-cloud-diffusion-data/showerFlow/sim-E1261AT600AP180-180/ShowerFlow_alt1_nb2_inputs8070450532247928831_fnorms_dhist_try5*.pth"
+    # model_path_base1 = "/data/dust/user/dayhallh/point-cloud-diffusion-data/showerFlow/sim-E1261AT600AP180-180/ShowerFlow_alt1_nb2_inputs8070450532247928831_fnorms_dhist_try3_*.pth"
+    # model_path_base2 = "/data/dust/user/dayhallh/point-cloud-diffusion-data/showerFlow/sim-E1261AT600AP180-180/ShowerFlow_alt1_nb2_inputs8070450532247928831_fnorms_dhist_try5*.pth"
     model_path_base = "/data/dust/user/dayhallh/point-cloud-diffusion-data/showerFlow/sim-E1261AT600AP180-180/ShowerFlow_alt1_nb2_inputs8070450532247928831_fnorms_dhist_try9*.pth"
-    #model_path_base = "/data/dust/user/dayhallh/point-cloud-diffusion-data/showerFlow/highGran_g40_p22_th90_ph90_en10-100/ShowerFlow_original_nb10_inputs36893488147419103231_dhist_try8_*.pth"
-    #model_path_base = "/data/dust/user/dayhallh/point-cloud-diffusion-data/showerFlow/sim-E1261AT600AP180-180/ShowerFlow_log1_nb2_inputs8070450532247928831_fnorms_dhist_try6_*.pth"
+    # model_path_base = "/data/dust/user/dayhallh/point-cloud-diffusion-data/showerFlow/highGran_g40_p22_th90_ph90_en10-100/ShowerFlow_original_nb10_inputs36893488147419103231_dhist_try8_*.pth"
+    # model_path_base = "/data/dust/user/dayhallh/point-cloud-diffusion-data/showerFlow/sim-E1261AT600AP180-180/ShowerFlow_log1_nb2_inputs8070450532247928831_fnorms_dhist_try6_*.pth"
 
-    #for model_path_base in [model_path_base1, model_path_base2]:
+    # for model_path_base in [model_path_base1, model_path_base2]:
     if True:
         for model_path in glob.glob(model_path_base):
             if "alt1" in model_path:

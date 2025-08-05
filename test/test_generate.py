@@ -177,5 +177,7 @@ def test_write_showers(tmpdir):
 
     test_diff_model_path = "test/example_cm_model_condE.pt"
 
-    generate.write_showers(config, params_dict, test_flow_model_path, test_diff_model_path)
+    generate.write_showers(
+        config, params_dict, test_flow_model_path, test_diff_model_path
+    )
     # probably should check the output.... TODO

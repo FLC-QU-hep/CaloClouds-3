@@ -471,9 +471,7 @@ def _train_ds_function_factory(
 
         # for predicted values
         if "total_clusters" in config.shower_flow_inputs:
-            num_points = (
-                num_points / meta.n_pts_rescale
-            )
+            num_points = num_points / meta.n_pts_rescale
             num_points = num_points.view(-1, 1).to(device).float()
             output.append(num_points)
         if "total_energy" in config.shower_flow_inputs:

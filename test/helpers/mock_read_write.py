@@ -26,4 +26,3 @@ def mock_read_raw_regaxes(config, idxs):
     )
 
     return incident_energies, coordinates
-

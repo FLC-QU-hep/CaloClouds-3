@@ -14,7 +14,9 @@ class Configs:
         self.comet_workspace = "henrydayhall"
 
         # Model arguments
-        self.model_name = "Diffusion"  # choices=['AllCond_epicVAE_nFlow_PointDiff', 'Diffusion]
+        self.model_name = (
+            "Diffusion"  # choices=['AllCond_epicVAE_nFlow_PointDiff', 'Diffusion]
+        )
         self.latent_dim = 32  # caloclouds default: 256
         self.beta_1 = 1e-4
         self.beta_T = 0.02
@@ -43,16 +45,16 @@ class Configs:
         self.tail_bound = 10
 
         # showerflow arguments
-        self.shower_flow_version = 'original'  # options: ['original', 'alt1', 'alt2']
+        self.shower_flow_version = "original"  # options: ['original', 'alt1', 'alt2']
         self.shower_flow_inputs = [
-                "total_clusters",
-                "total_energy",
-                "cog_x",
-                "cog_y",
-                "cog_z",
-                "clusters_per_layer",
-                "energy_per_layer",
-                ]
+            "total_clusters",
+            "total_energy",
+            "cog_x",
+            "cog_y",
+            "cog_z",
+            "clusters_per_layer",
+            "energy_per_layer",
+        ]
         self.shower_flow_num_blocks = 10
         self.shower_flow_cond_features = ["energy"]
 
@@ -68,7 +70,6 @@ class Configs:
         # self._dataset_path = 'korcariw/CaloClouds/dataset/showers/photons_50GeV_sorted.h5'
         # self._dataset_path = 'akorol/projects/getting_high/ILDConfig/StandardConfig/production/out/photons_50GeV_40k.slcio.hdf5'
         self.quantized_pos = False
-
 
         # Dataloader
         self.workers = 32
@@ -182,4 +183,3 @@ class Configs:
         else:
             self.logdir_in_storage = False
             self._logdir = value
-

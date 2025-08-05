@@ -113,7 +113,9 @@ def process_events(model_path, config, n_events, dataloader=None, n_files=0):
         assert model_path.endswith(".pt")
         model = get_model_class(config)(config).to(config.device)
         model.load_state_dict(
-            torch.load(model_path, map_location=config.device, weights_only=False)["state_dict"]
+            torch.load(model_path, map_location=config.device, weights_only=False)[
+                "state_dict"
+            ]
         )
     else:
         assert not model_path.endswith(".pt")
@@ -149,9 +151,7 @@ def process_events(model_path, config, n_events, dataloader=None, n_files=0):
         hits_per_layer_batch = events_to_hits_per_layer(events, config)
         hits_per_layer[start : start + batch_len] = hits_per_layer_batch
         if dataloader is None:
-            points_batch = gen_raw_caloclouds(
-                model, hits_per_layer_batch, cond, config
-            )
+            points_batch = gen_raw_caloclouds(model, hits_per_layer_batch, cond, config)
         else:
             points_batch = dataloader[i]["event"]
             i += 1

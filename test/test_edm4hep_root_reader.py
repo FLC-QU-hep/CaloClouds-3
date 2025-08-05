@@ -84,20 +84,14 @@ def fake_events_0():
     child_index = ak.Array([[1, 2, 3, 2, 3, 4, 3, 4], [1, 2, 2]])
 
     ecal_pdg_name = (
-            "ECalBarrelSiHitsEvenContributions/ECalBarrelSiHitsEvenContributions.PDG"
-            )
+        "ECalBarrelSiHitsEvenContributions/ECalBarrelSiHitsEvenContributions.PDG"
+    )
     ecal_pdg = ak.Array([[22], []])
-    ecal_x_name = (
-        "ECalBarrelSiHitsEvenContributions/ECalBarrelSiHitsEvenContributions.stepPosition.x"
-    )
+    ecal_x_name = "ECalBarrelSiHitsEvenContributions/ECalBarrelSiHitsEvenContributions.stepPosition.x"
     ecal_x = ak.Array([[0], []])
-    ecal_y_name = (
-        "ECalBarrelSiHitsEvenContributions/ECalBarrelSiHitsEvenContributions.stepPosition.y"
-    )
+    ecal_y_name = "ECalBarrelSiHitsEvenContributions/ECalBarrelSiHitsEvenContributions.stepPosition.y"
     ecal_y = ak.Array([[0], []])
-    ecal_z_name = (
-        "ECalBarrelSiHitsEvenContributions/ECalBarrelSiHitsEvenContributions.stepPosition.z"
-    )
+    ecal_z_name = "ECalBarrelSiHitsEvenContributions/ECalBarrelSiHitsEvenContributions.stepPosition.z"
     ecal_z = ak.Array([[0], []])
     ecal_energy_name = (
         "ECalBarrelSiHitsEvenContributions/ECalBarrelSiHitsEvenContributions.energy"
@@ -147,20 +141,14 @@ def fake_events_1():
     child_index = ak.Array([[1, 2, 3, 4], [], [1]])
 
     ecal_pdg_name = (
-            "ECalBarrelSiHitsEvenContributions/ECalBarrelSiHitsEvenContributions.PDG"
-            )
+        "ECalBarrelSiHitsEvenContributions/ECalBarrelSiHitsEvenContributions.PDG"
+    )
     ecal_pdg = ak.Array([[22, 22], [22], [22, 22]])
-    ecal_x_name = (
-        "ECalBarrelSiHitsEvenContributions/ECalBarrelSiHitsEvenContributions.stepPosition.x"
-    )
+    ecal_x_name = "ECalBarrelSiHitsEvenContributions/ECalBarrelSiHitsEvenContributions.stepPosition.x"
     ecal_x = ak.Array([[1, -1], [0], [0, 1]])
-    ecal_y_name = (
-        "ECalBarrelSiHitsEvenContributions/ECalBarrelSiHitsEvenContributions.stepPosition.y"
-    )
+    ecal_y_name = "ECalBarrelSiHitsEvenContributions/ECalBarrelSiHitsEvenContributions.stepPosition.y"
     ecal_y = ak.Array([[1, -1], [0], [0, 1]])
-    ecal_z_name = (
-        "ECalBarrelSiHitsEvenContributions/ECalBarrelSiHitsEvenContributions.stepPosition.z"
-    )
+    ecal_z_name = "ECalBarrelSiHitsEvenContributions/ECalBarrelSiHitsEvenContributions.stepPosition.z"
     ecal_z = ak.Array([[0, 0], [0], [0, 0]])
     ecal_energy_name = (
         "ECalBarrelSiHitsEvenContributions/ECalBarrelSiHitsEvenContributions.energy"
@@ -196,6 +184,7 @@ def mock_get_events_filenames(file_names):
     faked = [fake_events_0(), fake_events_1()]
     events = [faked[i % 2] for i in range(len(file_names))]
     return file_names, events
+
 
 # now don't read anything, just mock the get_events_filenames
 # so that the methods can be tested without needing to read the files

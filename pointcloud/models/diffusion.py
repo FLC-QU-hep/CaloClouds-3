@@ -151,7 +151,9 @@ class Diffusion(Module):
         else:
             z = cond_feats
         # loss_diffusion = self.diffusion.get_loss(x, z)    # diffusion loss
-        data_mask = x[..., 3] > 1e-5  # anything with very small energy is considered padding
+        data_mask = (
+            x[..., 3] > 1e-5
+        )  # anything with very small energy is considered padding
 
         loss_diffusion = self.diffusion.loss(
             x, noise, sigma, context=z, input_mask=data_mask
@@ -200,7 +202,6 @@ class Diffusion(Module):
         )
 
         if not self.distillation:
-
             sigmas = k_diffusion.sampling.get_sigmas_karras(
                 config.num_steps,
                 config.sigma_min,
@@ -318,9 +319,13 @@ class Denoiser(torch.nn.Module):
     ):  # B,   # for consistency model
         sigma_data = self.sigma_data.expand(sigma.shape[0], -1)  # B, 4
         sigma = k_diffusion.utils.append_dims(sigma, sigma_data.ndim)  # B, 4
-        c_skip = sigma_data**2 / ((sigma - self.sigma_min) ** 2 + sigma_data**2)  # B, 4
+        c_skip = sigma_data**2 / (
+            (sigma - self.sigma_min) ** 2 + sigma_data**2
+        )  # B, 4
         c_out = (
-            (sigma - self.sigma_min) * sigma_data / (sigma**2 + sigma_data**2) ** 0.5
+            (sigma - self.sigma_min)
+            * sigma_data
+            / (sigma**2 + sigma_data**2) ** 0.5
         )  # B, 4
         c_in = 1 / (sigma**2 + sigma_data**2) ** 0.5  # B, 4
         return c_skip, c_out, c_in
@@ -346,7 +351,7 @@ class Denoiser(torch.nn.Module):
         -------
         loss : torch.Tensor (batch_size,)
             Mean loss of each batch.
-            
+
         """
         # c_skip, c_out, c_in = [k_diffusion.utils.append_dims(x, input.ndim) for x in self.get_scalings(sigma)]   # B,1,1
         c_skip, c_out, c_in = [
@@ -397,7 +402,6 @@ class Denoiser(torch.nn.Module):
 
     # inspired by https://github.com/openai/consistency_models/blob/main/cm/karras_diffusion.py#L106
     def consistency_loss(self, input, teacher_model, target_model, config, **kwargs):
-
         noise = torch.randn_like(input)
         dims = input.ndim
         num_scales = config.num_steps
@@ -497,7 +501,6 @@ class Denoiser(torch.nn.Module):
 
 
 class PointwiseNet_kDiffusion(Module):
-
     def __init__(self, point_dim, context_dim, residual, args=None):
         super().__init__()
         time_dim = 64
@@ -507,9 +510,11 @@ class PointwiseNet_kDiffusion(Module):
 
         self.act = functional.leaky_relu
         self.residual = residual
-        hidden_1 = getattr(args, "diffusion_pointwise_hidden_l1", 128)  # newer models have 32
-        hidden_2 = getattr(args, "diffusion_pointwise_hidden_l2", hidden_1*2)
-        hidden_3 = getattr(args, "diffusion_pointwise_hidden_l3", hidden_2*2)
+        hidden_1 = getattr(
+            args, "diffusion_pointwise_hidden_l1", 128
+        )  # newer models have 32
+        hidden_2 = getattr(args, "diffusion_pointwise_hidden_l2", hidden_1 * 2)
+        hidden_3 = getattr(args, "diffusion_pointwise_hidden_l3", hidden_2 * 2)
         hidden_4 = getattr(args, "diffusion_pointwise_hidden_l4", hidden_2)
         hidden_5 = getattr(args, "diffusion_pointwise_hidden_l5", hidden_1)
         self.layers = ModuleList(
@@ -563,7 +568,6 @@ class PointwiseNet_kDiffusion(Module):
 
 
 class PointwiseNet_kDiffusion_Dropout(Module):
-
     def __init__(self, point_dim, context_dim, residual, dropout_rate=0.0):
         super().__init__()
         time_dim = 64
@@ -626,7 +630,6 @@ class PointwiseNet_kDiffusion_Dropout(Module):
 
 
 class PointwiseNet_kDiffusion_Dropout_mid(Module):
-
     def __init__(self, point_dim, context_dim, residual, dropout_rate=0.0):
         super().__init__()
         time_dim = 64

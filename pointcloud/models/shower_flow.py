@@ -64,7 +64,6 @@ class SafeExpTransform(T.Transform):
         return x
 
 
-
 class HybridTanH_factory:
     def __init__(self, num_inputs, num_cond_inputs, device):
         self.num_inputs = num_inputs
@@ -126,7 +125,6 @@ class HybridTanH_factory:
         base_dist_gen=get_gauss_basis,
         **transform_args
     ):
-
         # TODO, could the params of the base dist also be added to the model?
         with seed_torch(42):
             base_dist = base_dist_gen(self.num_inputs, self.device, **transform_args)
@@ -258,9 +256,7 @@ def compile_HybridTanH_log1(num_blocks, num_inputs, num_cond_inputs, device):
     transform_pattern = transform_pattern * num_blocks
     transform_pattern += ["partial_log"]
 
-    model, flow_dist, transforms = factory.create(
-        1, transform_pattern, count_bins=8
-    )
+    model, flow_dist, transforms = factory.create(1, transform_pattern, count_bins=8)
     return model, flow_dist, transforms
 
 

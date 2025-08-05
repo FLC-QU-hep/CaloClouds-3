@@ -140,7 +140,9 @@ def get_pretrained(config, model):
         config.end_lr = 1e-5
 
         checkpoint = torch.load(
-            config.uda_model_path, map_location=torch.device(config.device), weights_only=False
+            config.uda_model_path,
+            map_location=torch.device(config.device),
+            weights_only=False,
         )  # caloclouds for uda
         model.load_state_dict(
             checkpoint["others"]["model_ema"], strict=False

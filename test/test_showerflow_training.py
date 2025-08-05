@@ -17,16 +17,12 @@ def test_get_to_factory(tmpdir):
     os.makedirs(showerflow_dir)
 
     # start tests with the get functions
-    pointsE_path = showerflow_training.get_incident_npts_visible(
-        config, showerflow_dir
-    )
+    pointsE_path = showerflow_training.get_incident_npts_visible(config, showerflow_dir)
     assert os.path.exists(pointsE_path)
     # get the file's tiem stamp
     pointsE_time = os.path.getmtime(pointsE_path)
     # doing it again should not cause it to be recreated
-    pointsE_path = showerflow_training.get_incident_npts_visible(
-        config, showerflow_dir
-    )
+    pointsE_path = showerflow_training.get_incident_npts_visible(config, showerflow_dir)
     new_pointsE_time = os.path.getmtime(pointsE_path)
     assert pointsE_time == new_pointsE_time
     loaded = np.load(pointsE_path)
@@ -73,15 +69,11 @@ def test_get_to_factory(tmpdir):
     assert loaded["rescaled_energy_per_layer"].shape == (n_events, 30)
     assert np.all(loaded["rescaled_energy_per_layer"] >= 0)
 
-    cog_path, cog_sample = showerflow_training.get_cog(
-        config, showerflow_dir
-    )
+    cog_path, cog_sample = showerflow_training.get_cog(config, showerflow_dir)
     assert os.path.exists(cog_path)
     # do it again to check it is not recreated
     time = os.path.getmtime(cog_path)
-    cog_path, cog_sample = showerflow_training.get_cog(
-        config, showerflow_dir
-    )
+    cog_path, cog_sample = showerflow_training.get_cog(config, showerflow_dir)
     assert time == os.path.getmtime(cog_path)
 
     loaded = np.load(cog_path)

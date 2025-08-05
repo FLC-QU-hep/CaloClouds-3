@@ -5,7 +5,6 @@ from scripts.ShowerFlow import main
 from helpers import config_creator
 
 
-
 # The user warning is about the number of workers,
 # but this number works well on our setup
 @pytest.mark.filterwarnings("ignore::UserWarning")
@@ -18,4 +17,3 @@ def test_main_default(tmpdir):
     assert os.path.exists(best_model_path)
     assert os.path.exists(best_data_path)
     assert os.path.exists(history_path)
-

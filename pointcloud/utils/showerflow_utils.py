@@ -224,7 +224,9 @@ def config_params_from_showerflow_path(showerflow_path):
     max_input_dims = 65
     if len(inputs_used_mask) < max_input_dims:
         # pad at the start
-        inputs_used_mask = np.pad(inputs_used_mask, (max_input_dims - len(inputs_used_mask), 0))
+        inputs_used_mask = np.pad(
+            inputs_used_mask, (max_input_dims - len(inputs_used_mask), 0)
+        )
     inputs = input_mask_to_list(inputs_used_mask)
     fixed_input_norms = "fnorms" in parts
     cut_inputs = "".join([str(i) for i in range(5) if not inputs_used_mask[i]])
@@ -252,9 +254,13 @@ def config_from_showerflow_path(config, showerflow_path):
         " This may indicate there is something unusual about the path."
         " Deducing the config by processing the file name."
     )
-    version, num_blocks, cut_inputs, inputs, fixed_input_norms = (
-        config_params_from_showerflow_path(showerflow_path)
-    )
+    (
+        version,
+        num_blocks,
+        cut_inputs,
+        inputs,
+        fixed_input_norms,
+    ) = config_params_from_showerflow_path(showerflow_path)
     # otherwise, we can guess from the path
     config = copy.deepcopy(config)
     config.shower_flow_version = version

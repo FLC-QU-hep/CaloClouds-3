@@ -15,11 +15,15 @@ def _wrap_func(func, xdata, ydata, transform):
     Stolen directly from scipy.optimize._minipack_py, which is hidden from the user
     """
     if transform is None:
+
         def func_wrapped(params):
             return func(xdata, *params) - ydata
+
     elif transform.size == 1 or transform.ndim == 1:
+
         def func_wrapped(params):
             return transform * (func(xdata, *params) - ydata)
+
     else:
         # Chisq = (y - yd)^T C^{-1} (y-yd)
         # transform = L such that C = L L^T
@@ -31,6 +35,7 @@ def _wrap_func(func, xdata, ydata, transform):
         # and minimize (y-yd)'^T (y-yd)'
         def func_wrapped(params):
             return solve_triangular(transform, func(xdata, *params) - ydata, lower=True)
+
     return func_wrapped
 
 
@@ -181,6 +186,7 @@ def evaluator_factory(f, xdata, ydata, sigma=None):
     def score_func(params):
         func = _wrap_func(f, xdata, ydata, transform)
         return (func(params) ** 2).sum()
+
     return score_func
 
 
@@ -420,18 +426,21 @@ def curve_fit(
         if not quiet and (n_attempts < 10 or n_attempts % 10 == 0):
             format_input = ", ".join([f"{p:.6g}" for p in trial])
             format_opt = ", ".join([f"{p:.6g}" for p in popt])
-            print(f"Optimisation trial {i+1}/{n_attempts} complete\n"
-                  f"Initial parameters: {format_input}\n"
-                  f"Optimal parameters: {format_opt}\n"
-                  f"Score: {scores[i]:.6g}\n")
+            print(
+                f"Optimisation trial {i+1}/{n_attempts} complete\n"
+                f"Initial parameters: {format_input}\n"
+                f"Optimal parameters: {format_opt}\n"
+                f"Score: {scores[i]:.6g}\n"
+            )
     best = np.argmin(scores)
     if not quiet:
-        print(f"All {n_attempts} optimisation trials complete\n"
-              "Best trial;")
+        print(f"All {n_attempts} optimisation trials complete\n" "Best trial;")
         format_input = ", ".join([f"{p:.6g}" for p in trials[best]])
         format_opt = ", ".join([f"{p:.6g}" for p in found[best]])
-        print(f"Initial parameters: {format_input}\n"
-              f"Optimal parameters: {format_opt}\n"
-              f"Score: {scores[i]:.6g}\n")
+        print(
+            f"Initial parameters: {format_input}\n"
+            f"Optimal parameters: {format_opt}\n"
+            f"Score: {scores[i]:.6g}\n"
+        )
 
     return found[best], covariences[best]

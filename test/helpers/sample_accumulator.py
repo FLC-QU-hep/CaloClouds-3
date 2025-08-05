@@ -50,10 +50,10 @@ def make(add_varients=False, start_acc=None):
 
 def add_random(acc, n_events=100):
     events = np.random.rand(n_events, 100, 4)
-    incident_energies = 10 + np.random.rand(n_events)*80
+    incident_energies = 10 + np.random.rand(n_events) * 80
     try:
         first_index = np.max(acc.accumulated_indices) + 1
     except ValueError:
         first_index = 0
-    indices = list(range(first_index, first_index+n_events))
+    indices = list(range(first_index, first_index + n_events))
     acc.add(indices, incident_energies, events)

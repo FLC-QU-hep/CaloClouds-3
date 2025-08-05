@@ -159,11 +159,11 @@ class DetectorScaleFactors:
         if np.any(self.trim_edges):
             for event in events_as_cells:
                 for layer in event:
-                    layer[:self.trim_edges[0]] = 0
+                    layer[: self.trim_edges[0]] = 0
                     layer[-self.trim_edges[1] :] = 0
                     layer[:, : self.trim_edges[2]] = 0
                     layer[:, -self.trim_edges[3] :] = 0
-        
+
         self.retain(events_as_cells)
         detector_map.mip_cut(events_as_cells)
         self.retain_at = self.retain_at + "_postMip"
@@ -178,7 +178,6 @@ class DetectorScaleFactors:
         return n, e
 
     def model_events(self, cond_idxs, n_coeff, e_coeff, fake_n_coeff=None):
-
         self.model_config.shower_flow_n_scaling = True
         self.model_config.shower_flow_coef_real = n_coeff
         self.model_config.shower_flow_coef_fake = fake_n_coeff

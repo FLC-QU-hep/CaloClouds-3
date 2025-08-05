@@ -46,7 +46,7 @@ def test_cond_batcher():
     data = torch.tensor([[3, 7], [1, 2], [5, 8], [4, 6]])
     expected = np.array([[[1, 2], [4, 6]], [[3, 7], [5, 8]]])
     for i, batch in enumerate(gen_utils.cond_batcher(2, data)):
-        npt.assert_allclose(batch['diffusion'], expected[i])
+        npt.assert_allclose(batch["diffusion"], expected[i])
 
 
 class TestGenMethods:
@@ -128,7 +128,9 @@ class TestGenMethods:
         for bs in [0, 1, 2]:
             found = gen_utils.get_shower(model, num_points, energy, bs=bs)
             assert found.shape == (bs, num_points, 4)
-            found = gen_utils.get_shower(self.two_cond_flow[0], num_points, energy, cond_N, bs=bs)
+            found = gen_utils.get_shower(
+                self.two_cond_flow[0], num_points, energy, cond_N, bs=bs
+            )
             assert found.shape == (bs, num_points, 4)
             # there is actually nothing at this stage to prevet the model
             # from producing unphysical values. It's a raw diffusion model.
@@ -161,9 +163,7 @@ class TestGenMethods:
         destination_array = np.zeros((10, config.max_points, 4))
         cond = {"diffusion": (torch.arange(1, 3).reshape(-1, 1) * 10).float()}
         first_index = 2
-        gen_utils.gen_wish_inner_batch(
-            cond, destination_array, first_index, model
-        )
+        gen_utils.gen_wish_inner_batch(cond, destination_array, first_index, model)
         assert np.all(destination_array[:2] == 0)
         assert np.all(destination_array[4:] == 0)
         assert np.all(destination_array[2:4, :, 3] >= 0)
