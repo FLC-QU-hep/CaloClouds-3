@@ -8,7 +8,6 @@ from helpers import config_creator
 from pointcloud.utils import training
 from pointcloud.utils.misc import CheckpointManager
 
-from pointcloud.models import wish
 from pointcloud.evaluation import generate
 
 
@@ -26,7 +25,7 @@ def test_get_ckp_mgr(tmpdir):
 
 
 def test_get_dataloader():
-    for config_type in ["wish", "default"]:
+    for config_type in ["default"]:
         config = config_creator.make(config_type)
         dataloader = training.get_dataloader(config)
         assert isinstance(dataloader, torch.utils.data.DataLoader)
@@ -41,10 +40,6 @@ def test_get_sample_density():
 
 def test_get_optimiser_schedular():
     combinations = [
-        ("wish", "Adam", 0),
-        ("wish", "RAdam", 0),
-        ("wish", "Adam", 1),
-        ("wish", "RAdam", 1),
         ("default", "Adam", 0),
         ("default", "RAdam", 0),
         ("default", "Adam", 1),
@@ -55,9 +50,7 @@ def test_get_optimiser_schedular():
         config = config_creator.make(name)
         config.optimizer = optim
         config.latent_dim = latent_dim
-        if name == "wish":
-            model = wish.Wish(config)
-        elif name == "default":
+        if name == "default":
             model, _, _, _ = generate.load_diffusion_model(
                 config, "cm", model_path="test/example_cm_model.pt"
             )
@@ -90,13 +83,10 @@ def test_get_optimiser_schedular():
 
 
 def test_get_pretrained():
-    for config_type in ["wish", "config_calotransf"]:
+    for config_type in ["default"]:
         config = config_creator.make(config_type)
-        if config_type == "wish":
-            model = wish.Wish(config)
-        else:
-            model, _, _, _ = generate.load_diffusion_model(
-                config, "cm", model_path="test/example_cm_model.pt"
-            )
+        model, _, _, _ = generate.load_diffusion_model(
+            config, "cm", model_path="test/example_cm_model.pt"
+        )
         found = training.get_pretrained(config, model)
         assert isinstance(found, type(model))

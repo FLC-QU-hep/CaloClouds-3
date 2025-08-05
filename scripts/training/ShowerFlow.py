@@ -16,17 +16,7 @@ import os
 import sys
 import time
 
-from pointcloud.config_varients import (
-    wish,
-    wish_maxwell,
-    caloclouds_2,
-    caloclouds_2_v2,
-    caloclouds_2,
-    caloclouds_2_v4,
-    caloclouds_3,
-    caloclouds_3,
-    caloclouds_3_v_simple_shower,
-)
+from pointcloud.config_varients import caloclouds_2, caloclouds_3
 from pointcloud.data.read_write import get_n_events
 from pointcloud.data.conditioning import get_cond_dim
 from pointcloud.utils import showerflow_training, showerflow_utils
@@ -742,15 +732,8 @@ if __name__ == "__main__":
         chosen = sys.argv[1].strip()
 
     config_choices = {
-        "wish": wish,
-        "wish_maxwell": wish_maxwell,
         "caloclouds_2": caloclouds_2,
-        "caloclouds_2_v2": caloclouds_2_v2,
-        "caloclouds_2": caloclouds_2,
-        "caloclouds_2_v4": caloclouds_2_v4,
         "caloclouds_3": caloclouds_3,
-        "caloclouds_3": caloclouds_3,
-        "caloclouds_3_v_simple_shower": caloclouds_3_v_simple_shower,
     }
     while chosen not in config_choices:
         chosen = input(f"Choose a version from {list(config_choices.keys())}:")

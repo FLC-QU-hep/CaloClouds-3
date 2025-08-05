@@ -1,7 +1,7 @@
 # get the folder above on the path
 import os
 import pytest
-from scripts.ShowerFlow import main
+from scripts.training.ShowerFlow import main
 from helpers import config_creator
 
 

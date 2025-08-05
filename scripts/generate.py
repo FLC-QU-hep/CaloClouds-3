@@ -11,13 +11,7 @@ import torch
 import os
 import time
 
-from pointcloud.config_varients import (
-    caloclouds_3,
-    caloclouds_3,
-    default,
-    caloclouds_2,
-)
-
+from pointcloud.config_varients import default, caloclouds_2, caloclouds_3
 
 from pointcloud.utils.metadata import Metadata
 from pointcloud.utils import detector_map
