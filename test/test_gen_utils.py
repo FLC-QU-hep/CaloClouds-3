@@ -7,7 +7,7 @@ import copy
 from numpy import testing as npt
 from pointcloud.utils import gen_utils, metadata
 
-from pointcloud.models.load import get_model_class, Wish, epicVAE_nFlow_kDiffusion
+from pointcloud.models.load import get_model_class, Wish, Diffusion
 from pointcloud.evaluation import generate
 from pointcloud.models.shower_flow import compile_HybridTanH_model
 from pointcloud.utils.stats_accumulator import HighLevelStats
@@ -116,8 +116,8 @@ class TestGenMethods:
 
     def test_model_classes(self):
         assert isinstance(self.models[self.model_names["wish"]][0], Wish)
-        assert isinstance(self.models[self.model_names["diffusion"]][0], epicVAE_nFlow_kDiffusion)
-        assert isinstance(self.two_cond_flow[0], epicVAE_nFlow_kDiffusion)
+        assert isinstance(self.models[self.model_names["diffusion"]][0], Diffusion)
+        assert isinstance(self.two_cond_flow[0], Diffusion)
 
     def test_get_shower(self):
         num_points = 100

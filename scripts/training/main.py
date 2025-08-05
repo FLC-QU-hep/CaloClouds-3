@@ -38,7 +38,7 @@ def get_model(config):
         model_ema = None
     elif config.model_name in [
         "AllCond_epicVAE_nFlow_PointDiff",
-        "epicVAE_nFlow_kDiffusion",
+        "Diffusion",
     ]:
         model = model_class(config).to(config.device)
         model_ema = model_class(config).to(config.device)
@@ -51,7 +51,7 @@ def get_model(config):
     else:
         raise NotImplementedError(
             f"Model {config.model_name} not implemented, known models: "
-            "flow, AllCond_epicVAE_nFlow_PointDiff, epicVAE_nFlow_kDiffusion, wish"
+            "flow, AllCond_epicVAE_nFlow_PointDiff, Diffusion, wish"
         )
     if model_ema is not None:
         # initiate EMA (exponential moving average) model
@@ -95,7 +95,7 @@ def main(config=Configs()):
         optimizer.zero_grad()
         if (
             config.model_name == "AllCond_epicVAE_nFlow_PointDiff"
-            or config.model_name == "epicVAE_nFlow_kDiffusion"
+            or config.model_name == "Diffusion"
         ):
             if config.latent_dim > 0:
                 optimizer_flow.zero_grad()
@@ -137,7 +137,7 @@ def main(config=Configs()):
                     kld_min=config.kld_min,
                 )
 
-        elif config.model_name == "epicVAE_nFlow_kDiffusion":
+        elif config.model_name == "Diffusion":
             cond_feats = get_cond_feats(config, batch, "diffusion")
             cond_feats = normalise_cond_feats(config, cond_feats, "diffusion")
 
@@ -213,7 +213,7 @@ def main(config=Configs()):
             }
         elif config.model_name in [
             "AllCond_epicVAE_nFlow_PointDiff",
-            "epicVAE_nFlow_kDiffusion",
+            "Diffusion",
             "wish",
         ]:
             opt_states = {

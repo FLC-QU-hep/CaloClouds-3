@@ -7,6 +7,59 @@ from .metadata import Metadata
 from ..data.read_write import local_to_global
 
 
+def get_shift(theta, phi, layer: int):
+    EIR = 1804.7
+    layer_bottom_pos = np.array(
+        [
+            1811.34020996,
+            1814.46508789,
+            1823.81005859,
+            1826.93505859,
+            1836.2800293,
+            1839.4050293,
+            1848.75,
+            1851.875,
+            1861.2199707,
+            1864.3449707,
+            1873.68994141,
+            1876.81494141,
+            1886.16003418,
+            1889.28503418,
+            1898.63000488,
+            1901.75500488,
+            1911.09997559,
+            1914.22497559,
+            1923.56994629,
+            1926.69494629,
+            1938.14001465,
+            1943.36499023,
+            1954.81005859,
+            1960.03503418,
+            1971.47998047,
+            1976.70495605,
+            1988.15002441,
+            1993.375,
+            2004.81994629,
+            2010.04504395,
+        ]
+    )
+    layer_bottom_pos = layer_bottom_pos - EIR
+    cell_thickness = 0.5250244140625  # in mm
+    dist_to_layers = layer_bottom_pos + cell_thickness / 2
+
+    theta = np.array(theta, dtype=np.float32)
+    phi = np.array(phi, dtype=np.float32)
+
+    theta = theta / 180.0 * np.pi  # theta in radians
+    phi = phi / 180.0 * np.pi  # phi in radians
+
+    r = dist_to_layers[layer] / np.cos(theta)
+    x_shift = r * np.sin(theta) * np.cos(phi)
+    y_shift = r * np.sin(theta) * np.sin(phi)
+
+    return x_shift, y_shift
+
+
 def get_offset(half_cell_size_global, dm):
     """
     Get the offset for the cell map.

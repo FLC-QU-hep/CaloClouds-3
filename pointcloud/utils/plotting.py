@@ -7,16 +7,6 @@ from scipy.stats import binned_statistic
 
 from ..utils import metrics
 
-# mpl.rcParams["xtick.labelsize"] = 25
-# mpl.rcParams["ytick.labelsize"] = 25
-# mpl.rcParams['font.size'] = 28
-# mpl.rcParams["font.size"] = 35
-# mpl.rcParams["legend.frameon"] = False
-# mpl.rcParams["text.usetex"] = True
-# mpl.rcParams["font.family"] = "serif"
-# mpl.rcParams['axes.aspect'] = 'equal'
-# mpl.rcParams['figure.autolayout'] = True # for the hit e distr.
-# mpl.rcParams['font.weight'] = 1  # Or you can use a numerical value, e.g., 700
 
 
 nice_hex = [

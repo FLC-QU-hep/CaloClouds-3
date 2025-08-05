@@ -87,7 +87,7 @@ def get_optimiser_schedular(config, model):
     if config.model_name == "wish":
         needs_flow = False
         model_parameters = [{"params": model.parameters()}]
-    elif config.model_name in ["epicVAE_nFlow", "epicVAE_nFlow_kDiffusion"]:
+    elif config.model_name in ["epicVAE_nFlow", "Diffusion"]:
         needs_flow = config.latent_dim > 0
         if needs_flow:
             model_parameters = [

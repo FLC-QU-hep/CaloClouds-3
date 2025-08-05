@@ -1,32 +1,59 @@
-# in the public repo this is distillation.py
-# this trains the student model
 from comet_ml import Experiment
 
-import os
 import torch
+import time
 from torch.utils.data import DataLoader
 from torch.nn.utils import clip_grad_norm_
-import time
 
-from pointcloud.data.dataset import PointCloudDataset, PointCloudDatasetGH
-from pointcloud.data.conditioning import get_cond_feats, normalise_cond_feats
-from pointcloud.utils.misc import seed_all, get_new_log_dir, CheckpointManager
-from pointcloud.utils.training import get_comet_experiment, get_ckp_mgr, get_dataloader
-from pointcloud.models.epicVAE_nflows_kDiffusion import epicVAE_nFlow_kDiffusion
-from pointcloud.configs import Configs
+from utils import misc, dataset
+from models.CaloClouds_3 import CaloClouds_3
+from configs import Configs
 
 
-def get_models(config):
-    model = epicVAE_nFlow_kDiffusion(config, distillation=True).to(config.device)
-    model_ema_target = epicVAE_nFlow_kDiffusion(config, distillation=True).to(
-        config.device
+def main():
+    config = Configs()
+    misc.seed_all(seed=config.seed)
+    start_time = time.localtime()
+
+    with open("comet_api_key.txt", "r") as file:
+        key = file.read()
+
+    if config.log_comet:
+        experiment = Experiment(
+            project_name=config.comet_project,
+            auto_metric_logging=False,
+            api_key=key,
+        )
+        experiment.log_parameters(config.__dict__)
+        experiment.set_name(
+            config.name + time.strftime("%Y_%m_%d__%H_%M_%S", start_time)
+        )
+    else:
+        experiment = None
+
+    # Logging
+    log_dir = misc.get_new_log_dir(
+        config.logdir,
+        prefix=config.name,
+        postfix="_" + config.tag if config.tag is not None else "",
+        start_time=start_time,
     )
-    model_teacher = epicVAE_nFlow_kDiffusion(config, distillation=False).to(
-        config.device
+    ckpt_mgr = misc.CheckpointManager(log_dir)
+
+    train_dset = dataset.PointCloudAngular(
+        files_path=config.dataset_path, bs=config.train_bs
     )
+    dataloader = DataLoader(
+        train_dset, batch_size=1, num_workers=config.workers, shuffle=config.shuffle
+    )
+
+    # Model
+    model = CaloClouds_3(config, distillation=True).to(config.device)
+    model_ema_target = CaloClouds_3(config, distillation=True).to(config.device)
+    model_teacher = CaloClouds_3(config, distillation=False).to(config.device)
 
     # load model
-    checkpoint = torch.load(os.path.join(config.logdir, config.model_path), weights_only=False)
+    checkpoint = torch.load(config.logdir + "/" + config.model_path)
     if config.use_ema_trainer:
         model.load_state_dict(checkpoint["others"]["model_ema"])
         model_ema_target.load_state_dict(checkpoint["others"]["model_ema"])
@@ -36,31 +63,12 @@ def get_models(config):
         model_ema_target.load_state_dict(checkpoint["state_dict"])
         model_teacher.load_state_dict(checkpoint["state_dict"])
     print("Model loaded from: ", config.logdir + "/" + config.model_path)
-    return model, model_ema_target, model_teacher
-
-
-def main(config=Configs()):
-    seed_all(seed=config.seed)
-    start_time = time.localtime()
-
-    # Comet online logging
-    experiment = get_comet_experiment(config, start_time)
-    ckpt_mgr = get_ckp_mgr(config, start_time)
-
-    # Datasets and loaders
-    dataloader = get_dataloader(config)
-
-    # Model
-    model, model_ema_target, model_teacher = get_models(config)
 
     if config.cm_random_init:
         print(
-            "randomly initializing diffusion parameters"
-            + "for online and ema (target) model"
+            "randomly initializing diffusion parameters for online and ema (target) model"
         )
-        random_model = epicVAE_nFlow_kDiffusion(config, distillation=True).to(
-            config.device
-        )
+        random_model = CaloClouds_3(config, distillation=True).to(config.device)
         model.diffusion.load_state_dict(random_model.diffusion.state_dict())
         model_ema_target.diffusion.load_state_dict(random_model.diffusion.state_dict())
         del random_model
@@ -96,9 +104,7 @@ def main(config=Configs()):
             weight_decay=config.weight_decay,
         )
     elif config.optimizer == "RAdam":
-        # Consistency Model was trained with Rectified Adam,
-        # in k-diffusion AdamW is used, in EDM normal Adam
-        optimizer = torch.optim.RAdam(
+        optimizer = torch.optim.RAdam(  # Consistency Model was trained with Rectified Adam, in k-diffusion AdamW is used, in EDM normal Adam
             [
                 {"params": model.diffusion.parameters()},
             ],
@@ -112,22 +118,30 @@ def main(config=Configs()):
     )
     print("no learning rate scheduler implemented")
 
+    # scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer=optimizer,
+    #                                                        T_max=15000)
+
     # Train
     def train(batch, it):
-
         # Load data
         x = batch["event"][0].float().to(config.device)  # B, N, 4
+        e = batch["energy"][0].float().to(config.device)  # B, 1
+        p = batch["p_norm_local"][0].float().to(config.device)  # B, 3
+        # num_points = batch['num_points'][0].max().item() # B, 1
         # Reset grad
         optimizer.zero_grad()
         model.zero_grad()
 
-        cond_feats = get_cond_feats(config, batch, "diffusion")
-        cond_feats = normalise_cond_feats(config, cond_feats, "diffusion")
-        cond_feats = torch.tensor(cond_feats).to(config.device).float()
+        # get condition features
+        if config.norm_cond:
+            # e = e / 100 * 2 -1   # assumse max incident energy: 100 GeV
+            e = e / 127  # same as new SF
+        cond_feats = torch.cat([e, p], -1)  # B, 2
 
-
-        # noise = torch.randn_like(x)    # noise for forward diffusion
-        # sigma = sample_density([x.shape[0]], device=x.device)  # time steps
+        # teacher_showers, x_T = model_teacher.sample(cond_feats, num_points, config, retun_noise=True)
+        # student_showers = model.sample(cond_feats, num_points, config, x_T=x_T)
+        # loss = torch.sqrt(F.mse_loss(student_showers, teacher_showers))
+        # # loss = F.huber_loss(student_showers, teacher_showers, delta=0.2)
 
         loss = model.get_cd_loss(x, cond_feats, model_teacher, model_ema_target, config)
 
@@ -147,7 +161,9 @@ def main(config=Configs()):
         ):
             targ.detach().mul_(mu).add_(src, alpha=1 - mu)
 
-        # TODO also add EMA model of online model with lower decay rate, i.e. 0.9999
+        # scheduler.step()
+
+        ## TODO also add EMA model of online model with lower decay rate, i.e. 0.9999
         # (might perfrom better than target model or last online model for sampling?)
 
         # Logging

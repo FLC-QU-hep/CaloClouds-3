@@ -14,7 +14,7 @@ class Configs:
         self.comet_workspace = "henrydayhall"
 
         # Model arguments
-        self.model_name = "epicVAE_nFlow_kDiffusion"  # choices=['AllCond_epicVAE_nFlow_PointDiff', 'epicVAE_nFlow_kDiffusion]
+        self.model_name = "Diffusion"  # choices=['AllCond_epicVAE_nFlow_PointDiff', 'Diffusion]
         self.latent_dim = 32  # caloclouds default: 256
         self.beta_1 = 1e-4
         self.beta_T = 0.02

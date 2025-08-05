@@ -3,6 +3,7 @@ import numpy as np
 import torch
 
 from .metadata import Metadata
+from .detector_map import get_shift
 
 from ..configs import Configs
 
@@ -128,6 +129,8 @@ def _shower_batch_arg_parser(*args, **kwargs):
         "shower_flow": None,
         "e_min": None,
         "e_max": None,
+        "theta": 0.0,
+        "phi": 0.0,
         "num": 2000,
         "bs": 32,
         "config": Configs(),
@@ -137,6 +140,8 @@ def _shower_batch_arg_parser(*args, **kwargs):
         "shower_flow",
         "e_min",
         "e_max",
+        "theta",
+        "phi",
         "num",
         "bs",
         "config",
@@ -188,7 +193,61 @@ def _shower_batch_arg_parser(*args, **kwargs):
     ), "e_min must be less than e_max"
     assert arg_values["num"] >= 0, "num must be positive"
     assert arg_values["bs"] >= 0, "bs must be positive"
+    assert arg_values["theta"] >= -360, "theta must be between -360 and 360"
+    assert arg_values["theta"] <= 360, "theta must be between -360 and 360"
+    assert arg_values["phi"] >= -360, "phi must be between -360 and 360"
+    assert arg_values["phi"] <= 360, "phi must be between -360 and 360"
     return arg_values.values()
+
+
+def get_direction(theta, phi):
+    theta = theta / 180.0 * np.pi  # theta in radians
+    phi = phi / 180.0 * np.pi  # phi in radians
+
+    px = np.cos(phi) * np.sin(theta)
+    py = np.sin(phi) * np.sin(theta)
+    pz = np.cos(theta)
+
+    return np.array([px, py, pz])
+
+
+def sample_points_in_angle_range(
+    num_points, theta_range=(0, 180), phi_range=(-180, 180)
+):
+    scale = 5
+
+    # Generate random points in a unit cube
+    points = np.random.randn(3, int(num_points * scale))
+
+    # Normalize the points to lie on the surface of the unit sphere
+    points /= np.linalg.norm(points, axis=0)[None, :]
+
+    theta_range = np.array(theta_range) / 180 * np.pi
+    phi_range = np.array(phi_range) / 180 * np.pi
+
+    # Convert Cartesian coordinates to spherical coordinates
+    phi = np.arctan2(points[1, :], points[0, :])
+    theta = np.arccos(points[2, :])
+
+    # Filter points based on theta and phi ranges
+    mask = np.logical_and.reduce(
+        (
+            theta >= theta_range[0],
+            theta <= theta_range[1],
+            phi >= phi_range[0],
+            phi <= phi_range[1],
+        )
+    )
+
+    points = points[:, mask]
+
+    phi = np.arctan2(points[1, :], points[0, :])
+    theta = np.arccos(points[2, :])
+
+    theta = theta / np.pi * 180
+    phi = phi / np.pi * 180
+
+    return points[:, :num_points], theta[:num_points], phi[:num_points]
 
 
 # batch inference
@@ -242,22 +301,34 @@ def gen_showers_batch(
         shower_flow,
         e_min,
         e_max,
+        theta,
+        phi,
         num,
         bs,
         config,
     ) = _shower_batch_arg_parser(*args, **kwargs)
 
-    # TODO generalise
-    if get_cond_features_names(config, "diffusion") != ["energy"]:
-        raise NotImplementedError(
-            "Currently only energy conditioning is supported for batch generation"
-        )
-    if get_cond_features_names(config, "showerflow") != ["energy"]:
-        raise NotImplementedError(
-            "Currently only energy conditioning is supported for batch generation"
-        )
-    cond = torch.FloatTensor(num, 1).uniform_(e_min, e_max)  # B,1
-    cond = cond.to(config.device)
+    diffusion_cond_names = get_cond_features_names(config, "diffusion")
+    shower_flow_cond_names = get_cond_features_names(config, "showerflow")
+    e_cond = torch.FloatTensor(num, 1).uniform_(e_min, e_max)  # B,1
+    for names in [diffusion_cond_names, shower_flow_cond_names]:
+        assert (
+            names[0] == "energy"
+        ), "Function assumes first conditioning value is energy"
+    if isinstance(theta, tuple):
+        _, theta, phi = sample_points_in_angle_range(num, theta, phi)
+        direction = get_direction(theta, phi)
+        direction = np.moveaxis(direction, 0, 1)
+        direction = torch.FloatTensor(direction).to(config.device)
+    else:
+        direction = (
+            torch.FloatTensor(get_direction(theta, phi))
+            .to(config.device)
+            .unsqueeze(0)
+            .repeat(num, 1)
+        )  # B,3
+
+    cond = torch.cat([e_cond, direction], -1).to(config.device)
     fake_showers = gen_cond_showers_batch(
         model,
         shower_flow,
@@ -365,18 +436,18 @@ def cond_batcher(batch_size, cond, showerflow_cond=None):
 
     """
     # if the conds are actually the same object, we only need to sort one
-    #identical_conds = cond is showerflow_cond
+    # identical_conds = cond is showerflow_cond
     ## sort by energies for better batching and faster inference
-    #if len(cond.shape) > 1:
+    # if len(cond.shape) > 1:
     #    mask = torch.argsort(cond[..., -1].squeeze())
-    #else:
+    # else:
     #    mask = torch.argsort(cond)
     ## change torch tensor to numpyarray
-    #mask = mask.cpu().numpy()
-    #mask = np.atleast_1d(mask)
-    #cond[:] = cond[mask]
+    # mask = mask.cpu().numpy()
+    # mask = np.atleast_1d(mask)
+    # cond[:] = cond[mask]
     #
-    #if not identical_conds and showerflow_cond is not None:
+    # if not identical_conds and showerflow_cond is not None:
     #    showerflow_cond = showerflow_cond[mask]
     num = cond.size(0)
     for evt_id in range(0, num, batch_size):
@@ -700,10 +771,13 @@ def gen_v1_inner_batch(
         cog_y_shift = metadata.mean_cog[1]
         cog_z_shift = metadata.mean_cog[2]
         if getattr(config, "shower_flow_roll_xyz", False):
-            cog_x_shift, cog_y_shift, cog_z_shift = cog_z_shift, cog_x_shift, cog_y_shift
+            cog_x_shift, cog_y_shift, cog_z_shift = (
+                cog_z_shift,
+                cog_x_shift,
+                cog_y_shift,
+            )
         # Still need to apply centering
         fake_showers[:, :, 0] -= cog_x_shift
         fake_showers[:, :, 1] -= cog_y_shift
-
 
     destination_array[first_index : first_index + bs] = fake_showers

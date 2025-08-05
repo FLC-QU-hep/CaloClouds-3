@@ -473,16 +473,36 @@ class PointCloudDatasetGH(PointCloudDataset):
         raise NotImplementedError("Why are you fuzzing the GH dataset?")
 
 
+# Contains heavy assumptions about the dataset - could draw these from metadata
+# might need to also return "points" as "points_per_layer"
 class PointCloudAngular(PointCloudDataset):
-    # These should be set from metadata...
-    # Ymin, Ymax = -250, 250
-    # Xmin, Xmax = -250, 250
-    # Zmin, Zmax = 0, 30
     keys_to_include = {
         "event": "events",
         "energy": "energy",
         "p_norm_local": "p_norm_local",
     }
+    # correct for the sim-E... datasets
+    Xmean, Ymean, Zmean = -0.0074305227, -0.21205868, 12.359252
+    Xstd, Ystd, Zstd = 21.608465, 22.748442, 5.305082
+    Emean, Estd = -1.5300317, 1.2500798
+
+    @classmethod
+    def normalize_xyze(cls, event, fuzz_perpendicular=False):
+        assert fuzz_perpendicular is False, "Assumption is that this is fuzzed on disk"
+        event[..., 3] = (
+            (np.log(event[..., 3] + 1e-12) - cls.Emean) / cls.Estd / 2
+        )  # energy transformation
+
+        event[..., 0] = (
+            (event[..., 0] - cls.Xmean) / cls.Xstd / 2
+        )  # x coordinate normalization
+        event[..., 1] = (
+            (event[..., 1] - cls.Ymean) / cls.Ystd / 2
+        )  # y coordinate normalization
+        event[..., 2] = (
+            (event[..., 2] - cls.Zmean) / cls.Zstd / 2
+        )  # z coordinate normalization
+        
 
 
 class CaloChallangeDataset(Dataset):
