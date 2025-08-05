@@ -19,10 +19,10 @@ from pointcloud.config_varients import (
     wish_maxwell,
     caloclouds_2,
     caloclouds_2_v2,
-    caloclouds_2_v3,
+    caloclouds_2,
     caloclouds_2_v4,
     caloclouds_3,
-    caloclouds_3_simple_shower,
+    caloclouds_3,
 )
 from pointcloud.data.read_write import get_n_events
 from pointcloud.data.conditioning import get_cond_dim
@@ -237,7 +237,7 @@ if __name__ == "__main__":
     # and if not given get it from the user
     cc_version = 3
     if cc_version == 3:
-        config = caloclouds_3_simple_shower.Configs()
+        config = caloclouds_3.Configs()
         config.dataset_path = "/data/dust/group/ilc/sft-ml/datasets/sim-E1261AT600AP180-180/sim-E1261AT600AP180-180_file_{}.slcio.hdf5"
         config.n_dataset_files = 88
         config.shower_flow_version = "alt1"
@@ -248,7 +248,7 @@ if __name__ == "__main__":
         config.shower_flow_tag = "try6"
         config.max_energy = 127
     elif cc_version == 2:
-        config = caloclouds_2_v3.Configs()
+        config = caloclouds_2.Configs()
         config.dataset_path = "/data/dust/user/dayhallh/data/ILCsoftEvents/highGran_g40_p22_th90_ph90_en10-100.hdf5"
         config.n_dataset_files = 1
         config.shower_flow_version = "original"

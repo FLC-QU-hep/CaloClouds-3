@@ -4,13 +4,13 @@
 # This notebook will run Caloclouds using inputs from G4 data rather than showerflow.
 # Minimal post processing is done before opening the plots.
 from pointcloud.evaluation import caloclouds_raw
-from pointcloud.config_varients import wish_maxwell, caloclouds_3_simple_shower, bug_dip
+from pointcloud.config_varients import wish_maxwell, caloclouds_3, bug_dip
 from matplotlib import pyplot as plt
 import numpy as np
 import os
 
 wish_config = wish_maxwell.Configs()
-config = caloclouds_3_simple_shower.Configs()
+config = caloclouds_3.Configs()
 config.device = "cpu"
 config.logdir = wish_config.logdir
 config.storage_base = wish_config.storage_base

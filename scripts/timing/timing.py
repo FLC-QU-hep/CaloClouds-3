@@ -8,7 +8,7 @@ import torch
 import os
 
 from pointcloud.config_varients import (
-    caloclouds_3_simple_shower,
+    caloclouds_3,
     caloclouds_3,
     default,
     caloclouds_2,
@@ -218,8 +218,8 @@ static_stats = np.load(
     "/data/dust/user/dayhallh/data/ILCsoftEvents/p22_th90_ph90_en10-100_joined/stats.npz"
 )
 
-angular_dataset = caloclouds_3_simple_shower.Configs().dataset_path
-angular_n_files = caloclouds_3_simple_shower.Configs().n_dataset_files
+angular_dataset = caloclouds_3.Configs().dataset_path
+angular_n_files = caloclouds_3.Configs().n_dataset_files
 
 
 try:
@@ -252,7 +252,7 @@ try:
     pass
     if True:  # new a1 model
         model_name = "CaloClouds3-ShowerFlow_a1_fnorms_2"
-        config = caloclouds_3_simple_shower.Configs()
+        config = caloclouds_3.Configs()
         config.dataset_tag = "p22_th90_ph90_en10-100"
         config.device = "cpu"
         config.cond_features = 4
@@ -291,7 +291,7 @@ try:
         # cc3_stats = np.load(showerflow_paths[0].replace(".pth", "_stats_cond_p22_th90_ph90_en10-100.npz"))
 
         # generate some custom metadata that will allow comparison between this model and the old model
-        train_dataset_meta = Metadata(caloclouds_3_simple_shower.Configs())
+        train_dataset_meta = Metadata(caloclouds_3.Configs())
         meta_here = Metadata(caloclouds_2.Configs())
 
         meta_here.incident_rescale = 127
@@ -467,7 +467,7 @@ def main(
 
 
 if __name__ == "__main__":
-    config = caloclouds_3_simple_shower.Configs()
+    config = caloclouds_3.Configs()
     config.device = "cpu"
     config.dataset_path_in_storage = False
     config._dataset_path = static_dataset

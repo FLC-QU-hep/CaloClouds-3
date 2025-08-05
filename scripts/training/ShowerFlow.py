@@ -21,10 +21,10 @@ from pointcloud.config_varients import (
     wish_maxwell,
     caloclouds_2,
     caloclouds_2_v2,
-    caloclouds_2_v3,
+    caloclouds_2,
     caloclouds_2_v4,
     caloclouds_3,
-    caloclouds_3_simple_shower,
+    caloclouds_3,
     caloclouds_3_v_simple_shower,
 )
 from pointcloud.data.read_write import get_n_events
@@ -746,10 +746,10 @@ if __name__ == "__main__":
         "wish_maxwell": wish_maxwell,
         "caloclouds_2": caloclouds_2,
         "caloclouds_2_v2": caloclouds_2_v2,
-        "caloclouds_2_v3": caloclouds_2_v3,
+        "caloclouds_2": caloclouds_2,
         "caloclouds_2_v4": caloclouds_2_v4,
         "caloclouds_3": caloclouds_3,
-        "caloclouds_3_simple_shower": caloclouds_3_simple_shower,
+        "caloclouds_3": caloclouds_3,
         "caloclouds_3_v_simple_shower": caloclouds_3_v_simple_shower,
     }
     while chosen not in config_choices:

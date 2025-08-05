@@ -9,7 +9,7 @@ import sys
 import os
 import torch
 from pointcloud.config_varients import (
-    caloclouds_3_simple_shower,
+    caloclouds_3,
     caloclouds_3,
     wish,
     default,
@@ -26,7 +26,7 @@ chosen = int(sys.argv[1])
 print(f"We will train the {chosen}th model")
 
 default_config = default.Configs()
-config = caloclouds_3_simple_shower.Configs()
+config = caloclouds_3.Configs()
 if torch.cuda.is_available():
     config.device = "cuda"
 else:

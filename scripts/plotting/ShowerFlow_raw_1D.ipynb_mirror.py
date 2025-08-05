@@ -9,7 +9,7 @@ import os
 from pointcloud.config_varients import (
     wish,
     caloclouds_3,
-    caloclouds_3_simple_shower,
+    caloclouds_3,
     default,
 )
 from pointcloud.models import shower_flow, fish_flow
@@ -25,7 +25,7 @@ config = caloclouds_3.Configs()
 config.storage_base = "/data/dust/user/dayhallh/"
 config.logdir = "/data/dust/user/dayhallh/point-cloud-diffusion-logs/"
 config.dataset_path_in_storage = False
-config.dataset_path = caloclouds_3_simple_shower.Configs().dataset_path
+config.dataset_path = caloclouds_3.Configs().dataset_path
 meta = metadata.Metadata(config)
 
 
@@ -268,7 +268,7 @@ fig.tight_layout()
 #
 # That done, we can draw the same values from the models, and plot them alongside.
 saved_models_1 = showerflow_utils.existing_models(caloclouds_3.Configs())
-saved_models_2 = showerflow_utils.existing_models(caloclouds_3_simple_shower.Configs())
+saved_models_2 = showerflow_utils.existing_models(caloclouds_3.Configs())
 saved_models = {**saved_models_1, **saved_models_2}
 from pointcloud.utils import showerflow_utils
 from pointcloud.data.conditioning import feature_lengths

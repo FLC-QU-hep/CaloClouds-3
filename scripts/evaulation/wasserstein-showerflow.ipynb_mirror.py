@@ -3,7 +3,7 @@
 import os
 import numpy as np
 import torch
-from pointcloud.config_varients import caloclouds_3_simple_shower
+from pointcloud.config_varients import caloclouds_3
 from pointcloud.evaluation import discriminator
 from pointcloud.utils import showerflow_training, showerflow_utils
 from pointcloud.utils.metadata import Metadata
@@ -11,7 +11,7 @@ from pointcloud.utils.plotting import RatioPlots, nice_hex
 from matplotlib import pyplot as plt
 
 
-config = caloclouds_3_simple_shower.Configs()
+config = caloclouds_3.Configs()
 if torch.cuda.is_available():
     config.device = "cuda"
 else:

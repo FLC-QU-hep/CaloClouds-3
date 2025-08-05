@@ -2,13 +2,13 @@ import numpy as np
 from matplotlib import pyplot as plt
 import torch
 import os
-from pointcloud.config_varients import caloclouds_3, caloclouds_3_simple_shower
+from pointcloud.config_varients import caloclouds_3, caloclouds_3
 from pointcloud.utils import plotting, showerflow_training, showerflow_utils
 from pointcloud.models.shower_flow import versions_dict
 from pointcloud.models.fish_flow import Adaptor
 
 config = caloclouds_3.Configs()
-config_s = caloclouds_3_simple_shower.Configs()
+config_s = caloclouds_3.Configs()
 config.dataset_path = config_s.dataset_path
 config.device = "cpu"
 config_s.device = "cpu"

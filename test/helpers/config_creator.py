@@ -3,13 +3,11 @@ Some common setting for testing config, regardless of the underlying config vers
 """
 import os
 import shutil
-from pointcloud.config_varients import default, wish, caloclouds_3, config_calotransf
+from pointcloud.config_varients import default, caloclouds_3
 
 dict_of_config = {
     "default": default,
-    "wish": wish,
     "caloclouds_3": caloclouds_3,
-    "config_calotransf": config_calotransf,
 }
 
 

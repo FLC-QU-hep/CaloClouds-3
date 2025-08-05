@@ -23,7 +23,7 @@ from pointcloud.config_varients import (
     wish_maxwell,
     caloclouds_2,
     caloclouds_3,
-    caloclouds_3_simple_shower,
+    caloclouds_3,
 )
 from pointcloud.configs import Configs
 
@@ -260,7 +260,7 @@ if __name__ == "__main__":
         "wish_maxwell": wish_maxwell,
         "caloclouds_2": caloclouds_2,
         "caloclouds_3": caloclouds_3,
-        "caloclouds_3_simple_shower": caloclouds_3_simple_shower,
+        "caloclouds_3": caloclouds_3,
     }
     while chosen not in config_choices:
         chosen = input(f"Choose a version from {list(config_choices.keys())}:")

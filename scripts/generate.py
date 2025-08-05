@@ -12,10 +12,10 @@ import os
 import time
 
 from pointcloud.config_varients import (
-    caloclouds_3_simple_shower,
+    caloclouds_3,
     caloclouds_3,
     default,
-    caloclouds_2_v3,
+    caloclouds_2,
 )
 
 
@@ -259,13 +259,13 @@ static_stats = np.load(
     "/data/dust/user/dayhallh/data/ILCsoftEvents/p22_th90_ph90_en10-100_joined/stats.npz"
 )
 
-angular_dataset = caloclouds_3_simple_shower.Configs().dataset_path
-angular_n_files = caloclouds_3_simple_shower.Configs().n_dataset_files
+angular_dataset = caloclouds_3.Configs().dataset_path
+angular_n_files = caloclouds_3.Configs().n_dataset_files
 try:
     pass
     if False:  # new a1 model
         model_name = "CaloClouds3-ShowerFlow_a1_fnorms_7"
-        config = caloclouds_3_simple_shower.Configs()
+        config = caloclouds_3.Configs()
         config.dataset_tag = "high_gran_g40_p22_th90_ph90_en10-100"
         config.device = "cpu"
         config.cond_features = 4
@@ -311,8 +311,8 @@ try:
         # cc3_stats = np.load(showerflow_paths[0].replace(".pth", "_stats_cond_p22_th90_ph90_en10-100.npz"))
 
         # generate some custom metadata that will allow comparison between this model and the old model
-        train_dataset_meta = Metadata(caloclouds_3_simple_shower.Configs())
-        meta_here = Metadata(caloclouds_2_v3.Configs())
+        train_dataset_meta = Metadata(caloclouds_3.Configs())
+        meta_here = Metadata(caloclouds_2.Configs())
 
         meta_here.incident_rescale = 127
         meta_here.n_pts_rescale = train_dataset_meta.n_pts_rescale
@@ -353,7 +353,7 @@ try:
 
     if True:
         model_name = "CaloClouds2-ShowerFlow_CC2_8"
-        config = caloclouds_2_v3.Configs()
+        config = caloclouds_2.Configs()
         config.dataset_tag = "highGran_g40_p22_th90_ph90_en10-100"
         config.device = "cpu"
         config.cond_features = (
@@ -429,7 +429,7 @@ except FileNotFoundError as e:
 
 
 if __name__ == "__main__":
-    config = caloclouds_3_simple_shower.Configs()
+    config = caloclouds_3.Configs()
     config.shower_flow_n_scaling = scale_n
     config.device = "cpu"
     config.dataset_path_in_storage = False

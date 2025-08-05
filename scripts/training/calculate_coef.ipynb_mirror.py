@@ -7,10 +7,10 @@ from matplotlib import pyplot as plt
 from matplotlib.colors import LogNorm
 
 from pointcloud.config_varients import (
-    caloclouds_3_simple_shower,
+    caloclouds_3,
     caloclouds_3,
     default,
-    caloclouds_2_v3,
+    caloclouds_2,
 )
 
 
@@ -49,13 +49,13 @@ static_n_files = 10
 # trim_edges[:] = 0
 
 
-angular_dataset = caloclouds_3_simple_shower.Configs().dataset_path
-angular_n_files = caloclouds_3_simple_shower.Configs().n_dataset_files
+angular_dataset = caloclouds_3.Configs().dataset_path
+angular_n_files = caloclouds_3.Configs().n_dataset_files
 
 try:
     pass
     if True:  # new a1 model
-        config = caloclouds_3_simple_shower.Configs()
+        config = caloclouds_3.Configs()
         config.device = "cpu"
         config.cond_features = 4
         config.diffusion_pointwise_hidden_l1 = 32
@@ -79,8 +79,8 @@ try:
         )
 
         # generate some custom metadata that will allow comparison between this model and the old model
-        train_dataset_meta = Metadata(caloclouds_3_simple_shower.Configs())
-        meta_here = Metadata(caloclouds_2_v3.Configs())
+        train_dataset_meta = Metadata(caloclouds_3.Configs())
+        meta_here = Metadata(caloclouds_2.Configs())
 
         meta_here.incident_rescale = 127
         meta_here.n_pts_rescale = train_dataset_meta.n_pts_rescale
@@ -120,7 +120,7 @@ try:
         models.update(caloclouds)
 
     if True:
-        config = caloclouds_2_v3.Configs()
+        config = caloclouds_2.Configs()
         config.device = "cpu"
         config.cond_features = (
             2  # number of conditioning features (i.e. energy+points=2)
@@ -172,7 +172,7 @@ except FileNotFoundError as e:
     print(e)
 
 
-config = caloclouds_3_simple_shower.Configs()
+config = caloclouds_3.Configs()
 config.device = "cpu"
 config.dataset_path_in_storage = False
 config._dataset_path = static_dataset

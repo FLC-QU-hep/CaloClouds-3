@@ -35,7 +35,7 @@ paper_cc2=\
 "/10-90GeV_x36_grid_regular_524k_float32.hdf5"
 
 
-config_name=caloclouds_3_simple_shower
+config_name=caloclouds_3
 #config_name=caloclouds_2_v3
 
 dataset_path=$anatolli_data
@@ -51,7 +51,7 @@ shower_flow_min_cond_energy=0
 shower_flow_min_train_points=0
 shower_flow_optimiser_on_nan='best'
 
-#config_name=caloclouds_3_simple_shower
+#config_name=caloclouds_3
 
 
 #shower_flow_version=alt1
