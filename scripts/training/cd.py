@@ -5,8 +5,9 @@ import time
 from torch.utils.data import DataLoader
 from torch.nn.utils import clip_grad_norm_
 
-from utils import misc, dataset
-from models.CaloClouds_3 import CaloClouds_3
+from pointcloud.utils import misc
+from pointcloud.data import dataset
+from pointcloud.models.diffusion import Diffusion
 from configs import Configs
 
 
@@ -48,9 +49,9 @@ def main():
     )
 
     # Model
-    model = CaloClouds_3(config, distillation=True).to(config.device)
-    model_ema_target = CaloClouds_3(config, distillation=True).to(config.device)
-    model_teacher = CaloClouds_3(config, distillation=False).to(config.device)
+    model = Diffusion(config, distillation=True).to(config.device)
+    model_ema_target = Diffusion(config, distillation=True).to(config.device)
+    model_teacher = Diffusion(config, distillation=False).to(config.device)
 
     # load model
     checkpoint = torch.load(config.logdir + "/" + config.model_path)
@@ -68,7 +69,7 @@ def main():
         print(
             "randomly initializing diffusion parameters for online and ema (target) model"
         )
-        random_model = CaloClouds_3(config, distillation=True).to(config.device)
+        random_model = Diffusion(config, distillation=True).to(config.device)
         model.diffusion.load_state_dict(random_model.diffusion.state_dict())
         model_ema_target.diffusion.load_state_dict(random_model.diffusion.state_dict())
         del random_model

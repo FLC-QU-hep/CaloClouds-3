@@ -19,16 +19,12 @@ from pointcloud.utils.training import (
 )
 from pointcloud.data.conditioning import get_cond_feats, normalise_cond_feats
 from pointcloud.config_varients import (
-    wish,
-    wish_maxwell,
     caloclouds_2,
-    caloclouds_3,
     caloclouds_3,
 )
 from pointcloud.configs import Configs
 
 from pointcloud.models.load import get_model_class
-from pointcloud.models.wish import accumulate_and_load_wish
 
 
 def get_model(config):
@@ -42,16 +38,10 @@ def get_model(config):
     ]:
         model = model_class(config).to(config.device)
         model_ema = model_class(config).to(config.device)
-    elif config.model_name == "wish":
-        if hasattr(config, "load_checkpoint"):
-            model = model_class.load(config.load_checkpoint)
-        else:
-            model, _ = accumulate_and_load_wish(config)
-        model_ema = model_class(config)
     else:
         raise NotImplementedError(
             f"Model {config.model_name} not implemented, known models: "
-            "flow, AllCond_epicVAE_nFlow_PointDiff, Diffusion, wish"
+            "flow, AllCond_epicVAE_nFlow_PointDiff, Diffusion"
         )
     if model_ema is not None:
         # initiate EMA (exponential moving average) model
@@ -173,18 +163,6 @@ def main(config=Configs()):
             k_diffusion.utils.ema_update(model, model_ema, ema_decay)
             ema_sched.step()
 
-        elif config.model_name == "wish":
-            loss = model.get_loss(batch, experiment, it)
-            loss.backward()
-            orig_grad_norm = clip_grad_norm_(model.parameters(), config.max_grad_norm)
-            optimizer.step()
-            scheduler.step()
-
-            # Update EMA model
-            ema_decay = ema_sched.get_value()
-            k_diffusion.utils.ema_update(model, model_ema, ema_decay)
-            ema_sched.step()
-
         if it % config.log_iter == 0:
             print(
                 f"[Train] Iter {it:04d} | Loss {loss.item():.6f} "
@@ -214,7 +192,6 @@ def main(config=Configs()):
         elif config.model_name in [
             "AllCond_epicVAE_nFlow_PointDiff",
             "Diffusion",
-            "wish",
         ]:
             opt_states = {
                 "model_ema": model_ema.state_dict(),  # save the EMA model
@@ -256,10 +233,7 @@ if __name__ == "__main__":
         chosen = sys.argv[1].strip()
 
     config_choices = {
-        "wish": wish,
-        "wish_maxwell": wish_maxwell,
         "caloclouds_2": caloclouds_2,
-        "caloclouds_3": caloclouds_3,
         "caloclouds_3": caloclouds_3,
     }
     while chosen not in config_choices:

@@ -3,21 +3,14 @@ import torch
 import os
 import warnings
 
-from pointcloud.config_varients.wish import Configs
-from pointcloud.config_varients.wish_maxwell import Configs as MaxwellConfigs
-
 from pointcloud.utils.metadata import Metadata
 from pointcloud.utils import detector_map
 from pointcloud.data.conditioning import read_raw_regaxes_withcond, get_cond_dim
 from pointcloud.utils import showerflow_utils
-from pointcloud.models.wish import Wish
-from pointcloud.models.fish import Fish
 from pointcloud.models.shower_flow import versions_dict
 from pointcloud.models.load import get_model_class
 from pointcloud.utils.gen_utils import gen_cond_showers_batch
 
-
-from pointcloud.config_varients.wish import Configs as WishConfigs
 from pointcloud.configs import Configs
 
 
@@ -1072,10 +1065,7 @@ def conditioned_sample_model(model_config, binned, cond, model, shower_flow=None
         n_events = len(cond)
     if n_events == 0:
         return np.zeros(0), np.zeros((0, 0, 4))
-    if model_config.model_name in ["fish", "wish"]:
-        batch_len = min(1000, n_events)
-    else:
-        batch_len = min(100, n_events)
+    batch_len = min(100, n_events)
 
     batch_starts = np.arange(0, n_events, batch_len)
     n_batches = np.ceil(n_events / batch_len)
@@ -1121,77 +1111,6 @@ def get_path(config, name, detector_projection=False):
     try_mkdir(binned_metrics_dir)
     file_name = name.replace(" ", "_") + ".npz"
     return os.path.join(binned_metrics_dir, file_name)
-
-
-def get_wish_models(
-    wish_path="../point-cloud-diffusion-logs/wish/dataset_accumulators"
-    "/p22_th90_ph90_en10-1/wish_poly{}.pt",
-    n_poly_degrees=4,
-    device="cpu",
-):
-    """
-    Gather a set of models for evaluation.
-
-    Parameters
-    ----------
-    wish_path : str, optional
-        The path to the wish models, with a formatable part for the
-        polynomial degree, by default
-        "../point-cloud-diffusion-logs/wish/dataset_accumulators"
-        "/p22_th90_ph90_en10-1/wish_poly{}.pt"
-    n_poly_degrees : int, optional
-        The number of polynomial degrees to gather, by default 4
-    device : str, optional
-        The device to load the models onto, by default "cpu"
-
-    Returns
-    -------
-    models : dict of {str: (torch.nn.Module, None, Configs)}
-        The models to evaluate, with the key being the name of the model.
-        The value is a tuple of the model, None (no flow model), and the
-        configuration used to create the model.
-    """
-    models = {}
-    for poly_degree in range(1, n_poly_degrees + 1):
-        config = WishConfigs()
-        config.poly_degree = poly_degree
-        config.device = device
-        here = Wish.load(wish_path.format(poly_degree))
-        models[f"Wish-poly{poly_degree}"] = (here, None, config)
-    return models
-
-
-def get_fish_models(
-    fish_path="../point-cloud-diffusion-logs/fish/fish.npz",
-    device="cpu",
-):
-    """
-    Gather a set of models for evaluation.
-
-    Parameters
-    ----------
-    fish_path : str, optional
-        The path to the fish model, by default
-        "../point-cloud-diffusion-logs/fish/fish.npz"
-    device : str, optional
-        The device to load the models onto, by default "cpu"
-
-    Returns
-    -------
-    models : dict of {str: (torch.nn.Module, None, Configs)}
-        The models to evaluate, with the key being the name of the model.
-        The value is a tuple of the model, None (no flow model), and the
-        configuration used to create the model.
-    """
-    models = {}
-    fish_model = Fish.load(fish_path)
-    # TODO fish isn't currently a torch Module
-    # may need to change this
-    # fish_model = fish_model.to(device)
-    config = WishConfigs()
-    config.model_name = "fish"
-    models["Fish"] = (fish_model, None, config)
-    return models
 
 
 def filenames_to_labels(filenames):
@@ -1270,8 +1189,9 @@ def get_caloclouds_models(
             print(calocloud_path)
             model.load_state_dict(
                 torch.load(calocloud_path, map_location=device, weights_only=False)[
-                    "state_dict"
-                ]
+                    #  "state_dict"  # < No should be ema
+                    "others"
+                ]["model_ema"]
             )
             model.eval()
             try:

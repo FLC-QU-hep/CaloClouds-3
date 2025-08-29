@@ -1,5 +1,5 @@
 import pytest
-from scripts.cd import main
+from scripts.training.cd import main
 
 from helpers import config_creator
 

@@ -1,10 +1,6 @@
 import torch
 
-from . import sample_accumulator
-
 from pointcloud.models.shower_flow import compile_HybridTanH_model
-from pointcloud.models.wish import Wish
-from pointcloud.utils.stats_accumulator import HighLevelStats
 
 
 def write_fake_flow_model(config, file_path):
@@ -19,19 +15,3 @@ def write_fake_flow_model(config, file_path):
     )
     torch.save({"model": flow.state_dict()}, file_path)
 
-
-def make_fake_wish_model(config):
-    """
-    Make a wish model with somehwat functional settings.
-    """
-    config.fit_attempts = 2
-    wish_model = Wish(config)
-    acc = sample_accumulator.make(add_varients=True)
-    hls = HighLevelStats(acc, wish_model.poly_degree)
-    wish_model.set_from_stats(hls)
-    return wish_model
-
-
-def write_fake_wish_model(config, file_path):
-    model = make_fake_wish_model(config)
-    model.save(file_path)

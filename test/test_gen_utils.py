@@ -3,16 +3,13 @@ Test the gen_utils (generator utilities) module.
 """
 import numpy as np
 import torch
-import copy
 from numpy import testing as npt
-from pointcloud.utils import gen_utils, metadata
+from pointcloud.utils import gen_utils
 
-from pointcloud.models.load import get_model_class, Wish, Diffusion
-from pointcloud.evaluation import generate
+from pointcloud.models.load import get_model_class, Diffusion, load_diffusion_model
 from pointcloud.models.shower_flow import compile_HybridTanH_model
-from pointcloud.utils.stats_accumulator import HighLevelStats
 
-from helpers import sample_accumulator, config_creator
+from helpers import config_creator
 
 
 def test_get_cog():
@@ -59,21 +56,7 @@ class TestGenMethods:
         """
         Make a list of models to test.
         """
-        # make ourselves a simple model
-        config = config_creator.make("wish")
-        config.cond_features = 1
-        wish_model = get_model_class(config)(config)
-
-        # give it some reasonable parameters
-        acc = sample_accumulator.make(add_varients=True)
-        hls = HighLevelStats(acc, wish_model.poly_degree)
-        wish_model.set_from_stats(hls)
-
-        cls.config.append(config)
-        cls.models.append((wish_model,))
-        cls.model_names["wish"] = 0
-
-        # now make a caloclouds/showerflow model
+        # make a caloclouds/showerflow model
         config = config_creator.make()
         config.cond_features = 1
         config.shower_flow_cond_features = 1
@@ -104,7 +87,7 @@ class TestGenMethods:
             device=config.device,
         )
 
-        diff_model, coef_real, coef_fake, n_splines = generate.load_diffusion_model(
+        diff_model, coef_real, coef_fake, n_splines = load_diffusion_model(
             config, "cm", model_path="test/example_cm_model.pt"
         )
         cls.two_cond_flow = (diff_model, distribution)

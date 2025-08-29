@@ -8,7 +8,7 @@ from helpers import config_creator
 from pointcloud.utils import training
 from pointcloud.utils.misc import CheckpointManager
 
-from pointcloud.evaluation import generate
+from pointcloud.models import load
 
 
 def test_get_comet_experiment():
@@ -51,7 +51,7 @@ def test_get_optimiser_schedular():
         config.optimizer = optim
         config.latent_dim = latent_dim
         if name == "default":
-            model, _, _, _ = generate.load_diffusion_model(
+            model, _, _, _ = load.load_diffusion_model(
                 config, "cm", model_path="test/example_cm_model.pt"
             )
         (
@@ -85,7 +85,7 @@ def test_get_optimiser_schedular():
 def test_get_pretrained():
     for config_type in ["default"]:
         config = config_creator.make(config_type)
-        model, _, _, _ = generate.load_diffusion_model(
+        model, _, _, _ = load.load_diffusion_model(
             config, "cm", model_path="test/example_cm_model.pt"
         )
         found = training.get_pretrained(config, model)

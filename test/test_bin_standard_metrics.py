@@ -7,21 +7,16 @@ import numpy.testing as npt
 from unittest.mock import patch
 
 from helpers.mock_read_write import mock_read_raw_regaxes, mock_get_n_events
-from helpers.sample_models import write_fake_flow_model, make_fake_wish_model
+from helpers.sample_models import write_fake_flow_model
 from helpers import config_creator
 
 
-from pointcloud.config_varients.wish import Configs as WishConfigs
-from pointcloud.models.wish import Wish
-from pointcloud.utils import stats_accumulator
 from pointcloud.evaluation.bin_standard_metrics import (
     try_mkdir,
     BinnedData,
     sample_g4,
     sample_model,
-    sample_accumulator,
     get_path,
-    get_wish_models,
     get_caloclouds_models,
 )
 
@@ -173,8 +168,8 @@ def test_BinnedData(tmpdir):
 
 # both get_n_events and read_raw_regaxis are tested elsewhere
 # here we will mock the calls to them
-@patch("pointcloud.data.trees.get_n_events", new=mock_get_n_events)
-@patch("pointcloud.data.trees.read_raw_regaxes", new=mock_read_raw_regaxes)
+@patch("pointcloud.data.read_write.get_n_events", new=mock_get_n_events)
+@patch("pointcloud.data.read_write.read_raw_regaxes", new=mock_read_raw_regaxes)
 def test_sample_g4():
     binned = make_default_binned([[-100, 100], [-100, 100], [-100, 100]])
     config = config_creator.make("default")
@@ -191,41 +186,31 @@ def test_sample_g4():
         ), f"hist {i} is empty, {binned.y_labels[i]}, {binned.x_labels[i]}"
 
 
-def test_sample_model():
-    # test with wish
-    config = config_creator.make("wish")
-    wish_model = make_fake_wish_model(config)
+def test_sample_model(tmpdir):
+    # test model
+    cfg = config_creator.make("caloclouds_3")
+    cfg.cond_features = 2
+    cfg.cond_features_names = ["energy", "points"]
+    cfg.shower_flow_cond_features = ["energy"]
+    test_cm_model_path = "test/example_cm_model.pt"
+    # fake the flow model
+    test_model_path = str(tmpdir) + "/example_flow_model.pt"
+    write_fake_flow_model(cfg, test_model_path)
+    models = get_caloclouds_models(test_cm_model_path, test_model_path, config=cfg)
+    model, flow_dist, config = models["CaloClouds"][0]
 
     binned = make_default_binned([[-100, 100], [-100, 100], [-100, 100]])
     # sample no events
-    sample_model(config, binned, 0, wish_model)
+    sample_model(config, binned, 0, model, flow_dist)
     for counts in binned.counts:
         assert np.all(counts == 0)
     # sample many events
-    energies, events = sample_model(config, binned, 100, wish_model)
+    energies, events = sample_model(config, binned, 100, model, flow_dist)
     # check something got added
     for i, counts in enumerate(binned.counts[:6]):
         assert np.any(
             counts > 0
         ), f"hist {i} is empty, {binned.y_labels[i]}, {binned.x_labels[i]}"
-
-
-def test_sample_accumulator():
-    # test with an empty accumulator
-    config = config_creator.make()
-    acc = stats_accumulator.StatsAccumulator()
-    binned = make_default_binned()
-    sample_accumulator(config, binned, acc, 0)
-    for counts in binned.counts[:4]:
-        assert np.all(counts == 0)
-    sample_accumulator(config, binned, acc, 100)
-    for counts in binned.counts[:4]:
-        assert np.all(counts == 0)
-    fake_events = np.zeros((1, 10, 4))
-    fake_events[0, :, 3] = 1
-    acc.add([1], np.ones(1), fake_events)
-    sample_accumulator(config, binned, acc, 1)
-    assert np.any(binned.counts[0] > 0)
 
 
 def test_get_path(tmpdir):
@@ -236,24 +221,6 @@ def test_get_path(tmpdir):
     assert isinstance(path, str)
     dir_name = os.path.dirname(path)
     assert os.path.exists(dir_name)
-
-
-def test_get_wish_models(tmpdir):
-    # make some fake models to read
-    config = config_creator.make("wish")
-    wish_model = make_fake_wish_model(config)
-    save_path = os.path.join(str(tmpdir), "wish_model_{}.pt")
-    n_poly_degrees = 3
-    for i in range(n_poly_degrees):
-        wish_model.save(save_path.format(i + 1))
-    # test reading them
-    models = get_wish_models(save_path, n_poly_degrees)
-    assert len(models) == n_poly_degrees
-    for name in models:
-        wish, flow, conf = models[name]
-        assert isinstance(wish, Wish)
-        assert flow is None
-        assert isinstance(conf, WishConfigs)
 
 
 def test_get_caloclouds_models(tmpdir):

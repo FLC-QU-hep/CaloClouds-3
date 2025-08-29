@@ -5,33 +5,35 @@ import os
 
 from pointcloud.evaluation.bin_standard_metrics import get_path
 
-from helpers.sample_models import make_fake_wish_model
-from helpers.sample_accumulator import make as make_fake_accumulator
+from helpers.sample_models import write_fake_flow_model
 from helpers import config_creator
 
-from scripts.create_standard_metrics import main
+from pointcloud.evaluation.bin_standard_metrics import (
+    get_caloclouds_models,
+)
+
+from scripts.evaluation.create_standard_metrics import main
 
 
-def fake_models(config):
-    config.fit_attempts = 2
-    config.poly_degree = 2
-    model = make_fake_wish_model(config)
-    models = {"fake model": (model, None, config)}
+def fake_models(config, tmpdir):
+    # test model
+    test_cm_model_path = "test/example_cm_model.pt"
+    # fake the flow model
+    test_model_path = str(tmpdir) + "/example_flow_model.pt"
+    write_fake_flow_model(config, test_model_path)
+    models = get_caloclouds_models(test_cm_model_path, test_model_path, config=config)
+    model, flow_dist, config = models["CaloClouds"][0]
     return models
 
 
-def fake_accumulator(logdir):
-    accumulator = make_fake_accumulator()
-    path = os.path.join(logdir, "fake_accumulator.h5")
-    accumulator.save(path)
-    return path
-
-
 def test_main(tmpdir):
-    config = config_creator.make("wish", my_tmpdir=tmpdir)
+    config = config_creator.make("caloclouds_3")
+    config.cond_features = 2
+    config.cond_features_names = ["energy", "points"]
+    config.shower_flow_cond_features = ["energy"]
+    config.log_dir = tmpdir
 
-    models = fake_models(config)
-    accumulator_path = fake_accumulator(config.logdir)
+    models = fake_models(config, tmpdir)
 
     main(
         config=config,
@@ -41,7 +43,6 @@ def test_main(tmpdir):
         max_g4_events=10,
         max_model_events=0,
         models=models,
-        accumulator_path=accumulator_path,
     )
 
     # check things actually got saved

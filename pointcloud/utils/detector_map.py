@@ -644,7 +644,7 @@ def mip_cut(events_as_cells, energy_scale=1.0):
     The mip peak is 0.2 MeV. Anything with less than half that
     Should be zeroed.
     """
-    half_mip = 0.5 * 2e-4 * energy_scale
+    half_mip = 0.5 * 2e-1 * energy_scale
     for event in events_as_cells:
         for layer in event:
             layer[layer < half_mip] = 0
