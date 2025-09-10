@@ -3,7 +3,7 @@ Module to test the training module
 """
 import time
 import torch
-from helpers import config_creator
+from helpers import config_creator, example_paths
 
 from pointcloud.utils import training
 from pointcloud.utils.misc import CheckpointManager
@@ -40,20 +40,20 @@ def test_get_sample_density():
 
 def test_get_optimiser_schedular():
     combinations = [
-        ("default", "Adam", 0),
-        ("default", "RAdam", 0),
-        ("default", "Adam", 1),
-        ("default", "RAdam", 1),
+        ("caloclouds_3", "Adam", 0),
+        ("caloclouds_3", "RAdam", 0),
+        ("caloclouds_3", "Adam", 1),
+        ("caloclouds_3", "RAdam", 1),
     ]
 
     for name, optim, latent_dim in combinations:
         config = config_creator.make(name)
         config.optimizer = optim
         config.latent_dim = latent_dim
-        if name == "default":
-            model, _, _, _ = load.load_diffusion_model(
-                config, "cm", model_path="test/example_cm_model.pt"
-            )
+        config.cond_features = ["energy", "p_norm_local"]
+        model, _, _, _ = load.load_diffusion_model(
+            config, "cm", model_path=example_paths.example_cm_model
+        )
         (
             optimiser,
             scheduler,
@@ -83,10 +83,10 @@ def test_get_optimiser_schedular():
 
 
 def test_get_pretrained():
-    for config_type in ["default"]:
+    for config_type in ["caloclouds_2"]:
         config = config_creator.make(config_type)
         model, _, _, _ = load.load_diffusion_model(
-            config, "cm", model_path="test/example_cm_model.pt"
+            config, "cm", model_path=example_paths.example_cm_model
         )
         found = training.get_pretrained(config, model)
         assert isinstance(found, type(model))

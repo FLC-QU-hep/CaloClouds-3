@@ -12,7 +12,7 @@ import warnings
 from pointcloud.data import conditioning
 from pointcloud.utils.metadata import Metadata
 
-from helpers import config_creator
+from helpers import config_creator, example_paths
 from helpers.mock_metadata import TemporaryMetadata
 
 
@@ -461,6 +461,6 @@ class TestRead:
 def test_cond_dim_at_path():
     # just run this on the models that are saved as examples
     # might not hit all the forks
-    model_path_1 = "test/example_cm_model.pt"
+    model_path_1 = example_paths.example_cm_model
     found = conditioning.cond_dim_at_path(model_path_1, "diffusion")
     assert found == 2

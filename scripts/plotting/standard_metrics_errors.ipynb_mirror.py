@@ -1,7 +1,7 @@
 # # Generate standard comparison metrics
-#
+# 
 # These are a set of standard kinematics for comparing models and data.
-#
+# 
 # - Mean energy binned along;
 #     * Radius from shower axis
 #     * layer
@@ -12,9 +12,9 @@
 #     * center of gravity in z (detector coords)
 #     * number of hits
 #     * energy sum
-#
+# 
 # Lining up these distributions with geant 4 shows good simulation behaviour.
-#
+# 
 # ## Start with imports and config
 
 import os
@@ -34,16 +34,16 @@ from pointcloud.evaluation.bin_standard_metrics import (
 
 config = Configs()
 # ## Histogramming
-#
+# 
 # BinnedData is a class that takes sets of points and accumulates them for each of the binnings we are intrested in.
 # This class, and related uitilites are in `pointclouds/evaluation/bin_standard_metrics.py`.
 # We have preped and generated data in this class using `scripts/create_standard_metrics.py`.
-#
+# 
 
 # ## Data as BinnedData
-#
+# 
 # For Geant 4, the accumulator and each of the models, load the generate binned data
-#
+# 
 # Geant 4 is our ground truth, so it gets special treatment.
 g4_name = "Geant 4"
 
@@ -67,26 +67,17 @@ def get_path_or_ref(config, name):
             save_path = ref_path
     return save_path
 
-
 g4_save_path_proj = "/data/dust/user/dayhallh/point-cloud-diffusion-logs/binned_metrics/Geant_4_p22_th90_ph90_en10-100_seed0_detectorProj.npz"
 
 binned_g4_proj = DetectorBinnedData.load(g4_save_path_proj)
 save_paths_proj = {
-    "CC2": glob.glob(
-        "/data/dust/user/dayhallh/point-cloud-diffusion-logs/binned_metrics/CaloClouds2-ShowerFlow_CC2_p22_th90_ph90_en10-100_seed*_detectorProj.npz"
-    ),
-    "CC3": glob.glob(
-        "/data/dust/user/dayhallh/point-cloud-diffusion-logs/binned_metrics/CaloClouds3-ShowerFlow_a1_fnorms_2_p22_th90_ph90_en10-100_seed*_detectorProj.npz"
-    ),
-    "CC2 noCoG": glob.glob(
-        "/data/dust/user/dayhallh/point-cloud-diffusion-logs/binned_metrics/CaloClouds2-ShowerFlow_CC2_p22_th90_ph90_en10-100_noCoGCalebration_seed*_detectorProj.npz"
-    ),
-    "CC3 noCoG": glob.glob(
-        "/data/dust/user/dayhallh/point-cloud-diffusion-logs/binned_metrics/CaloClouds3-ShowerFlow_a1_fnorms_2_p22_th90_ph90_en10-100_noCoGCalebration_seed*_detectorProj.npz"
-    ),
-    # "CC2 no factor": "/data/dust/user/dayhallh/point-cloud-diffusion-logs/binned_metrics/CaloClouds2-ShowerFlow_CC2_p22_th90_ph90_en10-100_noFactor_detectorProj.npz",
-    # "CC2 no factor, true Npts": "/data/dust/user/dayhallh/point-cloud-diffusion-logs/binned_metrics/CaloClouds2-ShowerFlow_CC2_p22_th90_ph90_en10-100_noFactor_detectorProj_trueNPts.npz",
-    # "CC3 no factor": "/data/dust/user/dayhallh/point-cloud-diffusion-logs/binned_metrics/CaloClouds3-ShowerFlow_a1_fnorms_2_p22_th90_ph90_en10-100_noFactor_detectorProj.npz",
+    "CC2": glob.glob("/data/dust/user/dayhallh/point-cloud-diffusion-logs/binned_metrics/CaloClouds2-ShowerFlow_CC2_p22_th90_ph90_en10-100_seed*_detectorProj.npz"),
+    "CC3": glob.glob("/data/dust/user/dayhallh/point-cloud-diffusion-logs/binned_metrics/CaloClouds3-ShowerFlow_a1_fnorms_2_p22_th90_ph90_en10-100_seed*_detectorProj.npz"),
+    "CC2 noCoG": glob.glob("/data/dust/user/dayhallh/point-cloud-diffusion-logs/binned_metrics/CaloClouds2-ShowerFlow_CC2_p22_th90_ph90_en10-100_noCoGCalebration_seed*_detectorProj.npz"),
+    "CC3 noCoG": glob.glob("/data/dust/user/dayhallh/point-cloud-diffusion-logs/binned_metrics/CaloClouds3-ShowerFlow_a1_fnorms_2_p22_th90_ph90_en10-100_noCoGCalebration_seed*_detectorProj.npz"),
+   #"CC2 no factor": "/data/dust/user/dayhallh/point-cloud-diffusion-logs/binned_metrics/CaloClouds2-ShowerFlow_CC2_p22_th90_ph90_en10-100_noFactor_detectorProj.npz",
+   # "CC2 no factor, true Npts": "/data/dust/user/dayhallh/point-cloud-diffusion-logs/binned_metrics/CaloClouds2-ShowerFlow_CC2_p22_th90_ph90_en10-100_noFactor_detectorProj_trueNPts.npz",
+    #"CC3 no factor": "/data/dust/user/dayhallh/point-cloud-diffusion-logs/binned_metrics/CaloClouds3-ShowerFlow_a1_fnorms_2_p22_th90_ph90_en10-100_noFactor_detectorProj.npz",
 }
 # model_names += [f"Wish-poly{poly_degree}" for poly_degree in range(1, 4)]
 config.logdir = "/data/dust/user/dayhallh/point-cloud-diffusion-logs/investigation"
@@ -101,22 +92,20 @@ for model_name, save_path in save_paths_proj.items():
             f"Can't load {model_name}, recreate with create_standard_metrics.py if required"
         )
         continue
-    # print(save_path)
+    #print(save_path)
     binned = BinnedErrors.load(save_path)
     to_compare_proj[model_name] = binned
 
 # to_compare["G4 angular"] = binned_g4_sim
 # For only some of the distributions, we can also get data from the StatsAccumulator to compare;
 # ## Plotting
-#
+# 
 # Now the samples have been generated, we can focus on histogramming them.
 # This may require some manual adjustment to cater for the ranges in which there are significant number of counts.
 from pointcloud.utils.plotting import plot_line_with_devation, plot_hist_with_devation
 
+def make_hist_plots(binned_g4=binned_g4_proj, to_compare=to_compare_proj, save_tag=None):
 
-def make_hist_plots(
-    binned_g4=binned_g4_proj, to_compare=to_compare_proj, save_tag=None
-):
     hist_idx_order = [0, 10, 7, 1, 11, 9, 2, 4, 8, 3, 5, 6]
 
     n_plts = len(hist_idx_order)
@@ -124,6 +113,7 @@ def make_hist_plots(
     height_ratios = [3, 1] * n_rows
 
     for semilogy in [False, True]:
+
         fig, ax_arr = plt.subplots(
             2 * n_rows,
             4,
@@ -140,6 +130,7 @@ def make_hist_plots(
         model_colours = [plt.cm.tab10(i / 10) for i in range(len(to_compare))]
 
         for i, hist_idx in enumerate(hist_idx_order):
+
             main_ax = ax_arr[2 * i]
             ratio_ax = ax_arr[2 * i + 1]
             ratio_ax.sharex(main_ax)
@@ -189,7 +180,7 @@ def make_hist_plots(
                 main_ax.set_xlim(0, 2200)
 
             xmin, xmax = main_ax.get_xlim()
-            ratio_ax.hlines([1], xmin, xmax, color="k", alpha=0.5)
+            ratio_ax.hlines([1], xmin, xmax, color='k', alpha=0.5)
 
             ratios = []
             # models
@@ -226,16 +217,10 @@ def make_hist_plots(
 
                 # and the ratio
                 ratio = model_weights / weights[:n_bins_here]
-                ratio_errors = model_error / model_weights
+                ratio_errors = model_error/model_weights
                 plot_line_with_devation(
-                    ratio_ax,
-                    colour,
-                    dummy_values_here,
-                    ratio,
-                    ratio_errors,
-                    label=model_name,
-                )
-                # ratio_ax.plot(dummy_values_here, ratio, c=colour, label=model_name)
+                    ratio_ax, colour, dummy_values_here, ratio, ratio_errors, label=model_name)
+                #ratio_ax.plot(dummy_values_here, ratio, c=colour, label=model_name)
                 ratios.append(ratio)
 
             all_ratios = np.concatenate(ratios)
@@ -266,18 +251,18 @@ def make_hist_plots(
                 bbox_inches="tight",
             )
 
-
 make_hist_plots(binned_g4_proj, to_compare_proj)
 # Now, CC2 and CC3 have different scale factors for matching the hits and energy deposited in cells to the true energy or hits.
-# reduced = {k:to_compare_proj[k] for k in ["CC2", "CC3"]}
+#reduced = {k:to_compare_proj[k] for k in ["CC2", "CC3"]}
 reduced = {}
-# reduced["Geant 4"] = to_compare_proj["Geant 4"]
+#reduced["Geant 4"] = to_compare_proj["Geant 4"]
 reduced["CC2"] = to_compare_proj["CC2 noCoG"]
 reduced["CC3"] = to_compare_proj["CC3 noCoG"]
 make_hist_plots(binned_g4_proj, reduced, save_tag="noCoG_withErr")
-# reduced = {k:to_compare_proj[k] for k in ["CC2", "CC3"]}
+#reduced = {k:to_compare_proj[k] for k in ["CC2", "CC3"]}
 reduced = {}
-# reduced["Geant 4"] = to_compare_proj["Geant 4"]
+#reduced["Geant 4"] = to_compare_proj["Geant 4"]
 reduced["CC2"] = to_compare_proj["CC2"]
 reduced["CC3"] = to_compare_proj["CC3 noCoG"]
 make_hist_plots(binned_g4_proj, reduced, save_tag="mixed_withErr")
+

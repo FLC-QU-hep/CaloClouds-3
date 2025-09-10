@@ -6,7 +6,7 @@ import os
 from pointcloud.evaluation.bin_standard_metrics import get_path
 
 from helpers.sample_models import write_fake_flow_model
-from helpers import config_creator
+from helpers import config_creator, example_paths
 
 from pointcloud.evaluation.bin_standard_metrics import (
     get_caloclouds_models,
@@ -17,7 +17,7 @@ from scripts.evaluation.create_standard_metrics import main
 
 def fake_models(config, tmpdir):
     # test model
-    test_cm_model_path = "test/example_cm_model.pt"
+    test_cm_model_path = example_paths.example_cm_model
     # fake the flow model
     test_model_path = str(tmpdir) + "/example_flow_model.pt"
     write_fake_flow_model(config, test_model_path)

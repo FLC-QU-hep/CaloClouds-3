@@ -5,12 +5,12 @@ import os
 import torch
 from pointcloud.models import load
 
-from helpers import config_creator
+from helpers import config_creator, example_paths
 from helpers.sample_models import write_fake_flow_model
 
 
 def test_load_flow_model_caloclouds(tmpdir):
-    config = config_creator.make("caloclouds_3", my_tmpdir=tmpdir)
+    config = config_creator.make("caloclouds_2", my_tmpdir=tmpdir)
     config.shower_flow_num_blocks = 10
     config.cond_features = 1
     config.cond_features_names = ["energy"]
@@ -59,14 +59,10 @@ def test_load_flow_model_caloclouds(tmpdir):
 
 def test_load_diffusion_model_calocloud():
     config = config_creator.make("caloclouds_3")
-    config.shower_flow_num_blocks = 10
-    config.cond_features = 2
-    config.cond_features_names = ["energy", "points"]
-    config.shower_flow_cond_features = ["energy"]
     # only testing the cm model, becuse the file is small and
     # can be kept in the test dir of the repo
     model_name = "cm"
-    test_model_path = "test/example_cm_model.pt"
+    test_model_path = example_paths.example_cm_model
     model, coef_real, coef_fake, n_splines = load.load_diffusion_model(
         config, model_name, model_path=test_model_path
     )
@@ -77,9 +73,9 @@ def test_load_diffusion_model_calocloud():
     # check the model can be sampled from
     batch_size = 5
     max_hits = 100
-    total_hits = torch.ones((batch_size, 1), device=config.device)
-    total_energy = torch.FloatTensor(batch_size, 1).uniform_(0, 1)
-    conditioning = torch.cat([total_hits, total_energy], -1)
+    energy = torch.FloatTensor(batch_size, 1).uniform_(0, 1)
+    directions = torch.FloatTensor(batch_size, 3).uniform_(-1, 1)
+    conditioning = torch.cat([energy, directions], -1)
 
     samples = model.sample(conditioning, max_hits, config)
     assert samples.shape == (batch_size, max_hits, 4)

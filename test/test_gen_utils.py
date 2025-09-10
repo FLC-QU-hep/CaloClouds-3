@@ -5,11 +5,12 @@ import numpy as np
 import torch
 from numpy import testing as npt
 from pointcloud.utils import gen_utils
+from pointcloud.data import conditioning
 
 from pointcloud.models.load import get_model_class, Diffusion, load_diffusion_model
 from pointcloud.models.shower_flow import compile_HybridTanH_model
 
-from helpers import config_creator
+from helpers import config_creator, example_paths
 
 
 def test_get_cog():
@@ -39,9 +40,9 @@ def test_cond_batcher():
     # don't choke on empty input
     for batch in gen_utils.cond_batcher(1, torch.ones(0)):
         pass
-    # sort the input
+    # we no longer sort
     data = torch.tensor([[3, 7], [1, 2], [5, 8], [4, 6]])
-    expected = np.array([[[1, 2], [4, 6]], [[3, 7], [5, 8]]])
+    expected = np.array([[[3, 7], [1, 2]], [[5, 8], [4, 6]]])
     for i, batch in enumerate(gen_utils.cond_batcher(2, data)):
         npt.assert_allclose(batch["diffusion"], expected[i])
 
@@ -73,22 +74,21 @@ class TestGenMethods:
 
         cls.config.append(config)
         cls.models.append((diff_model, distribution))
-        cls.model_names["diffusion"] = 1
+        cls.model_names["diffusion"] = 0
 
         # try with 2 cond features. Not in the list of models, because requires different input
-        config = config_creator.make()
-        config.cond_features = 2
-        config.shower_flow_cond_features = 2
+        config = config_creator.make("caloclouds_3")
 
+        cond_dim = conditioning.get_cond_dim(config, "showerflow")
         flow, distribution, transforms = compile_HybridTanH_model(
             num_blocks=config.shower_flow_num_blocks,
             num_inputs=65,
-            num_cond_inputs=config.shower_flow_cond_features,
+            num_cond_inputs=cond_dim,
             device=config.device,
         )
 
         diff_model, coef_real, coef_fake, n_splines = load_diffusion_model(
-            config, "cm", model_path="test/example_cm_model.pt"
+            config, "cm", model_path=example_paths.example_cm_model
         )
         cls.two_cond_flow = (diff_model, distribution)
 
@@ -98,7 +98,6 @@ class TestGenMethods:
         cls.models.clear()
 
     def test_model_classes(self):
-        assert isinstance(self.models[self.model_names["wish"]][0], Wish)
         assert isinstance(self.models[self.model_names["diffusion"]][0], Diffusion)
         assert isinstance(self.two_cond_flow[0], Diffusion)
 
@@ -139,17 +138,6 @@ class TestGenMethods:
             found = gen_utils.gen_cond_showers_batch(*models, cond, config=config)
             assert found.shape == (10, config.max_points, 4)
             assert np.all(found[:, :, 3] >= 0)
-
-    def test_gen_wish_inner_batch(self):
-        model = self.models[self.model_names["wish"]][0]
-        config = self.config[self.model_names["wish"]]
-        destination_array = np.zeros((10, config.max_points, 4))
-        cond = {"diffusion": (torch.arange(1, 3).reshape(-1, 1) * 10).float()}
-        first_index = 2
-        gen_utils.gen_wish_inner_batch(cond, destination_array, first_index, model)
-        assert np.all(destination_array[:2] == 0)
-        assert np.all(destination_array[4:] == 0)
-        assert np.all(destination_array[2:4, :, 3] >= 0)
 
     def test_gen_v1_inner_batch(self):
         model, shower_flow = self.models[self.model_names["diffusion"]]
