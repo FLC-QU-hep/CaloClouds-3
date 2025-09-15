@@ -58,26 +58,28 @@ class TestGenMethods:
         Make a list of models to test.
         """
         # make a caloclouds/showerflow model
-        config = config_creator.make()
-        config.cond_features = 1
-        config.shower_flow_cond_features = 1
+        config = config_creator.make("caloclouds_3")
+        cond_dim = conditioning.get_cond_dim(config, "showerflow")
 
         # fake the flow model
         flow, distribution, transforms = compile_HybridTanH_model(
             num_blocks=config.shower_flow_num_blocks,
-            num_inputs=65,
-            num_cond_inputs=config.shower_flow_cond_features,
+            num_inputs=60,
+            num_cond_inputs=cond_dim,
             device=config.device,
         )
+        diff_model, coef_real, coef_fake, n_splines = load_diffusion_model(
+            config, "cm", model_path=example_paths.example_cm_model
+        )
 
-        diff_model = get_model_class(config)(config)
 
         cls.config.append(config)
         cls.models.append((diff_model, distribution))
         cls.model_names["diffusion"] = 0
 
         # try with 2 cond features. Not in the list of models, because requires different input
-        config = config_creator.make("caloclouds_3")
+        config = config_creator.make("caloclouds_2")
+        config.cond_features_names = ["energy", "points"]
 
         cond_dim = conditioning.get_cond_dim(config, "showerflow")
         flow, distribution, transforms = compile_HybridTanH_model(
@@ -86,10 +88,8 @@ class TestGenMethods:
             num_cond_inputs=cond_dim,
             device=config.device,
         )
+        diff_model = get_model_class(config)(config)
 
-        diff_model, coef_real, coef_fake, n_splines = load_diffusion_model(
-            config, "cm", model_path=example_paths.example_cm_model
-        )
         cls.two_cond_flow = (diff_model, distribution)
 
     @classmethod
@@ -105,10 +105,11 @@ class TestGenMethods:
         num_points = 100
         bs = 1
         energy = 50
+        conditioning = [energy, 0, 0, 1]
         cond_N = 50
         model = self.models[self.model_names["diffusion"]][0]
         for bs in [0, 1, 2]:
-            found = gen_utils.get_shower(model, num_points, energy, bs=bs)
+            found = gen_utils.get_shower(model, num_points, conditioning, bs=bs)
             assert found.shape == (bs, num_points, 4)
             found = gen_utils.get_shower(
                 self.two_cond_flow[0], num_points, energy, cond_N, bs=bs
@@ -125,14 +126,16 @@ class TestGenMethods:
         # shoud work for all model/config pairs
         for config, models in zip(self.config, self.models):
             found, found_cond = gen_utils.gen_showers_batch(
-                *models, e_min, e_max, num, bs, config
+                *models, e_min, e_max, config, num=num, bs=bs
             )
             assert found.shape == (num, config.max_points, 4)
-            assert found_cond.shape == (num, 1)
+            assert found_cond.shape == (num, 4)
             assert (found[:, :, 3] >= 0).all()
 
     def test_gen_cond_showers_batch(self):
-        cond = (torch.arange(10).reshape(-1, 1) * 10).float()
+        cond_E = (torch.arange(10).reshape(-1, 1) * 10).float()
+        cond_dir = torch.tensor([[0, 0, 1]] * 10).float()
+        cond = torch.cat([cond_E, cond_dir], dim=1)
         # cond as a double
         for config, models in zip(self.config, self.models):
             found = gen_utils.gen_cond_showers_batch(*models, cond, config=config)
@@ -144,7 +147,7 @@ class TestGenMethods:
         config = self.config[self.model_names["diffusion"]]
         destination_array = np.zeros((10, config.max_points, 4))
         first_index = 2
-        cond = {"diffusion": (torch.arange(1, 3).reshape(-1, 1) * 10).float()}
+        cond = {"diffusion": (torch.tensor([[10, 0, 0, 1], [20, 0, 0.5, 0.5]]).float())}
         gen_utils.gen_v1_inner_batch(
             cond, destination_array, first_index, model, shower_flow, config
         )

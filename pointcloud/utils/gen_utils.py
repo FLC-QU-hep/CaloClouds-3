@@ -86,27 +86,49 @@ def get_scale_factor(
 # Consider changin how the cond_feats is passed in for
 # backward compatibility with older versions?
 # Maybe achived
-def get_shower(model, num_points, cond_feats, cond_N=None, bs=1, config=Configs()):
+def get_shower(model, num_points, cond_feats, cond_N=None, bs=None, config=Configs()):
     """
     Get a shower from the diffusion model.
+
+    Parameters
+    ----------
+    model : torch.nn.Module
+        The diffusion model.
+    num_points : int
+        The number of points per event to generate.
+    cond_feats : torch.Tensor, (0d, 1d or 2d)
+        The conditioning features.
+        If 0d or 1d, this is the same for all batches/events.
+        If 1d, each row is a different batch/event.
+    cond_N : torch.Tensor
+        The number of points in each event, if given
+        it is assumed to be an additional conditioning feature.
+    bs : int
+        The batch size, as in the number of events to generate.
+        Default 1.
+
+    Returns
+    -------
+    fake_shower : torch.Tensor (bs, num_points, 4)
+        The generated shower.
     """
-    try:
-        n_conds = len(cond_feats)
-    except TypeError:
-        cond_feats = torch.tensor([cond_feats] * bs).float().reshape(bs, 1)
-    else:
-        cond_feats = torch.atleast_2d(torch.tensor(cond_feats).float()).reshape(
-            n_conds, -1
-        )
-    if cond_N is not None:
-        try:
-            n_conds = len(cond_N)
-        except TypeError:
-            cond_N = torch.tensor([cond_N] * bs).float().reshape(bs, 1)
+    cond_feats = torch.tensor(cond_feats).float()
+    if len(cond_feats.shape) == 2:
+        if bs is None:
+            bs = cond_feats.shape[0]
         else:
-            cond_N = torch.atleast_2d(torch.tensor(cond_N).float()).reshape(n_conds, -1)
-        if len(cond_N.shape) == 1:
-            cond_N = cond_N[:, None]
+            assert bs == cond_feats.shape[0]
+    else:
+        if bs is None:
+            bs = 1
+        cond_feats = torch.tile(cond_feats, (bs, 1))
+        
+    if cond_N is not None:
+        cond_N = torch.tensor(cond_N).float()
+        if len(cond_N.shape) > 0:
+            assert cond_N.shape[0] == bs
+        else:
+            cond_N = torch.tile(cond_N, (bs, 1))
         cond_feats = torch.cat([cond_feats, cond_N], dim=1)
     fake_shower = model.sample(cond_feats, num_points, config)
     return fake_shower
@@ -131,8 +153,6 @@ def _shower_batch_arg_parser(*args, **kwargs):
         "e_max": None,
         "theta": 0.0,
         "phi": 0.0,
-        "num": 2000,
-        "bs": 32,
         "config": Configs(),
     }
     arg_positions = [
@@ -142,27 +162,35 @@ def _shower_batch_arg_parser(*args, **kwargs):
         "e_max",
         "theta",
         "phi",
-        "num",
-        "bs",
         "config",
     ]
+    kw_only_args = {
+            "num": 2000,
+            "bs": 32,
+        }
+
     config_pos = arg_positions.index("config")
     if "config" in kwargs:
         assert (
             len(args) <= config_pos
         ), "config given twice, once as positional, once as kwarg"
         config = kwargs["config"]
-    elif config_pos < len(args) + 1:
-        if config_pos < len(args) and is_config(args[config_pos]):
-            config = args[config_pos]
-        elif is_config(args[config_pos - 1]):
-            config = args[config_pos - 1]
-        else:
-            raise ValueError(
-                f"Expected a Configs object in position {config_pos} or {config_pos-1}"
-            )
     else:
-        config = Configs()
+        # actually just ignore the positioning and try and fish a config out
+        # of the args list anywhere
+        for i, arg in enumerate(args):
+            if is_config(arg):
+                config = arg
+                # put it where we found it
+                del arg_positions[config_pos]
+                arg_positions.insert(i, "config")
+                break
+        else:
+            if len(args) > config_pos:
+                raise ValueError(
+                    f"Expected a Configs object in position {config_pos}"
+                )
+            config = Configs()
 
     if config.model_name in ["wish", "fish"]:
         n_required_args -= 1
@@ -185,6 +213,11 @@ def _shower_batch_arg_parser(*args, **kwargs):
             arg_values[name] = kwargs.pop(name)
         else:
             assert i >= n_required_args, f"Argument {name} (position {i}) is required"
+    for arg in kw_only_args:
+        if arg in kwargs:
+            arg_values[arg] = kwargs.pop(arg)
+        else:
+            arg_values[arg] = kw_only_args[arg]
     assert not kwargs, f"Unknown arguments given: {kwargs.keys()}"
     # do some sanity checks
     assert arg_values.get("e_min", 1) >= 0, "e_min must be non-negative"
@@ -197,7 +230,18 @@ def _shower_batch_arg_parser(*args, **kwargs):
     assert arg_values["theta"] <= 360, "theta must be between -360 and 360"
     assert arg_values["phi"] >= -360, "phi must be between -360 and 360"
     assert arg_values["phi"] <= 360, "phi must be between -360 and 360"
-    return arg_values.values()
+    output = (
+        arg_values["model"],
+        arg_values["shower_flow"],
+        arg_values["e_min"],
+        arg_values["e_max"],
+        arg_values["theta"],
+        arg_values["phi"],
+        arg_values["num"],
+        arg_values["bs"],
+        arg_values["config"],
+    )
+    return output
 
 
 def get_direction(theta, phi):

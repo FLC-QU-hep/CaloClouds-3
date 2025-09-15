@@ -26,8 +26,6 @@ class Configs(default.Configs):
         self.shower_flow_version = "alt1"  # options: ['original', 'alt1', 'alt2']
         self.shower_flow_cond_features = ["energy", "p_norm_local"]
         self.shower_flow_inputs = [
-            "cog_x",
-            "cog_y",
             "clusters_per_layer",
             "energy_per_layer",
         ]
@@ -35,3 +33,5 @@ class Configs(default.Configs):
         self.shower_flow_fixed_input_norms = True
 
         self.process_kwargs(kwargs)
+
+        self.cog_calibration = False

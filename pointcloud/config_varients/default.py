@@ -62,6 +62,7 @@ class Configs:
         self.shower_flow_min_cond_energy = 0.0
         self.shower_flow_min_train_points = 0
         self.shower_flow_optimiser_on_nan = "best"
+        self.shower_flow_fixed_input_norms = False
         self.shower_flow_log_convert = False
 
         # Data
