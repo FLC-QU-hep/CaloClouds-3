@@ -50,10 +50,12 @@ def test_get_optimiser_schedular():
         config = config_creator.make(name)
         config.optimizer = optim
         config.latent_dim = latent_dim
-        config.cond_features = ["energy", "p_norm_local"]
-        model, _, _, _ = load.load_diffusion_model(
-            config, "cm", model_path=example_paths.example_cm_model
-        )
+        if latent_dim > 0:
+            model = load.get_model_class(config)(config)
+        else:
+            model, _, _, _ = load.load_diffusion_model(
+                config, "cm", model_path=example_paths.example_cm_model
+            )
         (
             optimiser,
             scheduler,
@@ -83,7 +85,7 @@ def test_get_optimiser_schedular():
 
 
 def test_get_pretrained():
-    for config_type in ["caloclouds_2"]:
+    for config_type in ["caloclouds_3"]:
         config = config_creator.make(config_type)
         model, _, _, _ = load.load_diffusion_model(
             config, "cm", model_path=example_paths.example_cm_model
