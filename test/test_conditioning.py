@@ -99,26 +99,26 @@ def test_get_cond_feats():
 
 
 def test_normalise_cond_feats():
-    config = config_creator.make()
-    config.cond_features = ["energy", "n_points", "p_norm_local"]
+    config = config_creator.make("caloclouds_3")
+    config.cond_features_names = ["energy", "n_points", "p_norm_local"]
     config.shower_flow_cond_features = ["energy", "points", "p_norm_local"]
     # no changes
     config.norm_cond = False
     original_cond = torch.arange(0, 15).reshape(3, 5).float()
     cond = original_cond.clone()
+    meta = Metadata(config)
     found = conditioning.normalise_cond_feats(config, cond, "diffusion")
     assert cond is found
     npt.assert_allclose(found, original_cond)
     # normalise diffusion
     config.norm_cond = True
     found = conditioning.normalise_cond_feats(config, cond, "diffusion")
-    npt.assert_allclose((original_cond[:, 0] / 100) * 2 - 1, found[:, 0])
+    npt.assert_allclose((original_cond[:, 0] / meta.incident_rescale), found[:, 0])
     npt.assert_allclose((original_cond[:, 1] / config.max_points) * 2 - 1, found[:, 1])
     npt.assert_allclose(original_cond[:, 2:], found[:, 2:])
     npt.assert_allclose(cond, original_cond)
     assert found is not cond
     # normalise showerflow
-    meta = Metadata(config)
     found = conditioning.normalise_cond_feats(config, cond, "showerflow")
     npt.assert_allclose((original_cond[:, 0] / meta.incident_rescale), found[:, 0])
     npt.assert_allclose((original_cond[:, 1] / config.max_points) * 2 - 1, found[:, 1])
@@ -463,4 +463,4 @@ def test_cond_dim_at_path():
     # might not hit all the forks
     model_path_1 = example_paths.example_cm_model
     found = conditioning.cond_dim_at_path(model_path_1, "diffusion")
-    assert found == 2
+    assert found == 4
