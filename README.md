@@ -1,7 +1,7 @@
 # CaloClouds 3
 
-### Thorsten Buss^1,2^, Henry~Day-Hall^2^, Frank Gaede^2^, Gregor Kasieczka^1^, Katja Krüger^2^, Anatolii Korol^2^, Thomas Madlener^2^, Peter McKeown^3^, Martina Mozzanica^1^, Lorenzo Valente^1^
-^1^DESY, ^2^University of Hamburg, ^3^CERN
+### Thorsten Buss<sup>1,2</sup>, Henry~Day-Hall<sup>2</sup>, Frank Gaede<sup>2</sup>, Gregor Kasieczka<sup>1</sup>, Katja Krüger<sup>2</sup>, Anatolii Korol<sup>2</sup>, Thomas Madlener<sup>2</sup>, Peter McKeown<sup>3</sup>, Martina Mozzanica<sup>1</sup>, Lorenzo Valente<sup>1</sup>
+<sup>1</sup>DESY, <sup>2</sup>University of Hamburg, <sup>3</sup>CERN
 
 This repository stands as a placeholder for the code of the CaloClouds 3 project,
 which will be released as soon as the paper is out of review.
