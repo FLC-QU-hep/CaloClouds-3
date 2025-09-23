@@ -404,21 +404,21 @@ class BinnedData:
         """
         rescaled = np.copy(events)
         rescaled[:, :, 3] /= self.energy_scale
-        if False:  # TODO: fix
-            for dim in range(3):
-                # for dim in [0, 2]:  # skip the y rescale
-                raw = events[:, :, dim]
-                unit = (raw - self.xyz_limits[dim][0]) / (
-                    self.xyz_limits[dim][1] - self.xyz_limits[dim][0]
-                )
-                # assert np.all(unit <= 1.), \
-                # f"Dim {dim}, limits {self.xyz_limits[dim]}, "\
-                # f"Raw min {np.min(raw)}, max {np.max(raw)}, unit {unit}"
-                # Models can generate data outside of the range
-                rescaled[:, :, dim] = (
-                    unit * (self.true_xyz_limits[dim][1] - self.true_xyz_limits[dim][0])
-                    + self.true_xyz_limits[dim][0]
-                )
+        # TODO recheck - this currently doesn't provide the right scaling
+        for dim in range(3):
+            # for dim in [0, 2]:  # skip the y rescale
+            raw = events[:, :, dim]
+            unit = (raw - self.xyz_limits[dim][0]) / (
+                self.xyz_limits[dim][1] - self.xyz_limits[dim][0]
+            )
+            # assert np.all(unit <= 1.), \
+            # f"Dim {dim}, limits {self.xyz_limits[dim]}, "\
+            # f"Raw min {np.min(raw)}, max {np.max(raw)}, unit {unit}"
+            # Models can generate data outside of the range
+            rescaled[:, :, dim] = (
+                unit * (self.true_xyz_limits[dim][1] - self.true_xyz_limits[dim][0])
+                + self.true_xyz_limits[dim][0]
+            )
         return rescaled
 
     def add_events(self, events):
@@ -552,7 +552,7 @@ class BinnedData:
         if "mean" in self.y_labels[idx].lower():
             return self.counts[idx]
         counts = self.counts[idx]
-        hist_idx = self.hist_idx("number of showers", "number of hits")
+        hist_idx = self.hist_idx("number of showers", "number of clusters")
         total_showers = np.sum(self.counts[hist_idx])
         return counts / total_showers
 
@@ -1189,7 +1189,6 @@ def get_caloclouds_models(
             print(calocloud_path)
             model.load_state_dict(
                 torch.load(calocloud_path, map_location=device, weights_only=False)[
-                    #  "state_dict"  # < No should be ema
                     "others"
                 ]["model_ema"]
             )

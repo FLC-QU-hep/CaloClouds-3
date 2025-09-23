@@ -5,7 +5,7 @@ from pointcloud.utils import metadata
 
 
 def mock_get_n_events(path, n_files):
-    return [3]
+    return [2]
 
 
 def mock_read_raw_regaxes(config, idxs):

@@ -19,13 +19,16 @@ from pointcloud.evaluation.bin_standard_metrics import (
     get_path,
     get_caloclouds_models,
 )
+from pointcloud.utils.metadata import Metadata
 
 
-def make_default_binned(xyz_limits=None):
+def make_default_binned(xyz_limits=None, energy_scale=1):
     if xyz_limits is None:
         xyz_limits = [[-1, 1], [-1, 1], [-1, 1]]
     layer_bottom_pos = np.linspace(*xyz_limits[2], 30)
-    binned = BinnedData("test", xyz_limits, 10, layer_bottom_pos, 0.05, [0.0, 0.0])
+    binned = BinnedData(
+        "test", xyz_limits, energy_scale, layer_bottom_pos, 0.05, [0.0, 0.0]
+    )
     return binned
 
 
@@ -49,15 +52,15 @@ def test_BinnedData(tmpdir):
     # test init
     binned = make_default_binned()
     expected_hists = [
-        ["sum hits", "radius [mm]"],
+        ["sum clusters", "radius [mm]"],
         ["sum energy [MeV]", "radius [mm]"],
-        ["sum hits", "layers"],
+        ["sum clusters", "layers"],
         ["sum energy [MeV]", "layers"],
-        ["number of cells", "visible cell energy [MeV]"],
-        ["number of showers", "number of hits"],
+        ["number of clusters", "cluster energy [MeV]"],
+        ["number of showers", "number of clusters"],
         ["number of showers", "energy sum [MeV]"],
         ["number of showers", "center of gravity X [mm]"],
-        ["number of showers", "center of gravity Z [mm]"],
+        ["number of showers", "center of gravity Z [layer]"],
         ["number of showers", "center of gravity Y [mm]"],
         ["mean energy [MeV]", "radius [mm]"],
         ["mean energy [MeV]", "layers"],
@@ -93,7 +96,7 @@ def test_BinnedData(tmpdir):
     assert np.sum(binned.counts[hits_vs_radius]) == 2
     assert np.sum(binned.counts[hits_vs_radius] > 0) == 1
     energy_vs_radius = binned.hist_idx(*expected_hists[1])
-    assert np.sum(binned.counts[energy_vs_radius]) == 2 / 10
+    assert np.sum(binned.counts[energy_vs_radius]) == 2
     assert np.sum(binned.counts[energy_vs_radius] > 0) == 1
     hits_vs_layers = binned.hist_idx(*expected_hists[2])
     hist = binned.counts[hits_vs_layers]
@@ -103,7 +106,7 @@ def test_BinnedData(tmpdir):
     assert np.all(hist[center + 1 :] == 0)
     energy_vs_layers = binned.hist_idx(*expected_hists[3])
     hist = binned.counts[energy_vs_layers]
-    assert hist[center] == 2 / 10
+    assert hist[center] == 2
     assert np.all(hist[:center] == 0)
     assert np.all(hist[center + 1 :] == 0)
     # for all the rest, just check exactly one bin got 2 counts
@@ -121,7 +124,7 @@ def test_BinnedData(tmpdir):
         i += len(expected_hists) - 2
         energy_vs_radius = binned.hist_idx(*expected_hists[i])
         hist = binned.counts[energy_vs_radius]
-        assert np.sum(hist) == 1 / 10
+        assert np.sum(hist) == 1
         assert np.sum(hist > 0) == 1
     # test total_showers
     assert binned.total_showers() == 2
@@ -138,6 +141,7 @@ def test_BinnedData(tmpdir):
     fake_events[0, :, 2] = np.linspace(-1, 1, 10)
     fake_events[0, :, 3] = np.linspace(0, 1, 10)
     rescaled = binned.rescaled_events(fake_events)
+    # TODO unexpected
     npt.assert_allclose(
         rescaled[0, :, 0],
         np.linspace(binned.true_xyz_limits[0][0], binned.true_xyz_limits[0][1], 10),
@@ -148,7 +152,7 @@ def test_BinnedData(tmpdir):
         rescaled[0, :, 2],
         np.linspace(binned.true_xyz_limits[2][0], binned.true_xyz_limits[2][1], 10),
     )
-    npt.assert_allclose(rescaled[0, :, 3], np.linspace(0, 0.1, 10))
+    npt.assert_allclose(rescaled[0, :, 3], np.linspace(0, 1, 10))
     # test normed - just try one
     unnormed = binned.counts[0]
     normed = binned.normed(0)
@@ -189,17 +193,22 @@ def test_sample_g4():
 def test_sample_model(tmpdir):
     # test model
     cfg = config_creator.make("caloclouds_3")
-    cfg.cond_features = 2
-    cfg.cond_features_names = ["energy", "points"]
-    cfg.shower_flow_cond_features = ["energy"]
+    meta = Metadata(cfg)
     test_cm_model_path = example_paths.example_cm_model
     # fake the flow model
     test_model_path = str(tmpdir) + "/example_flow_model.pt"
     write_fake_flow_model(cfg, test_model_path)
     models = get_caloclouds_models(test_cm_model_path, test_model_path, config=cfg)
-    model, flow_dist, config = models["CaloClouds"][0]
+    model, flow_dist, config = models["CaloClouds3"]
 
-    binned = make_default_binned([[-100, 100], [-100, 100], [-100, 100]])
+    binned = make_default_binned(
+        [
+            [-100, 100],
+            [-100, 100],
+            [meta.layer_bottom_pos_global[0], meta.layer_bottom_pos_global[-1] + 10],
+        ],
+        energy_scale=10,
+    )
     # sample no events
     sample_model(config, binned, 0, model, flow_dist)
     for counts in binned.counts:
@@ -226,8 +235,6 @@ def test_get_path(tmpdir):
 def test_get_caloclouds_models(tmpdir):
     # Need to get the right paths
     cfg = config_creator.make("caloclouds_3")
-    cfg.cond_features = 2
-    cfg.cond_features_names = ["energy", "points"]
     cfg.shower_flow_cond_features = ["energy"]
     test_cm_model_path = example_paths.example_cm_model
     # fake the flow model

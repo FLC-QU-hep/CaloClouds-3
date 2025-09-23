@@ -342,10 +342,11 @@ def read_raw_regaxes(config, pick_events=None, total_size=None, per_event_cols=N
         per_event_cols = ["energy"]
     if not hasattr(config, "n_dataset_files"):
         config.n_dataset_files = 0
+    #import ipdb
+    #ipdb.set_trace()
     n_events = get_n_events(config.dataset_path, config.n_dataset_files)
     n_total_events = np.sum(n_events)
-    if total_size is None:
-        total_size = min(100, n_total_events)
+    total_size = min(100 if total_size is None else total_size, n_total_events)
     if pick_events is None:
         if total_size == 0:
             return np.zeros(0), np.zeros(0)
