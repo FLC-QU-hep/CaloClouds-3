@@ -2,6 +2,7 @@
 Unit test for the script create_standard_metrics.py
 """
 import os
+import numpy as np
 
 from pointcloud.evaluation.bin_standard_metrics import get_path
 
@@ -12,7 +13,7 @@ from pointcloud.evaluation.bin_standard_metrics import (
     get_caloclouds_models,
 )
 
-from scripts.evaluation.create_standard_metrics import main
+from scripts.evaluation.create_standard_metrics import main, get_configs
 
 
 def fake_models(config, tmpdir):
@@ -22,23 +23,29 @@ def fake_models(config, tmpdir):
     test_model_path = str(tmpdir) + "/example_flow_model.pt"
     write_fake_flow_model(config, test_model_path)
     models = get_caloclouds_models(test_cm_model_path, test_model_path, config=config)
-    model, flow_dist, config = models["CaloClouds"][0]
+    model, flow_dist, config = models["CaloClouds3"]
     return models
 
 
 def test_main(tmpdir):
     config = config_creator.make("caloclouds_3")
-    config.cond_features = 2
-    config.cond_features_names = ["energy", "points"]
-    config.shower_flow_cond_features = ["energy"]
-    config.log_dir = tmpdir
+    config.logdir = tmpdir
+
+    g4_gun = np.array([40, 50, 0])
+    cc3_model_gun = cc2_model_gun = g4_gun
+    cc2_model_gun[2] -= 0.1
+    cc2_model_gun[0] += 0.2
+    guns = [g4_gun, cc2_model_gun, cc3_model_gun]
 
     models = fake_models(config, tmpdir)
 
     main(
-        config=config,
+        config,
+        guns,
+        False,
+        True,
+        True,
         redo_g4_data=False,
-        redo_g4_acc_data=False,
         redo_model_data=False,
         max_g4_events=10,
         max_model_events=0,
@@ -46,9 +53,7 @@ def test_main(tmpdir):
     )
 
     # check things actually got saved
-    expected_path = get_path(config, "fake model")
+    expected_path = get_path(config, "CaloClouds3")
     assert os.path.exists(expected_path)
     expected_path = get_path(config, "Geant 4")
-    assert os.path.exists(expected_path)
-    expected_path = get_path(config, "Geant 4 Accumulator")
     assert os.path.exists(expected_path)

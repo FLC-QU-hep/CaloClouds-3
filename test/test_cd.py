@@ -9,5 +9,5 @@ from helpers import config_creator
 @pytest.mark.filterwarnings("ignore::UserWarning")
 def test_main(tmpdir):
     # set a test config
-    cfg = config_creator.make("default", my_tmpdir=tmpdir)
+    cfg = config_creator.make("caloclouds_3", my_tmpdir=tmpdir)
     main(cfg)

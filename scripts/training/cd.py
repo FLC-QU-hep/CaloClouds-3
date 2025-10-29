@@ -11,15 +11,13 @@ from pointcloud.models.diffusion import Diffusion
 from configs import Configs
 
 
-def main():
-    config = Configs()
+def main(config=Configs()):
     misc.seed_all(seed=config.seed)
     start_time = time.localtime()
 
-    with open("comet_api_key.txt", "r") as file:
-        key = file.read()
-
     if config.log_comet:
+        with open("comet_api_key.txt", "r") as file:
+            key = file.read()
         experiment = Experiment(
             project_name=config.comet_project,
             auto_metric_logging=False,
@@ -42,7 +40,7 @@ def main():
     ckpt_mgr = misc.CheckpointManager(log_dir)
 
     train_dset = dataset.PointCloudAngular(
-        files_path=config.dataset_path, bs=config.train_bs
+        file_path=config.dataset_path, bs=config.train_bs
     )
     dataloader = DataLoader(
         train_dset, batch_size=1, num_workers=config.workers, shuffle=config.shuffle
@@ -54,7 +52,10 @@ def main():
     model_teacher = Diffusion(config, distillation=False).to(config.device)
 
     # load model
-    checkpoint = torch.load(config.logdir + "/" + config.model_path)
+    checkpoint = torch.load(
+        config.logdir + "/" + config.model_path,
+        map_location=torch.device(config.device),
+    )
     if config.use_ema_trainer:
         model.load_state_dict(checkpoint["others"]["model_ema"])
         model_ema_target.load_state_dict(checkpoint["others"]["model_ema"])

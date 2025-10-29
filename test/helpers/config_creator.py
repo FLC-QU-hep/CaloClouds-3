@@ -30,7 +30,7 @@ def make(module_name="default", start_from=None, my_tmpdir=None):
         os.makedirs(config.logdir, exist_ok=True)
         config.logdir_uda = os.path.join(my_tmpdir, "logs_uda")
         os.makedirs(config.logdir_uda, exist_ok=True)
-        model_path = example_paths.mini_ckpt_sample
+        model_path = example_paths.example_cm_model
         # actually put the model in the logdir
         shutil.copy(model_path, config.logdir)
         # and in the uda logdir
