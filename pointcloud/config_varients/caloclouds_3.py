@@ -12,7 +12,7 @@ class Configs(default.Configs):
         self.storage_base = "/data/dust/user/"
         self._dataset_path = "akorol/data/AngularShowers_RegularDetector/hdf5_for_CC/sim-E1261AT600AP180-180_file_{}slcio.hdf5"
         self.n_dataset_files = 88
-        self.Acomment = "Running on the sim-E1261AT600AP180 dataset, first 10 files"
+        self.Acomment = "Running on the sim-E1261AT600AP180 dataset, first 88 files"
         self._logdir = "dayhallh/point-cloud-diffusion-logs"
 
         self.workers = 5
