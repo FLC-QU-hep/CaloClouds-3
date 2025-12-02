@@ -16,7 +16,8 @@ import os
 import sys
 import time
 
-from pointcloud.config_varients import caloclouds_2, caloclouds_3, test_run
+from pointcloud.config_varients import caloclouds_2, caloclouds_3, example
+from pointcloud import configs as default_configs
 from pointcloud.data.read_write import get_n_events
 from pointcloud.data.conditioning import get_cond_dim
 from pointcloud.utils import showerflow_training, showerflow_utils
@@ -730,13 +731,17 @@ if __name__ == "__main__":
     chosen = None
     if len(sys.argv) > 1:
         chosen = sys.argv[1].strip()
+    else:
+        chosen = "default"
 
     config_choices = {
         "caloclouds_2": caloclouds_2,
         "caloclouds_3": caloclouds_3,
-        "test_run": test_run,
+        "example": example,
+        "default": default_configs,
     }
-    while chosen not in config_choices:
+
+    if chosen not in config_choices:
         chosen = input(f"Choose a version from {list(config_choices.keys())}:")
         if chosen not in config_choices:
             print("Invalid choice")

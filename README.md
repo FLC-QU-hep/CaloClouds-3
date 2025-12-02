@@ -107,11 +107,13 @@ Then, if you are training the CaloClouds model family, you need to train two (or
 and also the Shower Flow model.
 The teacher model is trained using [`scripts/training/diffusion.py`](./scripts/training/diffusion.py), and the student model is trained with [`scripts/training/cd.py`](./scripts/training/cd.py).
 It should be called as a script, like; `python3 script/training/diffusion.py`.
+First train the teacher model with `python3 scripts/training/diffusion.py`,
+then add the location of the created teacher model to your configs file,
+then train the student model with `python3 scripts/training/cd.py`.
 Both of them will use the configs that are softlinked at `pointcloud/configs.py`, so be sure they have the right file paths.
 
-The Shower Flow (to predict energy and hist per layer) is trained via the script [`scripts/ShowerFlow.py`](./scripts/ShowerFlow.py).
-If you like jupyter notebooks, you can also use [`scripts/ShowerFlow.ipynb`](./scripts/ShowerFlow.ipynb), which does basically the same thing
-(however, if the notebook doesn't work, look at the script, because the script is in the unit tests, whereas the notebook is not).
+
+The Shower Flow (to predict energy and hist per layer) is trained via the script [`scripts/training/ShowerFlow.py`](./scripts/training/ShowerFlow.py).
 
 The polynomial fits for the occupancy calculations are performed in [`scripts/occupancy_scale.ipynb`](./scripts/occupancy_scale.ipynb).
 
