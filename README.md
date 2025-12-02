@@ -1,5 +1,5 @@
-[![pipeline status](https://gitlab.desy.de/ftx-sft/generative/point-cloud-diffusion/badges/main/pipeline.svg?ignore_skipped=true)](https://gitlab.desy.de/ftx-sft/generative/point-cloud-diffusion/-/commits/main) 
-[![coverage](https://gitlab.desy.de/ftx-sft/generative/point-cloud-diffusion/badges/main/coverage.svg)](https://gitlab.desy.de/ftx-sft/generative/point-cloud-diffusion/-/commits/main) 
+[![Run python tests](https://github.com/FLC-QU-hep/CaloClouds-3/actions/workflows/ci.yml/badge.svg)](https://github.com/FLC-QU-hep/CaloClouds-3/actions/workflows/ci.yml)
+[![cov](https://FLC-QU-hep.github.io/CaloClouds-3/badges/coverage.svg)](https://github.com/FLC-QU-hep/CaloClouds-3/actions)
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 
 

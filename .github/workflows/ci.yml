@@ -30,3 +30,6 @@ jobs:
                   coverage run -m pytest test/test*py
                   coverage xml -i
                   coverage report -i
+            - name: Update Coverage Badge
+              if: github.ref == 'refs/heads/main'
+              uses: we-cli/coverage-badge-action@main
