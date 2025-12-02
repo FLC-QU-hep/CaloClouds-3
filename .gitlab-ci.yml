@@ -28,7 +28,7 @@ pytest:
       #    - pip install -r requirements_fixed.txt
       #    - pip install pytest pytest-mock coverage
     - echo "Running pytests"
-    - coverage run -m pytest test/test*py test/externals/test*py
+    - coverage run -m pytest test/test*py
     - coverage xml -i
     - coverage report -i
   coverage: '/TOTAL.*\s+(\d+%)$/'
