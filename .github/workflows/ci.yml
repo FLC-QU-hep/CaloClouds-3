@@ -20,9 +20,13 @@ jobs:
             - name: Install dependancies
               run: |
                   python -m pip install --upgrade pip
-                  pip install -r requirements.txt
-                  pip install pytest
+                  pip install setuptools==69.0.3
+                  pip install -r requirements_fixed.txt
+                  pip install pytest pytest-mock coverage
             - name: Get submodules
               run: git submodule update --init --recursive
             - name: Run tests with pytest
-              run: pytest test/
+              run: |
+                  coverage run -m pytest test/test*py
+                  coverage xml -i
+                  coverage report -i
