@@ -16,7 +16,7 @@ jobs:
         container:
             image: ghcr.io/flc-qu-hep/container_caloclouds-3:latest
         steps:
-            - uses: actions/checkout@v3
+            - uses: actions/checkout@v5
             - name: Get submodules
               run: git submodule update --init --recursive
             - name: Run tests with pytest
