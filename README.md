@@ -92,6 +92,7 @@ Commonly changed settings are stored in a `Configs` object.
 Most notably, file paths to data and models are in the `Configs` object.
 So a good strategy would be to start out using the default configs, then when you get file-path related errors,
 make your own configs with the right file paths for your machine.
+These will also include the paths that determine the write locations for models that are created.
 Configs are stored in [`pointcloud/config_varients/`](./pointcloud/config_varients/), and the default choice is determined by what the soft link `pointcloud/configs.py` is pointing to.
 
 To make your own config;
@@ -115,17 +116,17 @@ Both of them will use the configs that are softlinked at `pointcloud/configs.py`
 
 The Shower Flow (to predict energy and hist per layer) is trained via the script [`scripts/training/ShowerFlow.py`](./scripts/training/ShowerFlow.py).
 
-The polynomial fits for the occupancy calculations are performed in [`scripts/occupancy_scale.ipynb`](./scripts/occupancy_scale.ipynb).
+The polynomial fits for the occupancy calculations are performed in [`scripts/training/calcluate_coef.ipynb`](./scripts/training/calcluate_coef.ipynb); or you can do calculations manually on the models produced.
 
-An outline of the sampling process for both CaloClouds II and CaloClouds II (CM) can be found in [`pointcloud/evaluation/generate.py`](./pointcloud/evaluation/generate.py).
+An outline of the sampling process for CaloClouds 3 can be found in [`scripts/generate.py`](./scripts/generate.py).
 
 ---
 
 The training dataset is available under the link: https://syncandshare.desy.de/index.php/s/XfDwx33ryERwPdi
 
-But if you are connected to `beegfs` you can also find the relevant goodies in Anatolii's directories.
+But if you are connected to `/data/dust` at DESY you can also find the relevant goodies in the `ilc`'s group directories;
 For example;
-`/beegfs/desy/user/akorol/data/calo-clouds/hdf5/high_granular_grid/train/10-90GeV_x36_grid_regular_524k_float32.hdf5`
+`/data/dust/group/ilc/sft-ml/datasets/sim-E1261AT600AP180-180/`
 
 Also, if you would be interested in generating some data, useful code can be found at [`gitlab.desy.de/ftx-sft/generative/data_production`](https://gitlab.desy.de/ftx-sft/generative/data_production).
 
@@ -134,9 +135,9 @@ Also, if you would be interested in generating some data, useful code can be fou
 ### Evaluating models
 
 There are tools for quickly generating some standard metrics for comparing model performance.
-The functions and classes in [`pointcloud/evaluation/bin_standard_metrics.py`](./pointcloud/evaluation/bin_standard_metrics.py) work with the script [`scripts/create_standard_metrics.py`](./scripts/create_standard_metrics.py) to generate and save some kinematic bins for standard variables,
+The functions and classes in [`pointcloud/evaluation/bin_standard_metrics.py`](./pointcloud/evaluation/bin_standard_metrics.py) work with the script [`scripts/evaluation/create_standard_metrics.py`](./scripts/evaluation/create_standard_metrics.py) to generate and save some kinematic bins for standard variables,
 which are saved as `.npz` in the log directory (as specified by the configs).
-So to make pretty plots, first check your model is in (see below) [`scripts/create_standard_metrics.py`](./scripts/create_standard_metrics.py) and run it.
+So to make pretty plots, first check your model is in (see below) [`scripts/evaluation/create_standard_metrics.py`](./scripts/evaluation/create_standard_metrics.py) and run it.
 Then use [`scripts/plotting/standard_metrics.ipynb`](scripts/plotting/standard_metrics.ipynb) to visualise the performance of the model.
 [`scripts/plotting/standard_metrics.ipynb`](./scripts/plotting/standard_metrics.ipynb) also has some reference values for comparison.
 
@@ -144,44 +145,14 @@ If you have a new model, and it has been trained for the ILD detector, it would 
 
 1. Ensure that the `gen_condE_showers_batch` function in [`pointcloud/utils/gen_utils.py`](./pointcloud/utils/gen_utils.py) can correctly generate data for your model. This is what will sample your model. Potentially adding a new `inner_batch_func`.
 2. Add a function to [`pointcloud/evaluation/bin_standard_metrics.py`](./pointcloud/evaluation/bin_standard_metrics.py) in the same format as the `get_caloclouds_models` or `get_wish_models` functions. This is where your model is loaded.
-3. In [`scripts/create_standard_metrics.py`](./scripts/create_standard_metrics.py) import and call your model creation function and add the new entries to the `models` dict.
+3. In [`scripts/evaluation/create_standard_metrics.py`](./scripts/evaluation/create_standard_metrics.py) import and call your model creation function and add the new entries to the `models` dict.
 4. In [`scripts/plotting/standard_metrics.ipynb`](./scripts/plotting/standard_metrics.ipynb) add your model name to the `model_names` list, so that it is picked up in the plots.
-5. Rerun [`scripts/create_standard_metrics.py`](./scripts/create_standard_metrics.py) and [`scripts/plotting/standard_metrics.ipynb`](./scripts/plotting/standard_metrics.ipynb).
+5. Rerun [`scripts/evaluation/create_standard_metrics.py`](./scripts/evaluation/create_standard_metrics.py) and [`scripts/plotting/standard_metrics.ipynb`](./scripts/plotting/standard_metrics.ipynb).
 
 Done.
 
-The timing of the models is benchmarked with [`scripts/timing.py`](./scripts/timing.py), also called as a script.
+The timing of the models is benchmarked with [`scripts/evaluation/timing.py`](./scripts/evaluation/timing.py), also called as a script.
 
----
-
-### Information on Wish
-
-One model in this dataset is a classical statistics model; the "wish" model.
-It lives in [`pointcloud/models/wish.py`](./pointcloud/models/wish.py).
-While it is possible to "train" this model (the parameters all have gradient), it's also possible to just set it using
-statistics accumulated from the whole dataset.
-
-The simplest possible way to do this is;
-```python
-# import an apropreate config
-from pointcloud.config_varients.wish import Configs
-configs = Configs()
-configs.dataset_path  # check that the configs points to your dataset, etc.
-
-from pointcloud.models.wish import accumulate_and_load_wish, load_wish_from_accumulator
-wish_model, accumulated_data = accumulate_and_load_wish(configs)
-
-wish_model.save("path/to/save/model.pt")
-# we don't have to save the accumulated_data, but it can be used
-# to make another wish model without reaccumulating if needed
-accumulated_data.save("path/to/save/accumulated.h5")
-
-# change some model hyperparameters
-configs.poly_degree = 5
-configs.fit_attempts = 50
-new_model = load_wish_from_accumulator("path/to/save/accumulated.h5", configs)
-```
----
 
 ## Code references
 
@@ -190,4 +161,3 @@ new_model = load_wish_from_accumulator("path/to/save/accumulated.h5", configs)
 - The consistency distillation is based on: https://github.com/openai/consistency_models/
 - The PointWise Net is adapted from: https://github.com/luost26/diffusion-point-cloud
 - Code base for our CaloClouds (1) model: https://github.com/FLC-QU-hep/CaloClouds
-- Code used for lazy operations on h5py arrays is from: https://github.com/catalystneuro/lazy_ops It is not installed from a repository because a bug fix was needed, and the maintainer cannot be reached. For simplicities sake, the relevant patched file is in `pointcloud/externals/lazy_ops` along with the licence file for the code. (This is currently not in use, and may be removed from future releases.)
