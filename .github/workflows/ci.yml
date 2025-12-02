@@ -12,7 +12,7 @@ jobs:
     build:
         runs-on: ubuntu-latest
         container:
-            image: ghcr.io/flc-qu-hep/container_caloclouds-3
+            image: ghcr.io/flc-qu-hep/container_caloclouds-3:latest
         steps:
             - uses: actions/checkout@v3
             - name: Get submodules
