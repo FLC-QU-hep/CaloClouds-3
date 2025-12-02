@@ -164,4 +164,3 @@ The timing of the models is benchmarked with [`scripts/evaluation/timing.py`](./
 - The consistency distillation is based on: https://github.com/openai/consistency_models/
 - The PointWise Net is adapted from: https://github.com/luost26/diffusion-point-cloud
 - Code base for our CaloClouds (1) model: https://github.com/FLC-QU-hep/CaloClouds
->>>>>>> cc3_clean
