@@ -11,6 +11,8 @@ on:
 jobs:
     build:
         runs-on: ubuntu-latest
+        permissions:
+            packages: read
         container:
             image: ghcr.io/flc-qu-hep/container_caloclouds-3:latest
         steps:
