@@ -7,6 +7,7 @@ from torch.nn.utils import clip_grad_norm_
 
 import k_diffusion
 import time
+import importlib
 
 from pointcloud.utils.misc import seed_all
 from pointcloud.utils.training import (
@@ -18,10 +19,6 @@ from pointcloud.utils.training import (
     get_pretrained,
 )
 from pointcloud.data.conditioning import get_cond_feats, normalise_cond_feats
-from pointcloud.config_varients import (
-    caloclouds_2,
-    caloclouds_3,
-)
 from pointcloud.configs import Configs
 
 from pointcloud.models.load import get_model_class
@@ -232,17 +229,21 @@ if __name__ == "__main__":
     if len(sys.argv) > 1:
         chosen = sys.argv[1].strip()
 
-    config_choices = {
-        "caloclouds_2": caloclouds_2,
-        "caloclouds_3": caloclouds_3,
-    }
-    while chosen not in config_choices:
-        chosen = input(f"Choose a version from {list(config_choices.keys())}:")
-        if chosen not in config_choices:
-            print("Invalid choice")
+    try:
+        chosen = importlib.import_module("pointcloud.config_varients." + chosen)
+    except ModuleNotFoundError:
+        chosen = False
+        
+
+    while not chosen:
+        chosen = input("Choose a version from the modules in `pointcloud/config_varients`:")
+        try:
+            chosen = importlib.import_module("pointcloud.config_varients." + chosen)
+        except ModuleNotFoundError:
+            chosen = False
 
     config_kwargs = {
         a.split("=")[0].strip(): a.split("=")[1].strip() for a in sys.argv[2:]
     }
-    config = config_choices[chosen].Configs(**config_kwargs)
+    config = chosen.Configs(**config_kwargs)
     main(config)

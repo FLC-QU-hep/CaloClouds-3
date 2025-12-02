@@ -150,10 +150,13 @@ class Diffusion(Module):
             z = torch.cat([z, cond_feats], -1)
         else:
             z = cond_feats
-        # loss_diffusion = self.diffusion.get_loss(x, z)    # diffusion loss
-        data_mask = (
-            x[..., 3] > 1e-5
-        )  # anything with very small energy is considered padding
+
+        data_mask = None
+        if not self.args.logarithmic_point_energy:
+            # loss_diffusion = self.diffusion.get_loss(x, z)    # diffusion loss
+            data_mask = (
+                x[..., 3] > 1e-5
+            )  # anything with very small energy is considered padding
 
         loss_diffusion = self.diffusion.loss(
             x, noise, sigma, context=z, input_mask=data_mask

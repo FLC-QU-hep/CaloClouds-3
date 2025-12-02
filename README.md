@@ -3,13 +3,26 @@
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 
 
-# Rolling implementation of CaloClouds and friends
+# CaloClouds3 
 
-Spawned the CaloClouds model published in ([arXiv:2305.04847](https://arxiv.org/abs/2305.04847)).
+Code used for training and intermediate assessments of the CaloClouds3 model,
+as published in ([arXiv:2511.01460](https://arxiv.org/pdf/2511.01460)).
+This model is a successor to the original CaloClouds model published in ([arXiv:2305.04847](https://arxiv.org/abs/2305.04847)).
 and also *CaloClouds II: Ultra-Fast Geometry-Independent Highly-Granular Calorimeter Simulation* ([arXiv:2309.05704](https://arxiv.org/abs/2309.05704)).
 
+Its purpose is to provide a fast simulation of a photon shower in a calorimeter, as depicted in the image below
 
-Not sure how to do something with git or gitlab? Please start by checking the docs here; [`gitlab.desy.de/ftx-sft/Documentation/-/tree/master/git`](https://gitlab.desy.de/ftx-sft/Documentation/-/tree/master/git)
+![Photon shower at 70 GeV](./assets/cc_e70_s0_idx2241_wbg.png)
+
+For more detailed information, please see the paper.
+[//]: <> (Only include this if we update the model zoo to have the right info.)
+[//]: <> (If you just want to produce photon showers with this model, an inference only setup is available in the [Quantum Universe Model Zoo](https://hmz-hub.desy.de). )
+
+
+The repository was forked from the CaloClouds 2 repository, ([github.com/FLC-QU-hep/CaloClouds-2](https://github.com/FLC-QU-hep/CaloClouds-2)).
+It has been developed iteratively between 2 primary developers, Anatolii Korol and Henry Day-Hall,
+ with contributions from Thorsten Buss and Lorenzo Valente. 
+
 
 ---
 
@@ -25,7 +38,6 @@ The entry points, however, are all in the `scripts` folder.
     - `evaluation`: Module containing functions for preparing data and calculating statistics for model evaluation.
     - `metadata`: Contains a set of subfolders (and symlinks to subfolders) specifying the metadata for each dataset. For example, detector geometry. See [`metadata.md`](./metadata.md) for more details.
     - `models`: Model classes themselves, and some helper code specific to models.
-    - `anomalies`: Code relating to anomaly detection in the data.
     - `utils`: Misc code that is useful at multiple points.
 - `scripts`: Code that doesn't get imported. Every file below this directory is an entry point.
     - `pointcloud`: Symlink back to the parent module, so that scripts can import code from it without messing with the path.
@@ -36,12 +48,45 @@ The entry points, however, are all in the `scripts` folder.
     - `pointcloud`: Symlink back to the parent module, so that tests can import code from it without messing with the path.
     - `scripts`: Symlink to scripts module; some scripts there get regression tests and thus need to be imported.
     - `programming_utils`: Symlink to programming utilities module, to allow for CI to check the repository is well maintained.
-- `externals`: other repos, containing other packages that are treated as submodules for convenience.
 
 
 ---
 
 ## Getting started
+
+Clone this repository with
+
+```bash
+git clone https://github.com/FLC-QU-hep/CaloClouds-3.git
+```
+
+Optionally, setup an environment to contain the requirements, this can be done with conda or virtualenv.
+
+```bash
+conda env create -n "caloclouds3" python=3.12.7
+conda activate caloclouds3
+conda install pip
+```
+or 
+
+```bash
+python3 -m venv caloclouds3
+source caloclouds3/bin/activate
+```
+
+Some requirements don't install as well as others, so it's best to install them "manually"
+
+```bash
+pip install setuptools==69.0.3
+pip install -r requirements.txt
+```
+
+Now in principle, the code is ready to go.
+If you have issues with the torch installation it can be worth doing that one manually also,
+it must match your CUDA version to work on GPU.
+
+
+### Local setup
 
 Commonly changed settings are stored in a `Configs` object.
 Most notably, file paths to data and models are in the `Configs` object.
@@ -50,17 +95,19 @@ make your own configs with the right file paths for your machine.
 Configs are stored in [`pointcloud/config_varients/`](./pointcloud/config_varients/), and the default choice is determined by what the soft link `pointcloud/configs.py` is pointing to.
 
 To make your own config;
-- Make the base file with `cd pointcloud && cp config_varients/default.py config_varients/my_funky_new_config_name.py`.
+- Make the base file with `cd pointcloud && cp config_varients/example.py config_varients/my_funky_new_config_name.py`.
 - Edit the funky new config to your taste.
-    It's also possible to `from .config_varients import default` to inherit from that `Configs` class, and change only what you need.
-    See [`config_varients/wish.py`](./pointcloud/config_varients/wish.py) for an example of that.
+    The elements of the config that you are most likely to need to change are present in [`config_varients/example.py`](./pointcloud/config_varients/example.py).
+    To see all possible entries in a config, have a look at [`pointcloud/config_varients/default.py`](./pointcloud/config_varients/default.py) and
+    [`pointcloud/config_varients/caloclouds_3.py`](./pointcloud/config_varients/caloclouds_3.py).
 - Remove the existing symbolic link with `rm configs.py`
 - Link your config `ln -s config_varients/my_funky_new_config_name.py configs.py`
 
 Then, if you are training the CaloClouds model family, you need to train two (or three) models; the teacher diffusion model (and optionally the distilled student model)
 and also the Shower Flow model.
-The teacher model is trained using [`scripts/main.py`](./scripts/main.py), and the student model is trained with [`scripts/cd.py`](./scripts/cd.py).
-It should be called as a script, like; `python3 script/main.py`.
+The teacher model is trained using [`scripts/training/diffusion.py`](./scripts/training/diffusion.py), and the student model is trained with [`scripts/training/cd.py`](./scripts/training/cd.py).
+It should be called as a script, like; `python3 script/training/diffusion.py`.
+Both of them will use the configs that are softlinked at `pointcloud/configs.py`, so be sure they have the right file paths.
 
 The Shower Flow (to predict energy and hist per layer) is trained via the script [`scripts/ShowerFlow.py`](./scripts/ShowerFlow.py).
 If you like jupyter notebooks, you can also use [`scripts/ShowerFlow.ipynb`](./scripts/ShowerFlow.ipynb), which does basically the same thing

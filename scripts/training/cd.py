@@ -8,7 +8,8 @@ from torch.nn.utils import clip_grad_norm_
 from pointcloud.utils import misc
 from pointcloud.data import dataset
 from pointcloud.models.diffusion import Diffusion
-from configs import Configs
+#from configs import Configs
+from pointcloud.config_varients.test_run import Configs
 
 
 def main(config=Configs()):

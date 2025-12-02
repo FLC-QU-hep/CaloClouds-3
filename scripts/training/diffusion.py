@@ -5,16 +5,12 @@ import torch
 from torch.utils.data import DataLoader
 from torch.nn.utils import clip_grad_norm_
 
-from utils import dataset, misc, training
-from models.diffusion import Diffusion
-from configs import Configs
-from validate_plots import (
-    data_real,
-    data_real_energy,
-    num_points_real,
-    data_real_direction,
-    plots,
-)
+from pointcloud.utils import misc, training
+from pointcloud.data import dataset
+from pointcloud.models.diffusion import Diffusion
+
+# from configs import Configs
+from pointcloud.configs import Configs
 
 import k_diffusion as K
 
@@ -22,10 +18,10 @@ cfg = Configs()
 misc.seed_all(seed=cfg.seed)
 start_time = time.localtime()
 
-with open("comet_api_key.txt", "r") as file:
-    key = file.read()
 
 if cfg.log_comet:
+    with open("comet_api_key.txt", "r") as file:
+        key = file.read()
     experiment = Experiment(
         project_name=cfg.comet_project,
         auto_metric_logging=False,
@@ -47,12 +43,11 @@ log_dir = misc.get_new_log_dir(
 ckpt_mgr = misc.CheckpointManager(log_dir)
 
 # Datasets and loaders
-if cfg.dataset == "x36_grid" or cfg.dataset == "clustered":
-    train_dset = dataset.PointCloudAngular(
-        file_path=cfg.dataset_path, bs=cfg.train_bs, quantized_pos=cfg.quantized_pos
-    )
-elif cfg.dataset == "angular":
-    train_dset = dataset.PointCloudAngular(files_path=cfg.dataset_path, bs=cfg.train_bs)
+if not cfg.quantized_pos:
+    print("Warning, as we use angular datasets, the assumption is that data is fuzzed on disk"
+          " config.quantized_pos will be ignored")
+
+train_dset = dataset.PointCloudAngular(file_path=cfg.dataset_path, bs=cfg.train_bs)
 dataloader = DataLoader(
     train_dset, batch_size=1, num_workers=cfg.workers, shuffle=cfg.shuffle
 )
@@ -103,38 +98,6 @@ scheduler = training.get_linear_scheduler(
     start_lr=cfg.lr,
     end_lr=cfg.end_lr,
 )
-
-
-def validate(path):
-    global data_real, data_real_energy, num_points_real, data_real_direction
-    data_real_direction = torch.tensor(data_real_direction).float().to(cfg.device)
-    data_real_energy = torch.tensor(data_real_energy).float().to(cfg.device)
-    cond_feats = torch.cat([data_real_energy, data_real_direction], -1)
-    num_points_real = torch.tensor(num_points_real).to(cfg.device)
-
-    fake_showers = torch.zeros(2000, 4, num_points_real.max()) + 1234
-    bs = 100
-    with torch.no_grad():
-        for i in range(0, len(data_real), bs):
-            fake_shower = model_ema.sample(
-                cond_feats[i : i + bs], num_points_real[i : i + bs].max(), cfg
-            ).cpu()
-            fake_shower = torch.moveaxis(fake_shower, 1, 2)
-
-            for j in range(bs):
-                fake_showers[i + j, :, : num_points_real[i + j]] = fake_shower[
-                    j, :, : num_points_real[i + j]
-                ]
-            # fake_showers[i:i+bs, :, :num_points_real[i:i+bs].max()] = fake_shower
-
-    fake_showers = fake_showers.cpu().numpy()
-
-    plots(data_real, fake_showers, path)
-
-
-# validation test
-if cfg.val_freq > 0:
-    validate(log_dir + "/iter_0_")
 
 
 # Train, validate and test
@@ -221,7 +184,6 @@ while not stop:
                 "scheduler": scheduler.state_dict(),
             }
             ckpt_mgr.save(model, cfg, 0, others=opt_states, step=it)
-            validate(log_dir + f"/iter_{it}_")
             if cfg.log_comet:
                 experiment.log_image(
                     log_dir + f"/iter_{it}_1d_hist.png", name="1d_hist"
