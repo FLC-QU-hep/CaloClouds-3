@@ -1,5 +1,4 @@
-from comet_ml import Experiment
-
+import os
 import torch
 import time
 from torch.utils.data import DataLoader
@@ -8,8 +7,7 @@ from torch.nn.utils import clip_grad_norm_
 from pointcloud.utils import misc
 from pointcloud.data import dataset
 from pointcloud.models.diffusion import Diffusion
-#from configs import Configs
-from pointcloud.config_varients.test_run import Configs
+from pointcloud.configs import Configs
 
 
 def main(config=Configs()):
@@ -17,6 +15,7 @@ def main(config=Configs()):
     start_time = time.localtime()
 
     if config.log_comet:
+        from comet_ml import Experiment
         with open("comet_api_key.txt", "r") as file:
             key = file.read()
         experiment = Experiment(
@@ -53,8 +52,7 @@ def main(config=Configs()):
     model_teacher = Diffusion(config, distillation=False).to(config.device)
 
     # load model
-    checkpoint = torch.load(
-        config.logdir + "/" + config.model_path,
+    checkpoint = torch.load(os.path.join(config.logdir, config.model_path),
         map_location=torch.device(config.device),
     )
     if config.use_ema_trainer:
