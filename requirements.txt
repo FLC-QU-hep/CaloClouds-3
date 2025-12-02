@@ -1,0 +1,18 @@
+# required python packages, installed by pip3
+# could probably relax the version requirements
+# these are know to work.
+# works under python 3.11
+comet_ml >= 3.37
+torch >= 2.1
+torch_geometric
+h5py >= 3.10
+pyro-ppl>=1.8
+pandas >= 2.1
+scikit-learn >= 1.4.1
+k-diffusion
+nflows
+setuptools==69.0.3  # some versions of setuptools dont contain pkg_resources
+uproot
+particle
+# in the scripts only
+plotly

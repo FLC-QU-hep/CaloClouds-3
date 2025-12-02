@@ -1,0 +1,41 @@
+# GitLab Continuous Integration configuration for the repository.
+image: gitlab.desy.de:5555/ftx-sft/generative/point-cloud-diffusion-docker:latest
+# image: gitlab.desy.de:5555/fh-sustainability-forum/sustainable-coding-tutorial/tutorial-containers/unittesting
+
+
+# "Global" build stages.
+stages:
+  - build
+  - test
+
+# Set the behaviour of the CI build.
+variables:
+  GIT_STRATEGY: fetch
+  GIT_SUBMODULE_STRATEGY: recursive
+
+# run the regression tests
+pytest:
+  stage: test
+  only:
+    - main
+    - henry_dev_newTests
+    - merge_requests
+  script:
+    - echo "add the install file to the path"
+    - PATH=/home/apprunner/.local/bin:$PATH
+      #    - echo "Installing requirments"
+      #    - pip install setuptools==69.0.3
+      #    - pip install -r requirements_fixed.txt
+      #    - pip install pytest pytest-mock coverage
+    - echo "Running pytests"
+    - coverage run -m pytest test/test*py
+    - coverage xml -i
+    - coverage report -i
+  coverage: '/TOTAL.*\s+(\d+%)$/'
+  artifacts:
+    reports:
+      coverage_report:
+        coverage_format: cobertura
+        path: coverage.xml
+      
+

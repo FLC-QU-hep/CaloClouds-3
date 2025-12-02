@@ -1,0 +1,813 @@
+import warnings
+import numpy as np
+import torch
+
+from .metadata import Metadata
+from .detector_map import get_shift
+
+from ..configs import Configs
+
+from .showerflow_utils import truescale_showerflow_output
+from ..data.conditioning import (
+    get_cond_features_names,
+    normalise_cond_feats,
+    is_cc2_diffusion,
+    feature_lengths,
+)
+
+
+def get_cog(x, y, z, e):
+    """
+    Calculate the center of gravity of a shower.
+
+    Parameters
+    ----------
+    x : np.array
+        The x positions of the shower particles.
+    y : np.array
+        The y positions of the shower particles.
+    z : np.array
+        The z positions of the shower particles.
+    e : np.array
+        The energies of the shower particles.
+
+    Returns
+    -------
+    cog_x : np.array or float
+        The x position of the center of gravity.
+        If the input has multiple dimensions, this has one less,
+        otherwise it is a float.
+    cog_y : np.array or float
+        The y position of the center of gravity.
+        If the input has multiple dimensions, this has one less,
+        otherwise it is a float.
+    cog_z : np.array or float
+        The z position of the center of gravity.
+        If the input has multiple dimensions, this has one less,
+        otherwise it is a float.
+    """
+    summed_e = e.sum(axis=-1)
+    if len(e.shape) > 1:
+        summed_e[summed_e == 0] = 1  # avoid division by zero
+    elif not summed_e:
+        return 0, 0, 0
+    return (
+        np.sum((x * e), axis=-1) / summed_e,
+        np.sum((y * e), axis=-1) / summed_e,
+        np.sum((z * e), axis=-1) / summed_e,
+    )
+
+
+def get_scale_factor(
+    num_clusters, coef_real, coef_fake, n_splines
+):  # num_clusters: (bs, 1)
+    if n_splines is not None:
+        spline_real = n_splines["spline_real"]
+        spline_fake = n_splines["spline_fake"]
+        scale_factor = (
+            spline_fake.predict(
+                spline_real.predict(num_clusters).reshape(-1, 1)
+            ).reshape(-1, 1)
+            / num_clusters
+        )
+    elif coef_fake is None:
+        poly_fn_real = np.poly1d(coef_real)
+        scale_factor = poly_fn_real(num_clusters) / num_clusters
+    else:
+        poly_fn_real = np.poly1d(coef_real)
+        poly_fn_fake = np.poly1d(coef_fake)
+        scale_factor = poly_fn_fake(poly_fn_real(num_clusters)) / num_clusters
+
+    scale_factor = np.clip(scale_factor, 0.0, None)  # cannot be negative
+    return scale_factor  # (bs, 1)
+
+
+# TODO
+# Consider changin how the cond_feats is passed in for
+# backward compatibility with older versions?
+# Maybe achived
+def get_shower(model, num_points, cond_feats, cond_N=None, bs=None, config=Configs()):
+    """
+    Get a shower from the diffusion model.
+
+    Parameters
+    ----------
+    model : torch.nn.Module
+        The diffusion model.
+    num_points : int
+        The number of points per event to generate.
+    cond_feats : torch.Tensor, (0d, 1d or 2d)
+        The conditioning features.
+        If 0d or 1d, this is the same for all batches/events.
+        If 1d, each row is a different batch/event.
+    cond_N : torch.Tensor
+        The number of points in each event, if given
+        it is assumed to be an additional conditioning feature.
+    bs : int
+        The batch size, as in the number of events to generate.
+        Default 1.
+
+    Returns
+    -------
+    fake_shower : torch.Tensor (bs, num_points, 4)
+        The generated shower.
+    """
+    cond_feats = torch.tensor(cond_feats).float()
+    if len(cond_feats.shape) == 2:
+        if bs is None:
+            bs = cond_feats.shape[0]
+        else:
+            assert bs == cond_feats.shape[0]
+    else:
+        if bs is None:
+            bs = 1
+        cond_feats = torch.tile(cond_feats, (bs, 1))
+        
+    if cond_N is not None:
+        cond_N = torch.tensor(cond_N).float()
+        if len(cond_N.shape) > 0:
+            assert cond_N.shape[0] == bs
+        else:
+            cond_N = torch.tile(cond_N, (bs, 1))
+        cond_feats = torch.cat([cond_feats, cond_N], dim=1)
+    fake_shower = model.sample(cond_feats, num_points, config)
+    return fake_shower
+
+
+def is_config(config):
+    return hasattr(config, "model_name")
+
+
+# for historic reasons, I don't want to mess with the
+# argument parsing of this function, but it's complex
+# so lets just make a separate function for it.
+# This is a fairly defensive function, that will complain
+# about any missing/unexpected arguments.
+def _shower_batch_arg_parser(*args, **kwargs):
+    # read the args differently for different models
+    n_required_args = 4
+    arg_values = {
+        "model": None,
+        "shower_flow": None,
+        "e_min": None,
+        "e_max": None,
+        "theta": 0.0,
+        "phi": 0.0,
+        "config": Configs(),
+    }
+    arg_positions = [
+        "model",
+        "shower_flow",
+        "e_min",
+        "e_max",
+        "theta",
+        "phi",
+        "config",
+    ]
+    kw_only_args = {
+            "num": 2000,
+            "bs": 32,
+        }
+
+    config_pos = arg_positions.index("config")
+    if "config" in kwargs:
+        assert (
+            len(args) <= config_pos
+        ), "config given twice, once as positional, once as kwarg"
+        config = kwargs["config"]
+    else:
+        # actually just ignore the positioning and try and fish a config out
+        # of the args list anywhere
+        for i, arg in enumerate(args):
+            if is_config(arg):
+                config = arg
+                # put it where we found it
+                del arg_positions[config_pos]
+                arg_positions.insert(i, "config")
+                break
+        else:
+            if len(args) > config_pos:
+                raise ValueError(
+                    f"Expected a Configs object in position {config_pos}"
+                )
+            config = Configs()
+
+    if config.model_name in ["wish", "fish"]:
+        n_required_args -= 1
+        del arg_positions[1]
+        assert (
+            "shower_flow" not in kwargs
+        ), "For models wish and fish, the shower_flow argument is not expected"
+
+    assert len(args) + len(kwargs) <= (
+        len(arg_positions)
+    ), f"Too many arguments given, expected {len(arg_positions)} at most"
+    for i, name in enumerate(arg_positions):
+        in_kwargs = name in kwargs
+        if len(args) > i:
+            assert (
+                not in_kwargs
+            ), f"Argument {name} given twice, once as positional, once as kwarg"
+            arg_values[name] = args[i]
+        elif in_kwargs:
+            arg_values[name] = kwargs.pop(name)
+        else:
+            assert i >= n_required_args, f"Argument {name} (position {i}) is required"
+    for arg in kw_only_args:
+        if arg in kwargs:
+            arg_values[arg] = kwargs.pop(arg)
+        else:
+            arg_values[arg] = kw_only_args[arg]
+    assert not kwargs, f"Unknown arguments given: {kwargs.keys()}"
+    # do some sanity checks
+    assert arg_values.get("e_min", 1) >= 0, "e_min must be non-negative"
+    assert arg_values.get("e_min", 1) <= arg_values.get(
+        "e_max", 2
+    ), "e_min must be less than e_max"
+    assert arg_values["num"] >= 0, "num must be positive"
+    assert arg_values["bs"] >= 0, "bs must be positive"
+    assert arg_values["theta"] >= -360, "theta must be between -360 and 360"
+    assert arg_values["theta"] <= 360, "theta must be between -360 and 360"
+    assert arg_values["phi"] >= -360, "phi must be between -360 and 360"
+    assert arg_values["phi"] <= 360, "phi must be between -360 and 360"
+    output = (
+        arg_values["model"],
+        arg_values["shower_flow"],
+        arg_values["e_min"],
+        arg_values["e_max"],
+        arg_values["theta"],
+        arg_values["phi"],
+        arg_values["num"],
+        arg_values["bs"],
+        arg_values["config"],
+    )
+    return output
+
+
+def get_direction(theta, phi):
+    theta = theta / 180.0 * np.pi  # theta in radians
+    phi = phi / 180.0 * np.pi  # phi in radians
+
+    px = np.cos(phi) * np.sin(theta)
+    py = np.sin(phi) * np.sin(theta)
+    pz = np.cos(theta)
+
+    return np.array([px, py, pz])
+
+
+def sample_points_in_angle_range(
+    num_points, theta_range=(0, 180), phi_range=(-180, 180)
+):
+    scale = 5
+
+    # Generate random points in a unit cube
+    points = np.random.randn(3, int(num_points * scale))
+
+    # Normalize the points to lie on the surface of the unit sphere
+    points /= np.linalg.norm(points, axis=0)[None, :]
+
+    theta_range = np.array(theta_range) / 180 * np.pi
+    phi_range = np.array(phi_range) / 180 * np.pi
+
+    # Convert Cartesian coordinates to spherical coordinates
+    phi = np.arctan2(points[1, :], points[0, :])
+    theta = np.arccos(points[2, :])
+
+    # Filter points based on theta and phi ranges
+    mask = np.logical_and.reduce(
+        (
+            theta >= theta_range[0],
+            theta <= theta_range[1],
+            phi >= phi_range[0],
+            phi <= phi_range[1],
+        )
+    )
+
+    points = points[:, mask]
+
+    phi = np.arctan2(points[1, :], points[0, :])
+    theta = np.arccos(points[2, :])
+
+    theta = theta / np.pi * 180
+    phi = phi / np.pi * 180
+
+    return points[:, :num_points], theta[:num_points], phi[:num_points]
+
+
+# batch inference
+def gen_showers_batch(
+    *args,
+    **kwargs,
+):
+    """
+    Generate a batch of showers for evaluation purposes.
+    Not sutable for training.
+
+    Parameters
+    ----------
+    models : torch.nn.Module
+        The model to generate showers from.
+        If the config.model_name specifies a model
+        that uses a shower flow, like caloclouds, then this should
+        be both the model and the flow distribution;
+    shower_flow : torch.distributions.Distribution, (optional)
+        The flow to sample from. Only needed for models that use one,
+        for models that don't, like Wish, this argument
+        isn't needed (either positionally, or as a kwarg).
+    e_min : float
+        The minimum incident energy of the showers.
+    e_max : float
+        The maximum incident energy of the showers.
+        It is required for all models.
+    num : int
+        Total number of showers to generate.
+        (default is 2000)
+    bs : int
+        The inner batch size to generate the batch in ....
+        (default is 32)
+    config : config.Configs
+        The configuration object. Used to determine the device
+        and the model.
+        (default is Configs())
+
+    Returns
+    -------
+    showers : np.array (num, config.max_points, 4)
+        The generated showers. The third dimension is (x, y, z, e)
+    cond : np.array (num, C)
+        The conditioning variables for the showers,
+        in the case that the showers are conditioned on just energy, this
+        is just a (num, 1) array of the incident energies.
+
+    """
+    (
+        model,
+        shower_flow,
+        e_min,
+        e_max,
+        theta,
+        phi,
+        num,
+        bs,
+        config,
+    ) = _shower_batch_arg_parser(*args, **kwargs)
+
+    diffusion_cond_names = get_cond_features_names(config, "diffusion")
+    shower_flow_cond_names = get_cond_features_names(config, "showerflow")
+    e_cond = torch.FloatTensor(num, 1).uniform_(e_min, e_max)  # B,1
+    for names in [diffusion_cond_names, shower_flow_cond_names]:
+        assert (
+            names[0] == "energy"
+        ), "Function assumes first conditioning value is energy"
+    if isinstance(theta, tuple):
+        _, theta, phi = sample_points_in_angle_range(num, theta, phi)
+        direction = get_direction(theta, phi)
+        direction = np.moveaxis(direction, 0, 1)
+        direction = torch.FloatTensor(direction).to(config.device)
+    else:
+        direction = (
+            torch.FloatTensor(get_direction(theta, phi))
+            .to(config.device)
+            .unsqueeze(0)
+            .repeat(num, 1)
+        )  # B,3
+
+    cond = torch.cat([e_cond, direction], -1).to(config.device)
+    fake_showers = gen_cond_showers_batch(
+        model,
+        shower_flow,
+        cond,
+        bs,
+        config,
+    )
+    cond = cond.detach().cpu().numpy()
+    return fake_showers, cond
+
+
+def gen_cond_showers_batch(
+    model,
+    shower_flow,
+    cond=None,
+    bs=32,
+    config=Configs(),
+):
+    """
+    Generate a batch of showers for evaluation purposes.
+    Not sutable for training.
+
+    Parameters
+    ----------
+    model : torch.nn.Module
+        The model to generate showers from.
+    shower_flow : torch.distributions.Distribution (optional)
+        The flow to sample from. Only needed for models that use one,
+        for models that don't like Wish, the e_min can be the second
+        positional argument, or shower_flow can be None.
+    cond : torch.Tensor (num, C)
+        The conditioning variable for the showers,
+        unnormalised.
+        Optionally, may be given seperately for showerflow then the diffusion model.
+        in the case that the showers are conditioned on just energy, this
+        is just a (num, 1) array of the incident energies.
+    bs : int
+        The inner batch size to generate the batch in ....
+    config : config.Configs
+        The configuration object. Used to determine the device
+        and the model.
+
+    Returns
+    -------
+    showers : np.array (condE.shape[0], config.max_points, 4)
+        The generated showers. The third dimension is (x, y, z, e)
+
+    """
+    if config.model_name in ["wish", "fish"]:
+        # for this model, we don't have to give a shower_flow
+        if cond is None:
+            cond = torch.tensor(shower_flow).to(config.device).float()
+        kw_args = {
+            "model": model,
+        }
+        inner_batch_func = gen_wish_inner_batch
+        showerflow_cond = None  # not needed for these models
+    else:
+        assert cond is not None, (
+            f"For model named {config.model}, "
+            + "3 positional arguments are expected; "
+            + "model, shower_flow, cond"
+        )
+        inner_batch_func = gen_v1_inner_batch
+        kw_args = {
+            "model": model,
+            "shower_flow": shower_flow,
+            "config": config,
+        }
+    seperate_showerflow_cond = isinstance(cond, dict)
+    if seperate_showerflow_cond:
+        # it's a seperate showerflow cond
+        showerflow_cond = torch.tensor(cond["showerflow"]).to(config.device).float()
+        cond = torch.tensor(cond["diffusion"]).to(config.device).float()
+    else:
+        # give showerflow the same cond as the diffusion model
+        cond = torch.tensor(cond).to(config.device).float()
+        showerflow_cond = cond
+    num = cond.shape[0]
+    fake_showers = np.empty((num, config.max_points, 4))
+    for i, cond_batch in enumerate(cond_batcher(bs, cond, showerflow_cond)):
+        inner_batch_func(cond_batch, fake_showers, i * bs, **kw_args)
+
+    return fake_showers
+
+
+def cond_batcher(batch_size, cond, showerflow_cond=None):
+    """
+    Yield batches of incident energies to condition the showers on.
+
+    Parameters
+    ----------
+    batch_size : int
+        Max batch size of incident energies to generate.
+    cond : torch.Tensor (num, C)
+        The conditioning variable for the showers,
+        in the case that the showers are conditioned on just energy, this
+        is just a (num, 1) array of the incident energies.
+        Energies is generaly expected to be the final value at the lowest dimension.
+
+    Yields
+    ------
+    cond_batch : torch.Tensor (batch_size or smaller, C)
+        The batch of incident energies to condition the showers on.
+
+    """
+    num = cond.size(0)
+    for evt_id in range(0, num, batch_size):
+        cond_batch = {"diffusion": cond[evt_id : evt_id + batch_size]}
+        if showerflow_cond is not None:
+            cond_batch["showerflow"] = showerflow_cond[evt_id : evt_id + batch_size]
+        yield cond_batch
+
+
+def gen_wish_inner_batch(cond_batch, destination_array, first_index, model):
+    """
+    Generate a batch of showers using the Wish model
+    according to the given incident energies.
+    Also works on fish.
+
+    Parameters
+    ----------
+    cond_batch : dict with str: torch.Tensor (batch_size, C)
+        In the dict is a key "diffusion" with the incident particle
+        properties to condition the showers on.
+    destination_array : np.array (large, max_points, 4)
+        The array to store the generated showers in.
+    first_index : int
+        The index to start storing the generated showers at.
+    model : torch.nn.Module
+        The model to generate showers from.
+    config : config.Configs
+        The configuration object, used to determine the max points.
+    """
+    cond_batch = cond_batch["diffusion"]
+    max_points = destination_array.shape[1]
+    last_index = first_index + cond_batch.size(0)
+    destination_array[first_index:last_index] = model.sample(cond_batch, max_points)
+
+
+def rotate_cc2_diffusion_output(cc2_shower):
+    # must rotate 90 in x-y and 90 in x-z
+    cc2_shower = cc2_shower[:, :, [2, 0, 1, 3]]
+    return cc2_shower
+
+
+def gen_v1_inner_batch(
+    cond_batch,
+    destination_array,
+    first_index,
+    model,
+    shower_flow,
+    config=Configs(),
+):
+    """
+    Generate a batch of showers using any of the v1 style models
+    according to the given incident energies.
+
+    Parameters
+    ----------
+    cond_batch : torch.Tensor (batch_size, cond_features)
+        The conditioning
+    model : torch.nn.Module
+        The model to generate showers from.
+    destination_array : np.array (large, max_points, 4)
+        The array to store the generated showers in.
+    first_index : int
+        The index to start storing the generated showers at.
+    shower_flow : torch.distributions.Distribution (optional)
+        The flow to sample from. Only needed for models that use one,
+        for models that don't like Wish, the e_min can be the second
+        positional argument, or shower_flow can be None.
+    config : config.Configs
+        The configuration object. Used to determine the device
+        and the model.
+
+    Returns
+    -------
+    output : np.array (cond_batch.size(0), config.max_points, 4)
+        The generated showers. The third dimension is (x, y, z, e)
+    """
+    if isinstance(cond_batch, dict):
+        showerflow_cond = cond_batch.get("showerflow", cond_batch["diffusion"][:])
+        if len(showerflow_cond.shape) == 1:
+            showerflow_cond = showerflow_cond[:, None]
+        cond_batch = cond_batch["diffusion"]
+        if len(cond_batch.shape) == 1:
+            cond_batch = cond_batch[:, None]
+    else:
+        if len(cond_batch.shape) == 1:
+            cond_batch = cond_batch[:, None]
+        showerflow_cond = cond_batch
+    cond_batch = normalise_cond_feats(config, cond_batch, "diffusion")
+    showerflow_cond = normalise_cond_feats(config, showerflow_cond, "showerflow")
+
+    metadata = Metadata(config)
+    bs = cond_batch.size(0)
+
+    conditioned_flow = shower_flow.condition(showerflow_cond)
+    samples = (
+        conditioned_flow.sample(
+            torch.Size(
+                [
+                    bs,
+                ]
+            )
+        )
+        .cpu()
+        .numpy()
+    )
+    problems = (samples[:, -30:] < 0).sum(axis=1) > 7
+    while problems.any():
+        n_problems = problems.sum()
+        conditioned_flow = shower_flow.condition(showerflow_cond[problems])
+        replacement_samples = (
+            conditioned_flow.sample(
+                torch.Size(
+                    [
+                        n_problems,
+                    ]
+                )
+            )
+            .cpu()
+            .numpy()
+        )
+        samples[problems] = replacement_samples
+        problems[problems] = (replacement_samples[:, -30:] < 0).sum(axis=1) > 7
+
+    (
+        num_clusters,
+        energies,
+        cog_x,
+        cog_y,
+        cog_z,
+        clusters_per_layer_gen,
+        e_per_layer_gen,
+    ) = truescale_showerflow_output(samples, config)
+
+    if getattr(config, "shower_flow_roll_xyz", False):
+        assert cog_z is not None
+        # it's a CC2 thing...
+        cog_x, cog_y, cog_z = cog_z, cog_x, cog_y
+
+    scale_factor = np.array([1.0])
+    if getattr(config, "shower_flow_n_scaling", True):
+        n_splines = getattr(config, "shower_flow_n_splines", None)
+        coef_real = getattr(config, "shower_flow_coef_real", None)
+        coef_fake = getattr(config, "shower_flow_coef_fake", None)
+        if all(v is None for v in [n_splines, coef_real, coef_fake]):
+            warnings.warn(
+                "Warning; not scaling number of clusters as no scaling parameters given"
+            )
+        else:
+            if num_clusters is None:
+                num_clusters = clusters_per_layer_gen.sum(axis=1)
+            # Check the old repo for there - splines should be used in CC2!
+            # in C3 it's a single number
+            scale_factor = get_scale_factor(
+                num_clusters, coef_real, coef_fake, n_splines
+            )  # B,1
+
+    # scale relative clusters per layer to actual number of clusters per layer
+    # and same for energy
+    if config.shower_flow_fixed_input_norms:
+        clusters_per_layer_gen = clusters_per_layer_gen * scale_factor[:, None]
+        num_clusters = clusters_per_layer_gen.sum(axis=1)
+        reductions = np.clip(config.max_points / num_clusters, 0, 1)
+        num_clusters = num_clusters * reductions
+        clusters_per_layer_gen = clusters_per_layer_gen * reductions[:, None]
+        clusters_per_layer_gen = clusters_per_layer_gen.astype(int)
+        num_clusters = num_clusters.astype(int)
+    else:
+        num_clusters = np.clip(
+            (num_clusters * scale_factor).astype(int), 0, config.max_points
+        )
+        clusters_per_layer_gen = (
+            clusters_per_layer_gen
+            / clusters_per_layer_gen.sum(axis=1, keepdims=True)
+            * num_clusters
+        ).astype(
+            int
+        )  # B,30
+    if energies is not None:
+        e_per_layer_gen = (
+            e_per_layer_gen / e_per_layer_gen.sum(axis=1, keepdims=True) * energies
+        )  # B,30
+
+    max_num_clusters = num_clusters.max()
+
+    diffusion_feature_names = get_cond_features_names(config, "diffusion")
+    if "points" in diffusion_feature_names:
+        diffusion_feature_names[diffusion_feature_names.index("points")] = "n_points"
+    cheat = getattr(config, "cheat", False)
+    if "n_points" in diffusion_feature_names and not cheat:
+        index = 0
+        for name in diffusion_feature_names:
+            if name == "n_points":
+                break
+            index += feature_lengths[name]
+        if config.dataset == "calo_challenge":
+            n = torch.log((num_clusters + 1) / config.min_points) / torch.log(
+                config.max_points / config.min_points
+            )
+        else:
+            # n = (num_clusters / config.max_points) * 2 - 1
+            n = (num_clusters / 6_000) * 2 - 1
+        cond_batch[:, index] = torch.tensor(n.flatten())
+        # and here
+
+    fake_showers = get_shower(
+        model,
+        max_num_clusters,
+        cond_batch,
+        bs=bs,
+        config=config,
+    )
+
+    fake_showers = fake_showers.detach().cpu().numpy()
+    if is_cc2_diffusion(config):
+        fake_showers = rotate_cc2_diffusion_output(fake_showers)
+    else:  # its CC3 and we need to un-log the energy
+        fake_showers[:, :, 3] = np.exp(
+            fake_showers[:, :, 3] * metadata.log_incident_std * 2
+            + metadata.log_incident_mean
+        )
+
+    # if np.isnan(fake_showers).sum() != 0:
+    #       return fake_showers
+    #     print('nans in showers!')
+    #     fake_showers[np.isnan(fake_showers)] = 0
+    #       break
+
+    # loop over events
+    z_positions = metadata.layer_bottom_pos_global + metadata.cell_thickness_global / 2
+    layer_indices = np.arange(len(z_positions))
+    for i, hits_per_layer in enumerate(clusters_per_layer_gen):
+        # for i, (hits_per_layer, e_per_layer) in enumerate(
+        #     zip(clusters_per_layer_gen, e_per_layer_gen)
+        # ):
+
+        n_hits_to_concat = max_num_clusters - hits_per_layer.sum()
+
+        z_flow = np.repeat(z_positions, hits_per_layer)
+        z_flow = np.concatenate([z_flow, np.zeros(n_hits_to_concat)])
+
+        mask = np.concatenate(
+            [np.ones(hits_per_layer.sum()), np.zeros(n_hits_to_concat)]
+        )
+
+        fake_showers[i, :, 2][mask == 0] = 10  # move them out of the sort
+        idx_dm = np.argsort(fake_showers[i, :, 2])
+        fake_showers[i, :, 2][idx_dm] = z_flow
+
+        fake_showers[i, :, :][mask == 0] = 0
+
+        # before we energy calibrate, get the indices of the points that aren't real
+        zero_e_mask = fake_showers[i, :, -1] <= 0
+
+        # energy per layer calibration
+        closest_layer = np.abs(fake_showers[i, :, 2][:, None] - z_positions).argmin(
+            axis=1
+        )
+
+        layer_sums = (
+            fake_showers[i, :, -1, None] * (closest_layer[:, None] == layer_indices)
+        ).sum(axis=0)
+        layer_sums[layer_sums <= 0] = 1  # avoid division by zero
+
+        layer_factors = e_per_layer_gen[i] / layer_sums
+        fake_showers[i, :, -1] *= layer_factors[closest_layer]
+
+        fake_showers[i][zero_e_mask] = 0
+
+    fake_showers = fake_showers[:, : config.max_points, :]
+    length = config.max_points - fake_showers.shape[1]
+    fake_showers = np.concatenate(
+        (fake_showers, np.zeros((bs, length, 4))), axis=1
+    )  # B, max_points, 4
+
+    # move to be roughly bettween 0 and 1
+    fake_showers[:, :, 0] = (fake_showers[:, :, 0] + 1) / 2
+    fake_showers[:, :, 1] = (fake_showers[:, :, 1] + 1) / 2
+
+    assert metadata.orientation[:16] == "hdf5:xyz==local:"
+    assert metadata.orientation_global[:17] == "hdf5:xyz==global:"
+    local_ori = metadata.orientation[16:]
+    global_ori = metadata.orientation_global[17:]
+    if global_ori[local_ori.index("x")] == "z":
+        assert global_ori[local_ori.index("y")] == "x"
+        # rotated coordinates mean local x==global z and local y==global x and local z==global y
+        fake_showers[:, :, 0] = (
+            fake_showers[:, :, 0] * (metadata.Zmin_global - metadata.Zmax_global)
+            + metadata.Zmax_global
+        )
+        fake_showers[:, :, 1] = (
+            fake_showers[:, :, 1] * (metadata.Xmin_global - metadata.Xmax_global)
+            + metadata.Xmax_global
+        )
+    elif global_ori[local_ori.index("x")] == "x":
+        assert global_ori[local_ori.index("y")] == "z"
+        fake_showers[:, :, 0] = (
+            fake_showers[:, :, 0] * (metadata.Xmin_global - metadata.Xmax_global)
+            + metadata.Xmax_global
+        )
+        fake_showers[:, :, 1] = (
+            fake_showers[:, :, 1] * (metadata.Zmin_global - metadata.Zmax_global)
+            + metadata.Zmax_global
+        )
+    else:
+        raise NotImplementedError(
+            f"Global orientation {global_ori} not supported for local orientation {local_ori}"
+        )
+
+    if getattr(config, "cog_calibration", True):
+        # CoG calibration
+        cog = get_cog(
+            fake_showers[:, :, 0],
+            fake_showers[:, :, 1],
+            fake_showers[:, :, 2],
+            fake_showers[:, :, 3],
+        )
+        fake_showers[:, :, 0] -= (cog[0] - cog_x)[:, None]
+        fake_showers[:, :, 1] -= (cog[1] - cog_y)[:, None]
+    else:
+        cog_x_shift = metadata.mean_cog[0]
+        cog_y_shift = metadata.mean_cog[1]
+        cog_z_shift = metadata.mean_cog[2]
+        if getattr(config, "shower_flow_roll_xyz", False):
+            cog_x_shift, cog_y_shift, cog_z_shift = (
+                cog_z_shift,
+                cog_x_shift,
+                cog_y_shift,
+            )
+        # Still need to apply centering
+        fake_showers[:, :, 0] -= cog_x_shift
+        fake_showers[:, :, 1] -= cog_y_shift
+
+    destination_array[first_index : first_index + bs] = fake_showers

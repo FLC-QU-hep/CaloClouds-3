@@ -1,0 +1,10 @@
+Some notes on this dataset;
+- Photons only
+- Electromagnetic calorimeter (ECAL) only
+- Incident energy of the photon is a uniform distribution between 10 and 90 GeV
+- The photon is generated just before surface of the calorimeter, a little off-centre as there is some supporting structure right at the mid-point at the calorimeter that would complicate the simulations. It's at -50mm in the Z direction.
+- Photon is travelling in the Y direction.
+- The dataset is also trimmed into a bounding box 400mm wide. This discards less than 1% of the data.
+- Dataset has been coarsened from G4 steps. The detector layers are split into 0.83mm square bins, and points in a single bin are summed to a single point. This is to reduce the size of the dataset and to make it more manageable for training.
+- The process is derived from the one used in https://arxiv.org/pdf/2305.04847
+- Almost all events contain a photon shower, but the photon has some hadronic cross section, so less than 1% of events do not look like the classic photon shower. These are kept as they have negligible impact on the training.
