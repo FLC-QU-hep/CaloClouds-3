@@ -1,3 +1,4 @@
+[![arXiv](https://img.shields.io/badge/arXiv-2511.01460-<COLOR>.svg)](https://arxiv.org/abs/2511.01460)
 [![Run python tests](https://github.com/FLC-QU-hep/CaloClouds-3/actions/workflows/ci.yml/badge.svg)](https://github.com/FLC-QU-hep/CaloClouds-3/actions/workflows/ci.yml)
 [![cov](https://FLC-QU-hep.github.io/CaloClouds-3/badges/coverage.svg)](https://github.com/FLC-QU-hep/CaloClouds-3/actions)
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
