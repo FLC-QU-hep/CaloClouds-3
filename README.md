@@ -19,8 +19,7 @@ Its purpose is to provide a fast simulation of a photon shower in a calorimeter,
 ![Photon shower at 70 GeV](./assets/cc_e70_s0_idx2241_wbg.png)
 
 For more detailed information, please see the paper.
-[//]: <> (Only include this if we update the model zoo to have the right info.)
-[//]: <> (If you just want to produce photon showers with this model, an inference only setup is available in the [Quantum Universe Model Zoo](https://hmz-hub.desy.de). )
+If you just want to produce photon showers with this model, an inference only setup is available in the [Quantum Universe Model Zoo](https://hmz-hub.desy.de).
 
 
 The repository was forked from the CaloClouds 2 repository, ([github.com/FLC-QU-hep/CaloClouds-2](https://github.com/FLC-QU-hep/CaloClouds-2)).
