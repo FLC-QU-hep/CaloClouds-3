@@ -1,0 +1,11 @@
+Some notes on this dataset;
+- Photons only, and only hits associated with secondatries that are pdg 11, -11 or 22
+- ECAL and HCAL
+- Incident energy of the photon is a uniform distribution between 5 and 130 GeV
+- The photon is generated just before surface of the calorimeter, a little off-centre as there is some supporting structure right at the mid-point at the calorimeter that would complicate the simulations. It's at -50mm in the Z direction.
+- Photon is physically travelling in the Y direction, and has not been rotated
+- No real bounding box, the bounding box here is just for the algorithms to work with
+- Dataset is G4 steps
+- no alignment shift
+- no rescaling
+- The process is derived from the one used in https://arxiv.org/pdf/2305.04847

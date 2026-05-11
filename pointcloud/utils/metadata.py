@@ -22,17 +22,23 @@ def get_metadata_folder(config=Configs()):
         Path to the metadata folder for the dataset.
     """
     this_dir = os.path.dirname(__file__)
-    dataset_filebase = os.path.basename(config.dataset_path).rsplit(".", 1)[0]
-
-    subfolders = os.listdir(os.path.join(this_dir, "../metadata/"))
-
-    for folder in subfolders:
-        globbed_folder = folder.replace("W", "*")
-        if fnmatch.fnmatch(dataset_filebase, globbed_folder):
-            break
+    if hasattr(config, "metadata_folder"):
+        data_dir = os.path.join(this_dir, "../metadata/", config.metadata_folder)
     else:
+        dataset_filebase = os.path.basename(config.dataset_path).rsplit(".", 1)[0]
+
+        subfolders = os.listdir(os.path.join(this_dir, "../metadata/"))
+
+        for folder in subfolders:
+            globbed_folder = folder.replace("W", "*")
+            if fnmatch.fnmatch(dataset_filebase, globbed_folder):
+                data_dir = os.path.join(this_dir, "../metadata/", folder)
+                break
+        else:
+            data_dir = None
+    if data_dir is None:
         raise NotImplementedError(
-            f"Cannot find metadata for the dataset at {config.dataset_path}."
+            f"Cannot find metadata for the dataset with filebase {dataset_filebase}"
             + f" Datasets with known metadata: {subfolders}"
             + " If you have the metadata for this dataset,"
             + " please add in a subfolder of metadata/."
@@ -40,7 +46,6 @@ def get_metadata_folder(config=Configs()):
             + " please make a symlink to the equivalent metadata."
             + " In these simlinks, 'W' will be treated as the glob wildcard."
         )
-    data_dir = os.path.join(this_dir, "../metadata/", folder)
     return data_dir
 
 
