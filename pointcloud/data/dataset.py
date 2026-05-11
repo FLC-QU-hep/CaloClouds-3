@@ -477,8 +477,6 @@ class PointCloudDatasetGH(PointCloudDataset):
         raise NotImplementedError("Why are you fuzzing the GH dataset?")
 
 
-# Contains heavy assumptions about the dataset - could draw these from metadata
-# might need to also return "points" as "points_per_layer"
 class PointCloudAngular(PointCloudDataset):
     keys_to_include = {
         "event": "events",
@@ -486,9 +484,10 @@ class PointCloudAngular(PointCloudDataset):
         "p_norm_local": "p_norm_local",
     }
     # correct for the sim-E... datasets
-    Xmean, Ymean, Zmean = -0.0074305227, -0.21205868, 12.359252
-    Xstd, Ystd, Zstd = 21.608465, 22.748442, 5.305082
-    Emean, Estd = -1.5300317, 1.2500798
+    metadata = Metadata(Configs())
+    Xmean, Ymean, Zmean = metadata.mean_xs, metadata.mean_ys, metadata.mean_zs
+    Xstd, Ystd, Zstd = metadata.std_xs, metadata.std_ys, metadata.std_zs
+    Emean, Estd = metadata.mean_log_es, metadata.std_log_es
 
     @classmethod
     def normalize_xyze(cls, event, fuzz_perpendicular=False):
