@@ -69,14 +69,10 @@ class Configs:
         self.storage_base = "/beegfs/desy/user/"
         self.dataset = "x36_grid"  # choices=['x36_grid', 'clustered', 'getting_high']
         self.dataset_path_in_storage = True
-        # self._dataset_path = 'akorol/data/calo-clouds/hdf5/clustered/10-90GeV_clustered_524k_sorted_float32.hdf5'
-        # self._dataset_path = 'akorol/data/calo-clouds/hdf5/high_granular_grid/train/10-90GeV_x36_grid_regular_524k.hdf5'
         self._dataset_path = "akorol/data/calo-clouds/hdf5/high_granular_grid/train/10-90GeV_x36_grid_regular_524k_float32.hdf5"
         self.n_dataset_files = 0  # it's not a split dataset
-        # self._dataset_path = 'korcariw/CaloClouds/dataset/showers/photons_10_100GeV_float32_sorted_train.h5'
-        # self._dataset_path = 'korcariw/CaloClouds/dataset/showers/photons_50GeV_sorted.h5'
-        # self._dataset_path = 'akorol/projects/getting_high/ILDConfig/StandardConfig/production/out/photons_50GeV_40k.slcio.hdf5'
         self.quantized_pos = False
+        self.data_features = ["x", "y", "z", "energy"]
 
         # Dataloader
         self.workers = 32

@@ -1,1 +1,1 @@
-config_varients/example.py
+config_varients/sepPhotonData.py

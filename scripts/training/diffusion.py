@@ -41,7 +41,6 @@ def train(batch, it, **setup):
     sigma = sample_density([x.shape[0]], device=x.device)  # time steps
 
     experiment = setup["experiment"]
-    print(x.shape, noise.shape, sigma.shape, cond_feats.shape)
     loss, loss_flow = model.get_loss(
         x,
         noise,
