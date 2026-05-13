@@ -149,3 +149,5 @@ testbed.ipynb
 *.pth
 *.swp
 *.npy
+log_dir/
+slurm_script/

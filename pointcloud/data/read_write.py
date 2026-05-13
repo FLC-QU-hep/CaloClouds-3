@@ -2,10 +2,11 @@
 Read and write dat aon disk, creates a common interface.
 """
 
+import glob
+from functools import lru_cache
+
 import h5py
 import numpy as np
-from functools import lru_cache
-import glob
 
 from ..utils.metadata import Metadata
 
@@ -112,20 +113,20 @@ def regularise_event_axes(events, is_transposed=None, known_regular=False):
         prior_axes = events.shape[:-3]
         if not all([a == 1 for a in prior_axes]):
             raise ValueError(
-                "There are axes not length 1 before the event axis; " f"{events.shape}"
+                f"There are axes not length 1 before the event axis; {events.shape}"
             )
         while len(events.shape) > 3:
             # don't want to straight up squeeze in case there is only one event
             events = events[0]
     if is_transposed:
-        assert (
-            events.shape[1] == 4
-        ), "The second last axes must be length 4 in transposed events"
+        assert events.shape[1] == 4, (
+            "The second last axes must be length 4 in transposed events"
+        )
         events = events.transpose(0, 2, 1)
     elif isinstance(is_transposed, bool):  # then it's false
-        assert (
-            events.shape[2] == 4
-        ), "The last axes must be length 4 in non-transposed events"
+        assert events.shape[2] == 4, (
+            "The last axes must be length 4 in non-transposed events"
+        )
     else:
         if events.shape[2] != 4:
             if not events.shape[1] == 4:
@@ -342,8 +343,8 @@ def read_raw_regaxes(config, pick_events=None, total_size=None, per_event_cols=N
         per_event_cols = ["energy"]
     if not hasattr(config, "n_dataset_files"):
         config.n_dataset_files = 0
-    #import ipdb
-    #ipdb.set_trace()
+    # import ipdb
+    # ipdb.set_trace()
     n_events = get_n_events(config.dataset_path, config.n_dataset_files)
     n_total_events = np.sum(n_events)
     total_size = min(100 if total_size is None else total_size, n_total_events)
@@ -361,9 +362,9 @@ def read_raw_regaxes(config, pick_events=None, total_size=None, per_event_cols=N
         pick_events = np.arange(n_total_events)[pick_events]
     else:
         pick_events = np.array(pick_events, dtype=int)
-        assert (
-            np.max(pick_events, initial=0) < n_total_events
-        ), "Event index out of range in pick_events"
+        assert np.max(pick_events, initial=0) < n_total_events, (
+            "Event index out of range in pick_events"
+        )
 
     file_names = get_files(config.dataset_path, config.n_dataset_files)
     file_indices = []
@@ -384,18 +385,17 @@ def read_raw_regaxes(config, pick_events=None, total_size=None, per_event_cols=N
     for name, indices in zip(file_names, file_indices):
         with h5py.File(name, "r") as dataset:
             events_here = dataset["events"]
-
             # treat empty files
             if len(events_here) == 0:
                 events.append(np.zeros(0))
                 per_event.append(np.zeros(0))
                 continue
-
             # account for the variations in shower axes layout
             n_events_here = events_here.shape[-3]
             events_here = events_here[..., indices, :, :]
             # and make the axes order regular
             events_here = regularise_event_axes(events_here)
+
             events.append(events_here)
 
             # event level variables have more randomness again
@@ -432,7 +432,23 @@ def read_raw_regaxes(config, pick_events=None, total_size=None, per_event_cols=N
     per_event = np.vstack(per_event)
     if per_event.shape[1] == 1:
         per_event = per_event[:, 0]
-    events = np.vstack(events)
+
+    if events[0].shape[1] == events[1].shape[1]:
+        events = np.vstack(events)
+    else:  # pad to max len
+        # print("Padding to max len in case it is not done beforehand.")
+        to_pad = [e for e in events if e.shape[0] > 0]
+        max_len = max(e.shape[1] for e in events)
+        to_pad = np.array(
+            [
+                np.concatenate(
+                    [e, np.zeros((e.shape[0], max_len - e.shape[1], e.shape[-1]))],
+                    axis=1,
+                )
+                for e in to_pad
+            ]
+        )
+        events = np.vstack(to_pad)
 
     metadata = Metadata(config)
     events_to_local(events, metadata.orientation)

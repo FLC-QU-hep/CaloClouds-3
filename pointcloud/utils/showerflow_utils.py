@@ -1,19 +1,22 @@
-import os
-import numpy as np
 import copy
-import warnings
 import itertools
+import os
+import warnings
 
+import numpy as np
 from pointcloud.data.naming import dataset_name_from_path
 from pointcloud.models.shower_flow import versions_dict
-from .metadata import Metadata
+
 from ..data.conditioning import get_cond_features_names
+from .metadata import Metadata
 
 
 def get_data_dir(config, last_resort="/home/{}/Data/"):
     user_name = os.getenv("USER", os.getenv("USERNAME", ""))
+    print(user_name)
     second_choice = os.path.join(config.storage_base, "point-cloud-diffusion-data")
     data_dir = getattr(config, "shower_flow_data_dir", second_choice)
+    print(second_choice, data_dir)
     if not os.path.exists(data_dir):
         data_dir = os.path.join(
             config.storage_base, user_name, "point-cloud-diffusion-data"
@@ -210,9 +213,9 @@ def models_at_paths(cond_features, check_paths):
 def config_params_from_showerflow_path(showerflow_path):
     # otherwise, we can guess from the path
     base_name = os.path.basename(showerflow_path)
-    assert base_name.startswith(
-        "ShowerFlow_"
-    ), f"Base name of path {showerflow_path} does not start with 'ShowerFlow_'"
+    assert base_name.startswith("ShowerFlow_"), (
+        f"Base name of path {showerflow_path} does not start with 'ShowerFlow_'"
+    )
     # we can reverse engineer the path
     parts = base_name.split(".pth")[0].split("_")
     version = parts[1]
