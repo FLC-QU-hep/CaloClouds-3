@@ -4,25 +4,50 @@
 #
 # Start by setting up notebook enviroment.
 
-from tqdm import tqdm
-
-import torch
-from torch import optim
-import matplotlib.pyplot as plt
-import matplotlib.gridspec as gridspec
-
-import numpy as np
 import os
 import sys
 import time
 
-from pointcloud.config_varients import caloclouds_2, caloclouds_3, example
+import matplotlib.gridspec as gridspec
+import matplotlib.pyplot as plt
+import numpy as np
+import torch
 from pointcloud import configs as default_configs
-from pointcloud.data.read_write import get_n_events
+from pointcloud.config_varients import caloclouds_2, caloclouds_3, example
 from pointcloud.data.conditioning import get_cond_dim
+from pointcloud.data.read_write import get_n_events
+from pointcloud.models import shower_flow
 from pointcloud.utils import showerflow_training, showerflow_utils
 from pointcloud.utils.metadata import Metadata
-from pointcloud.models import shower_flow
+from torch import optim
+from tqdm import tqdm
+
+
+def split_train_val(batch_size, dataset, shuffle, pin_memory):
+    perc_training = 0.9
+    train_batch, val_batch = (
+        int(perc_training * batch_size),
+        int((1 - perc_training) * batch_size),
+    )
+    train_size = int(perc_training * len(dataset))
+    train_dataset, val_dataset = torch.utils.data.random_split(
+        dataset, [train_size, len(dataset) - train_size]
+    )
+
+    val_loader = torch.utils.data.DataLoader(
+        val_dataset,
+        batch_size=val_batch,
+        shuffle=shuffle,
+        pin_memory=pin_memory,
+    )
+
+    train_loader = torch.utils.data.DataLoader(
+        train_dataset,
+        batch_size=train_batch,
+        shuffle=shuffle,
+        pin_memory=pin_memory,
+    )
+    return train_loader, val_loader
 
 
 def should_save(epoch):
@@ -32,7 +57,7 @@ def should_save(epoch):
     return set(str_epoch[1:]) == {"0"}
 
 
-def main(config, batch_size=2048, total_epochs=1_000_000_000, shuffle=True):
+def main(config, batch_size=2048, total_epochs=3_000, shuffle=True):
     # def main(config, batch_size=64, total_epochs=1_000_000_000, shuffle=True):
     """
     Really this is a script, but for ease of testing, it's the main function.
@@ -56,8 +81,15 @@ def main(config, batch_size=2048, total_epochs=1_000_000_000, shuffle=True):
         num_blocks=config.shower_flow_num_blocks,
         num_inputs=input_dim,
         num_cond_inputs=cond_dim,
+        af_dim=4,
         device=device,
     )  # num_cond_inputs
+
+    # print out the number of parameters
+    total_params = sum(p.numel() for p in model.parameters())
+    trainable_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
+    print(f"Total parameters:     {total_params:,}")
+    print(f"Trainable parameters: {trainable_params:,}")
     # ## Setup
     #
     # Load the data and check it's properties.
@@ -167,6 +199,7 @@ def main(config, batch_size=2048, total_epochs=1_000_000_000, shuffle=True):
 
     pin_memory = device == "cpu"
     print(f"Pin memory is {pin_memory}, device is {device}")
+
     train_loader = torch.utils.data.DataLoader(
         dataset,
         batch_size=batch_size,
@@ -227,6 +260,7 @@ def main(config, batch_size=2048, total_epochs=1_000_000_000, shuffle=True):
         history = np.load(history_data_path)
         epoch_nums = history[0].tolist()
         losses = history[1].tolist()
+        losses_val = history[2].tolist()
         if detailed_history:
             mean_parameter = history[2].tolist()
             max_parameter = history[3].tolist()
@@ -234,12 +268,12 @@ def main(config, batch_size=2048, total_epochs=1_000_000_000, shuffle=True):
 
     else:
         epoch_nums = []
-        losses = []
+        losses, losses_val = [], []
         if detailed_history:
             mean_parameter = []
             max_parameter = []
             gradient_norm = []
-    history_save_list = [epoch_nums, losses]
+    history_save_list = [epoch_nums, losses, losses_val]
     if detailed_history:
         history_save_list += [mean_parameter, max_parameter, gradient_norm]
 
@@ -254,12 +288,10 @@ def main(config, batch_size=2048, total_epochs=1_000_000_000, shuffle=True):
         dataset = make_train_ds(start_idx, start_idx + local_batch_size)
         if len(dataset) == 0:
             continue
-        train_loader = torch.utils.data.DataLoader(
-            dataset,
-            batch_size=batch_size,
-            shuffle=shuffle,
-            pin_memory=pin_memory,
+        train_loader, val_loader = split_train_val(
+            local_batch_size, dataset, shuffle, pin_memory
         )
+
         percent = (epoch - epoch_start) / (total_epochs - epoch_start)
         print(
             f"     Epoch number {epoch}; {percent:.0%} complete;"
@@ -271,7 +303,7 @@ def main(config, batch_size=2048, total_epochs=1_000_000_000, shuffle=True):
             context = data[:, :cond_dim].to(device).float()
             input_data = data[:, cond_dim:].to(device).float()
             if batch_idx % 10 == 0:
-                print(f"{batch_idx/batch_len:.0%}", end="\r")
+                print(f"{batch_idx / batch_len:.0%}", end="\r")
 
             # with additional features in latent space (e.g. Esum)
             optimizer.zero_grad()
@@ -322,9 +354,25 @@ def main(config, batch_size=2048, total_epochs=1_000_000_000, shuffle=True):
                 max_parameter.append(torch.max(parameter_list).item())
 
         mean_loss = np.mean(loss_list[-batch_len:])
+
+        # ── Validation ──────────────────────────────────────────────────────────[...]
+        model.eval()
+        val_loss_list = []
+        with torch.no_grad():
+            for val_data in val_loader:
+                context = val_data[:, :cond_dim].to(device).float()
+                input_data = val_data[:, cond_dim:].to(device).float()
+                nll = -distribution.condition(context).log_prob(input_data)
+                val_loss_list.append(nll.mean().item())
+                distribution.clear_cache()
+        mean_val_loss = np.mean(val_loss_list)
+        model.train()
+        # ────────────────────────────────────────────────────────────────[...]
+
         if not detailed_history:
             epoch_nums.append(epoch)
             losses.append(mean_loss)
+            losses_val.append(mean_val_loss)
 
         np.save(history_data_path, np.array(history_save_list))
 
@@ -352,7 +400,13 @@ def main(config, batch_size=2048, total_epochs=1_000_000_000, shuffle=True):
                     },
                     epoch_path,
                 )
-
+                plt.figure(1)
+                plt.plot(epoch_nums, losses)
+                plt.plot(epoch_nums, losses_val)
+                plt.xlabel("Epoch")
+                plt.ylabel("Loss")
+                plt.savefig(showerflow_dir + "/loss_history.png")
+                plt.close()
             # save best model based on loss
             if mean_loss <= best_loss:
                 best_loss = mean_loss
