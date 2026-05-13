@@ -433,7 +433,7 @@ def read_raw_regaxes(config, pick_events=None, total_size=None, per_event_cols=N
     if per_event.shape[1] == 1:
         per_event = per_event[:, 0]
 
-    if events[0].shape[1] == events[1].shape[1]:
+    if len(events) == 1 or len(set(e.shape[1] for e in events)) == 1:
         events = np.vstack(events)
     else:  # pad to max len
         # print("Padding to max len in case it is not done beforehand.")
