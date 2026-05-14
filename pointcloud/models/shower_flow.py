@@ -140,7 +140,7 @@ class HybridTanH_factory:
         return modules, flow_dist, self.transforms
 
 
-def compile_HybridTanH_model(num_blocks, num_inputs, num_cond_inputs, device):
+def compile_HybridTanH_model(num_blocks, num_inputs, num_cond_inputs, af_dim, device):
     """
     Simplified version of the default
 
@@ -183,7 +183,7 @@ def compile_HybridTanH_model(num_blocks, num_inputs, num_cond_inputs, device):
         The list of transformations that the model applies.
 
     """
-    factory = HybridTanH_factory(num_inputs, num_cond_inputs, device)
+    factory = HybridTanH_factory(num_inputs, num_cond_inputs, af_dim, device)
 
     transform_pattern = [
         "affine_coupling",
