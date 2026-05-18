@@ -33,7 +33,7 @@ from models.custom_pyro import ConditionalAffineCouplingTanH
 import torch
 import torch.nn as nn
 
-def compile_HybridTanH_model(num_blocks, num_inputs, num_cond_inputs, device):
+def compile_HybridTanH_model(num_blocks, num_inputs, num_cond_inputs, af_dim, device):
     # the latent space distribution: choosing a 2-dim Gaussian
     base_dist = dist.Normal(torch.zeros(num_inputs).to(device), torch.ones(num_inputs).to(device))
 
@@ -53,7 +53,7 @@ def compile_HybridTanH_model(num_blocks, num_inputs, num_cond_inputs, device):
         
 
                     
-        hypernet = ConditionalDenseNN(split_dim, num_cond_inputs, [input_dim*10, input_dim*10], param_dims1)
+        hypernet = ConditionalDenseNN(split_dim, num_cond_inputs, [input_dim*af_dim, input_dim*af_dim], param_dims1)
         ctf = ConditionalAffineCouplingTanH(split_dim, hypernet)
         transforms2.append(ctf)
         transforms.append(ctf)
@@ -63,7 +63,7 @@ def compile_HybridTanH_model(num_blocks, num_inputs, num_cond_inputs, device):
         transforms.append(ff)
 
         
-        hypernet = ConditionalDenseNN(split_dim, num_cond_inputs, [input_dim*10, input_dim*10], param_dims1)
+        hypernet = ConditionalDenseNN(split_dim, num_cond_inputs, [input_dim*af_dim, input_dim*af_dim], param_dims1)
         ctf = ConditionalAffineCouplingTanH(split_dim, hypernet)
         transforms2.append(ctf)
         transforms.append(ctf)
@@ -73,7 +73,7 @@ def compile_HybridTanH_model(num_blocks, num_inputs, num_cond_inputs, device):
         transforms.append(ff)
 
         
-        hypernet = ConditionalDenseNN(split_dim, num_cond_inputs, [input_dim*10, input_dim*10], param_dims1)
+        hypernet = ConditionalDenseNN(split_dim, num_cond_inputs, [input_dim*af_dim, input_dim*af_dim], param_dims1)
         ctf = ConditionalAffineCouplingTanH(split_dim, hypernet)
         transforms2.append(ctf)
         transforms.append(ctf)
@@ -97,7 +97,7 @@ def compile_HybridTanH_model(num_blocks, num_inputs, num_cond_inputs, device):
 
         
 
-        hypernet = ConditionalDenseNN(split_dim, num_cond_inputs, [input_dim*10, input_dim*10], param_dims1)
+        hypernet = ConditionalDenseNN(split_dim, num_cond_inputs, [input_dim*af_dim, input_dim*af_dim], param_dims1)
         ctf = ConditionalAffineCouplingTanH(split_dim, hypernet)
         transforms2.append(ctf)
         transforms.append(ctf)
@@ -107,7 +107,7 @@ def compile_HybridTanH_model(num_blocks, num_inputs, num_cond_inputs, device):
         transforms.append(ff)
 
         
-        hypernet = ConditionalDenseNN(split_dim, num_cond_inputs, [input_dim*10, input_dim*10], param_dims1)
+        hypernet = ConditionalDenseNN(split_dim, num_cond_inputs, [input_dim*af_dim, input_dim*af_dim], param_dims1)
         ctf = ConditionalAffineCouplingTanH(split_dim, hypernet)
         transforms2.append(ctf)
         transforms.append(ctf)
@@ -117,7 +117,7 @@ def compile_HybridTanH_model(num_blocks, num_inputs, num_cond_inputs, device):
         transforms.append(ff)
 
         
-        hypernet = ConditionalDenseNN(split_dim, num_cond_inputs, [input_dim*10, input_dim*10], param_dims1)
+        hypernet = ConditionalDenseNN(split_dim, num_cond_inputs, [input_dim*af_dim, input_dim*af_dim], param_dims1)
         ctf = ConditionalAffineCouplingTanH(split_dim, hypernet)
         transforms2.append(ctf)
         transforms.append(ctf)
@@ -145,7 +145,7 @@ device = torch.device('cpu')
 
 flow_model, flow_transforms = compile_HybridTanH_model(num_blocks=4, 
                                            num_inputs=62, ### when 'condioning' on additional Esum, Nhits etc add them on as inputs rather than 
-                                           num_cond_inputs=4, device=device)  # num_cond_inputs
+                                           num_cond_inputs=4, af_dim=10, device=device)  # num_cond_inputs
 # checkpoint = torch.load('/gpfs/dust/maxwell/user/akorol/logs/point-clouds-angular/SF/angular_ShowerFlow_best.pth', map_location=torch.device('cpu'))   # trained about 350 epochs
 checkpoint = torch.load('/data/dust/user/akorol/maxwell.merged/logs/point-clouds-angular/SF_new/angular_ShowerFlow_best.pth', map_location=device)   # trained about 350 epochs
 
