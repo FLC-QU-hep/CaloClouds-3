@@ -48,6 +48,7 @@ def load_flow_model(
         # adding 30 e layers
         num_inputs=input_dim,
         num_cond_inputs=get_cond_dim(config, "showerflow"),
+        af_dim=10,
         device=config.device,
     )  # num_cond_inputs
     checkpoint = torch.load(model_path, map_location=config.device, weights_only=False)
