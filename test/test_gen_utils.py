@@ -66,6 +66,7 @@ class TestGenMethods:
             num_blocks=config.shower_flow_num_blocks,
             num_inputs=60,
             num_cond_inputs=cond_dim,
+            af_dim = 10,
             device=config.device,
         )
         diff_model, coef_real, coef_fake, n_splines = load_diffusion_model(
@@ -86,6 +87,7 @@ class TestGenMethods:
             num_blocks=config.shower_flow_num_blocks,
             num_inputs=65,
             num_cond_inputs=cond_dim,
+            af_dim=10,
             device=config.device,
         )
         diff_model = get_model_class(config)(config)

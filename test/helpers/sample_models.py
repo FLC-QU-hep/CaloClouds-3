@@ -14,6 +14,7 @@ def write_fake_flow_model(config, file_path):
         num_blocks=config.shower_flow_num_blocks,
         num_inputs=get_input_mask(config).sum(),
         num_cond_inputs=get_cond_dim(config, "showerflow"),
+        af_dim=10,
         device=config.device,
     )
     torch.save({"model": flow.state_dict()}, file_path)

@@ -1208,6 +1208,7 @@ def get_caloclouds_models(
                 num_blocks=showerflow_config.shower_flow_num_blocks,
                 num_inputs=np.sum(input_mask),
                 num_cond_inputs=get_cond_dim(showerflow_config, "showerflow"),
+                af_dim=10,
                 device=device,
             )
             print(showerflow_path)
