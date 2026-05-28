@@ -44,7 +44,8 @@ class Configs:
         self.flow_hidden_dims = 128
         self.tails = "linear"
         self.tail_bound = 10
-
+        self.af_dim = 10 
+        
         # showerflow arguments
         self.shower_flow_version = "original"  # options: ['original', 'alt1', 'alt2']
         self.shower_flow_inputs = [

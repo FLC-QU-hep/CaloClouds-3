@@ -433,22 +433,19 @@ def read_raw_regaxes(config, pick_events=None, total_size=None, per_event_cols=N
     if per_event.shape[1] == 1:
         per_event = per_event[:, 0]
 
-    if events[0].shape[1] == events[1].shape[1]:
+    events = [e for e in events if e.shape[0] > 0]  # filter empty files
+    if len(set(e.shape[1] for e in events)) == 1:
         events = np.vstack(events)
     else:  # pad to max len
-        # print("Padding to max len in case it is not done beforehand.")
-        to_pad = [e for e in events if e.shape[0] > 0]
         max_len = max(e.shape[1] for e in events)
-        to_pad = np.array(
-            [
-                np.concatenate(
-                    [e, np.zeros((e.shape[0], max_len - e.shape[1], e.shape[-1]))],
-                    axis=1,
-                )
-                for e in to_pad
-            ]
-        )
-        events = np.vstack(to_pad)
+        padded = [
+            np.concatenate(
+                [e, np.zeros((e.shape[0], max_len - e.shape[1], e.shape[-1]))],
+                axis=1,
+            )
+            for e in events
+        ]
+        events = np.vstack(padded)
 
     metadata = Metadata(config)
     events_to_local(events, metadata.orientation)

@@ -10,7 +10,7 @@ class Configs(default.Configs):
         self.latent_dim = 0  # no latent flow in new calocloud
         self.dataset_path_in_storage = True
         self.storage_base = "/eos/user/m/mamozzan/"
-        self._dataset_path = "/eos/user/m/mamozzan/step2point/outputs/cc3input_merge_within_cell/input_cc3_file_{}.h5"
+        self._dataset_path = "/eos/user/m/mamozzan/step2point/outputs/cc3input_identity/input_cc3_file_{}.h5"
         self.metadata_folder = "/eos/user/m/mamozzan/CaloClouds-3/pointcloud/metadata/metadata_p22_th45-135_ph79-109_en5-130"
         self.n_dataset_files = 4
         self.Acomment = (

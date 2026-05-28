@@ -50,6 +50,275 @@ def split_train_val(batch_size, dataset, shuffle, pin_memory):
     return train_loader, val_loader
 
 
+def plot_shower_flow_eval(
+    showerflowdir,
+    E_true,
+    num_points,
+    num_points_sampled,
+    visible_energy,
+    visible_energy_sampled,
+    cog_x,
+    cog_x_sampled,
+    cog_y,
+    cog_y_sampled,
+    cog_z,
+    cog_z_sampled,
+    clusters_per_layer,
+    clusters_per_layer_sampled,
+    e_per_layer,
+    e_per_layer_sampled,
+):
+    plot_idx = 1
+
+    def save_and_close(title, filename):
+        plt.suptitle(title)
+        plt.savefig(showerflowdir + filename)
+        plt.close()
+
+    # Number of points
+    if num_points is not None and num_points_sampled is not None:
+        fig = plt.figure(figsize=(12, 6))
+        gs = gridspec.GridSpec(1, 2)
+
+        fig.add_subplot(gs[0])
+        h = plt.hist(num_points.flatten(), bins=100, color="lightgrey")
+        plt.hist(
+            num_points_sampled.flatten(),
+            bins=h[1],
+            histtype="step",
+            lw=2,
+            color="tab:orange",
+        )
+
+        fig.add_subplot(gs[1])
+        h = plt.hist(num_points.flatten(), bins=100, color="lightgrey")
+        plt.hist(
+            num_points_sampled.flatten(),
+            bins=h[1],
+            histtype="step",
+            lw=2,
+            color="tab:orange",
+        )
+        plt.yscale("log")
+        plt.ylim(1, 1e5)
+
+        save_and_close("Number of points per event", f"ShowerFlow_eval_{plot_idx}.png")
+    plot_idx += 1
+
+    # Visible energy
+    if visible_energy is not None and visible_energy_sampled is not None:
+        fig = plt.figure(figsize=(12, 6))
+        gs = gridspec.GridSpec(1, 2)
+
+        fig.add_subplot(gs[0])
+        h = plt.hist(visible_energy.flatten(), bins=100, color="lightgrey")
+        plt.hist(
+            visible_energy_sampled.flatten(),
+            bins=h[1],
+            histtype="step",
+            lw=2,
+            color="tab:orange",
+        )
+
+        fig.add_subplot(gs[1])
+        h = plt.hist(visible_energy.flatten(), bins=100, color="lightgrey")
+        plt.hist(
+            visible_energy_sampled.flatten(),
+            bins=h[1],
+            histtype="step",
+            lw=2,
+            color="tab:orange",
+        )
+        plt.yscale("log")
+        plt.ylim(1, 1e5)
+
+        save_and_close("visible energy", f"ShowerFlow_eval_{plot_idx}.png")
+    plot_idx += 1
+
+    # Sampling fraction
+    if visible_energy is not None and visible_energy_sampled is not None:
+        fig = plt.figure(figsize=(12, 6))
+        gs = gridspec.GridSpec(1, 2)
+
+        fig.add_subplot(gs[0])
+        h = plt.hist(
+            visible_energy.flatten() / E_true.flatten(), bins=100, color="lightgrey"
+        )
+        plt.hist(
+            visible_energy_sampled.flatten() / E_true.flatten(),
+            bins=h[1],
+            histtype="step",
+            lw=2,
+            color="tab:orange",
+        )
+
+        fig.add_subplot(gs[1])
+        h = plt.hist(
+            visible_energy.flatten() / E_true.flatten(), bins=100, color="lightgrey"
+        )
+        plt.hist(
+            visible_energy_sampled.flatten() / E_true.flatten(),
+            bins=h[1],
+            histtype="step",
+            lw=2,
+            color="tab:orange",
+        )
+        plt.yscale("log")
+        plt.ylim(1, 1e5)
+
+        save_and_close("Sampling fraction", f"ShowerFlow_eval_{plot_idx}.png")
+    plot_idx += 1
+
+    # CoG x
+    if cog_x is not None and cog_x_sampled is not None:
+        fig = plt.figure(figsize=(12, 6))
+        gs = gridspec.GridSpec(1, 2)
+
+        fig.add_subplot(gs[0])
+        h = plt.hist(cog_x.flatten(), bins=100, color="lightgrey")
+        plt.hist(
+            cog_x_sampled.flatten(),
+            bins=h[1],
+            histtype="step",
+            lw=2,
+            color="tab:orange",
+        )
+        plt.xlim(-20, 20)
+
+        fig.add_subplot(gs[1])
+        h = plt.hist(cog_x.flatten(), bins=100, color="lightgrey")
+        plt.hist(
+            cog_x_sampled.flatten(),
+            bins=h[1],
+            histtype="step",
+            lw=2,
+            color="tab:orange",
+        )
+        plt.yscale("log")
+        plt.ylim(1, 1e6)
+        plt.xlim(-20, 20)
+
+        save_and_close("center of gravity x", f"ShowerFlow_eval_{plot_idx}.png")
+    plot_idx += 1
+
+    # CoG y
+    if cog_y is not None and cog_y_sampled is not None:
+        fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 6))
+
+        h = ax1.hist(cog_y.flatten(), bins=100, color="lightgrey")
+        ax1.hist(
+            cog_y_sampled.flatten(),
+            bins=h[1],
+            histtype="step",
+            lw=2,
+            color="tab:orange",
+        )
+
+        h = ax2.hist(cog_y.flatten(), bins=100, color="lightgrey")
+        ax2.hist(
+            cog_y_sampled.flatten(),
+            bins=h[1],
+            histtype="step",
+            lw=2,
+            color="tab:orange",
+        )
+        ax2.set_yscale("log")
+
+        save_and_close("center of gravity y", f"ShowerFlow_eval_{plot_idx}.png")
+    plot_idx += 1
+
+    # CoG z
+    if cog_z is not None and cog_z_sampled is not None:
+        fig = plt.figure(figsize=(12, 6))
+        gs = gridspec.GridSpec(1, 2)
+
+        fig.add_subplot(gs[0])
+        h = plt.hist(cog_z.flatten(), bins=100, color="lightgrey")
+        plt.hist(
+            cog_z_sampled.flatten(),
+            bins=h[1],
+            histtype="step",
+            lw=2,
+            color="tab:orange",
+        )
+
+        ax = fig.add_subplot(gs[1])
+        h = ax.hist(cog_z.flatten(), bins=100, color="lightgrey")
+        ax.hist(
+            cog_z_sampled.flatten(),
+            bins=h[1],
+            histtype="step",
+            lw=2,
+            color="tab:orange",
+        )
+        ax.semilogy()
+
+        save_and_close("center of gravity z", f"ShowerFlow_eval_{plot_idx}.png")
+    plot_idx += 1
+
+    # Clusters per layer
+    if clusters_per_layer is not None and clusters_per_layer_sampled is not None:
+        for log_scale in [False, True]:
+            fig = plt.figure(figsize=(12, 12))
+            gs = gridspec.GridSpec(6, 5)
+            for i in range(30):
+                fig.add_subplot(gs[i])
+                h = plt.hist(
+                    clusters_per_layer[:, i].flatten(),
+                    bins=40,
+                    color="lightgrey",
+                    range=[
+                        clusters_per_layer[:, i].flatten().min() - 0.2,
+                        clusters_per_layer[:, i].flatten().max() + 0.2,
+                    ],
+                )
+                plt.hist(
+                    clusters_per_layer_sampled[:, i].flatten(),
+                    bins=h[1],
+                    histtype="step",
+                    lw=1,
+                    color="tab:orange",
+                )
+                if log_scale:
+                    plt.yscale("log")
+            title = (
+                "clusters per layer (log scale)" if log_scale else "clusters per layer"
+            )
+            save_and_close(title, f"ShowerFlow_eval_{plot_idx}.png")
+            plot_idx += 1
+    else:
+        plot_idx += 2
+
+    # Energy per layer
+    if e_per_layer is not None and e_per_layer_sampled is not None:
+        for log_scale in [False, True]:
+            fig = plt.figure(figsize=(12, 12))
+            gs = gridspec.GridSpec(6, 5)
+            for i in range(30):
+                fig.add_subplot(gs[i])
+                h = plt.hist(
+                    e_per_layer[:, i].flatten(),
+                    bins=40,
+                    color="lightgrey",
+                    range=[
+                        e_per_layer[:, i].flatten().min() - 0.2,
+                        e_per_layer[:, i].flatten().max() + 0.2,
+                    ],
+                )
+                plt.hist(
+                    e_per_layer_sampled[:, i].flatten(),
+                    bins=h[1],
+                    histtype="step",
+                    lw=1,
+                    color="tab:orange",
+                )
+                if log_scale:
+                    plt.yscale("log")
+            title = "energy per layer (log scale)" if log_scale else "energy per layer"
+            save_and_close(title, f"ShowerFlow_eval_{plot_idx}.png")
+            plot_idx += 1
+
+
 def should_save(epoch):
     if epoch < 10:
         return False
@@ -81,7 +350,7 @@ def main(config, batch_size=2048, total_epochs=3_000, shuffle=True):
         num_blocks=config.shower_flow_num_blocks,
         num_inputs=input_dim,
         num_cond_inputs=cond_dim,
-        af_dim=4,
+        af_dim=config.af_dim,
         device=device,
     )  # num_cond_inputs
 
@@ -124,11 +393,17 @@ def main(config, batch_size=2048, total_epochs=3_000, shuffle=True):
     # Calculating clusters per layer takes ~ 5 mins, so it's saved between runs.
 
     clusters_per_layer_path = showerflow_training.get_clusters_per_layer(
-        config, showerflow_dir, redo=False, local_batch_size=local_batch_size
+        config,
+        showerflow_dir,
+        redo=False,
+        local_batch_size=local_batch_size,
     )
 
     energy_per_layer_path = showerflow_training.get_energy_per_layer(
-        config, showerflow_dir, redo=False, local_batch_size=local_batch_size
+        config,
+        showerflow_dir,
+        redo=False,
+        local_batch_size=local_batch_size,
     )
 
     # The energy per layer and the clusters per layer have now either been calculated,
@@ -196,7 +471,6 @@ def main(config, batch_size=2048, total_epochs=3_000, shuffle=True):
     start_points = np.arange(0, n_events, local_batch_size)
     # try it out
     dataset = make_train_ds(0, 5)
-
     pin_memory = device == "cpu"
     print(f"Pin memory is {pin_memory}, device is {device}")
 
@@ -302,6 +576,10 @@ def main(config, batch_size=2048, total_epochs=3_000, shuffle=True):
         for batch_idx, data in enumerate(train_loader):
             context = data[:, :cond_dim].to(device).float()
             input_data = data[:, cond_dim:].to(device).float()
+            if torch.isnan(input_data).any():
+                print(f"NaN in input_data! Shape: {input_data.shape}")
+            if torch.isnan(context).any():
+                print(f"NaN in context! Shape: {context.shape}")
             if batch_idx % 10 == 0:
                 print(f"{batch_idx / batch_len:.0%}", end="\r")
 
@@ -362,7 +640,20 @@ def main(config, batch_size=2048, total_epochs=3_000, shuffle=True):
             for val_data in val_loader:
                 context = val_data[:, :cond_dim].to(device).float()
                 input_data = val_data[:, cond_dim:].to(device).float()
-                nll = -distribution.condition(context).log_prob(input_data)
+                assert not torch.isnan(input_data).any(), (
+                    f"NaN in input_data! Shape: {input_data.shape}"
+                )
+                # also check context
+                assert not torch.isnan(context).any(), "NaN in context!"
+                try:
+                    nll = -distribution.condition(context).log_prob(input_data)
+                    # ... rest of validation
+                except ValueError as e:
+                    if epoch == 0:
+                        nll = torch.zeros(input_data.shape[0], device=input_data.device)
+                    else:
+                        print(f"Skipping validation at epoch {epoch}: {e}")
+                        continue
                 val_loss_list.append(nll.mean().item())
                 distribution.clear_cache()
         mean_val_loss = np.mean(val_loss_list)
@@ -401,8 +692,9 @@ def main(config, batch_size=2048, total_epochs=3_000, shuffle=True):
                     epoch_path,
                 )
                 plt.figure(1)
-                plt.plot(epoch_nums, losses)
-                plt.plot(epoch_nums, losses_val)
+                plt.plot(epoch_nums, losses_val, label="val")
+                plt.plot(epoch_nums, losses, label="train")
+                plt.legend()
                 plt.xlabel("Epoch")
                 plt.ylabel("Loss")
                 plt.savefig(showerflow_dir + "/loss_history.png")
@@ -489,292 +781,82 @@ def main(config, batch_size=2048, total_epochs=3_000, shuffle=True):
 
     raw_E_true = np.concatenate(E_true_list, axis=0)
     samples = np.concatenate(samples_list, axis=0)
-    raw_num_points = np.concatenate(num_points_list, axis=0)
-    raw_visible_energy = np.concatenate(visible_energy_list, axis=0)
-    raw_cog_x = np.concatenate(cog_x_list, axis=0)
-    raw_cog_y = np.concatenate(cog_y_list, axis=0)
-    raw_cog_z = np.concatenate(cog_z_list, axis=0)
-    samples.shape, raw_E_true.shape
-    clusters_per_layer = np.concatenate(clusters_per_layer_list, axis=0)
-    e_per_layer = np.concatenate(e_per_layer_list, axis=0)
-    # sampled
-    num_points_sampled = samples[:, 0] * meta.n_pts_rescale
-    visible_energy_sampled = samples[:, 1] * meta.vis_eng_rescale
-    cog_x_sampled = (samples[:, 2] * meta.std_cog[0]) + meta.mean_cog[0]
-    cog_y_sampled = (samples[:, 3] * meta.std_cog[1]) + meta.mean_cog[1]
-    cog_z_sampled = (samples[:, 4] * meta.std_cog[2]) + meta.mean_cog[2]
-    clusters_per_layer_sampled = samples[:, 5:35]
-    e_per_layer_sampled = samples[:, 35:]
 
+    raw_num_points = (
+        np.concatenate(num_points_list, axis=0) if num_points_list else None
+    )
+    raw_visible_energy = (
+        np.concatenate(visible_energy_list, axis=0) if visible_energy_list else None
+    )
+    raw_cog_x = np.concatenate(cog_x_list, axis=0) if cog_x_list else None
+    raw_cog_y = np.concatenate(cog_y_list, axis=0) if cog_y_list else None
+    raw_cog_z = np.concatenate(cog_z_list, axis=0) if cog_z_list else None
+    samples.shape, raw_E_true.shape
+    clusters_per_layer = (
+        np.concatenate(clusters_per_layer_list, axis=0)
+        if clusters_per_layer_list
+        else None
+    )
+    e_per_layer = np.concatenate(e_per_layer_list, axis=0) if e_per_layer_list else None
     # truth; we need to undo the shifts that were done in the last training batch
+    # sampled
+    i = 0
+    if "total_clusters" in config.shower_flow_inputs:
+        num_points = raw_num_points * meta.n_pts_rescale
+        num_points_sampled = samples[:, i] * meta.n_pts_rescale
+        i += 1
+    if "total_energy" in config.shower_flow_inputs:
+        visible_energy = raw_visible_energy * meta.vis_eng_rescale
+        visible_energy_sampled = samples[:, i] * meta.vis_eng_rescale
+        i += 1
+    if "cog_x" in config.shower_flow_inputs:
+        cog_x = (raw_cog_x * meta.std_cog[0]) + meta.mean_cog[0]
+        cog_x_sampled = (samples[:, i] * meta.std_cog[0]) + meta.mean_cog[0]
+        i += 1
+    if "cog_y" in config.shower_flow_inputs:
+        cog_y = (raw_cog_y * meta.std_cog[1]) + meta.mean_cog[1]
+        cog_y_sampled = (samples[:, i] * meta.std_cog[1]) + meta.mean_cog[1]
+        i += 1
+    if "cog_z" in config.shower_flow_inputs:
+        cog_z = (raw_cog_z * meta.std_cog[2]) + meta.mean_cog[2]
+        cog_z_sampled = (samples[:, i] * meta.std_cog[2]) + meta.mean_cog[2]
+        i += 1
+    if "clusters_per_layer" in config.shower_flow_inputs:
+        clusters_per_layer_sampled = samples[:, i : i + 30]
+        # np.clip(samples[:, i : i + 30], 0, 1)
+        i += 30
+    if "energy_per_layer" in config.shower_flow_inputs:
+        e_per_layer_sampled = samples[:, i : i + 30]
+        # np.clip(samples[:, i : i + 30], 0, 1)
+        i += 30
 
     E_true = raw_E_true * meta.incident_rescale
-    num_points = raw_num_points * meta.n_pts_rescale
-    visible_energy = raw_visible_energy * meta.vis_eng_rescale
-    cog_x = (raw_cog_x * meta.std_cog[0]) + meta.mean_cog[0]
-    cog_y = (raw_cog_y * meta.std_cog[1]) + meta.mean_cog[1]
-    cog_z = (raw_cog_z * meta.std_cog[2]) + meta.mean_cog[2]
-
-    # clip cluster and energies per layer to [0,1]
-    clusters_per_layer_sampled = np.clip(clusters_per_layer_sampled, 0, 1)
-    e_per_layer_sampled = np.clip(e_per_layer_sampled, 0, 1)
-    print(cog_x.min(), cog_x.max())
-    print(cog_y.min(), cog_y.max())
-    print(cog_z.min(), cog_z.max())
     meta.vis_eng_rescale
-    fig = plt.figure(figsize=(12, 6))
-    gs = gridspec.GridSpec(1, 2)
 
-    ax = fig.add_subplot(gs[0])
-    h = plt.hist(num_points.flatten(), bins=100, color="lightgrey")
-    plt.hist(
-        num_points_sampled.flatten(),
-        bins=h[1],
-        histtype="step",
-        lw=2,
-        color="tab:orange",
+    plot_shower_flow_eval(
+        showerflow_dir + "/",
+        E_true,
+        num_points if "total_clusters" in config.shower_flow_inputs else None,
+        num_points_sampled if "total_clusters" in config.shower_flow_inputs else None,
+        visible_energy if "total_energy" in config.shower_flow_inputs else None,
+        visible_energy_sampled if "total_energy" in config.shower_flow_inputs else None,
+        cog_x if "cog_x" in config.shower_flow_inputs else None,
+        cog_x_sampled if "cog_x" in config.shower_flow_inputs else None,
+        cog_y if "cog_y" in config.shower_flow_inputs else None,
+        cog_y_sampled if "cog_y" in config.shower_flow_inputs else None,
+        cog_z if "cog_z" in config.shower_flow_inputs else None,
+        cog_z_sampled if "cog_z" in config.shower_flow_inputs else None,
+        clusters_per_layer
+        if "clusters_per_layer" in config.shower_flow_inputs
+        else None,
+        clusters_per_layer_sampled
+        if "clusters_per_layer" in config.shower_flow_inputs
+        else None,
+        e_per_layer if "energy_per_layer" in config.shower_flow_inputs else None,
+        e_per_layer_sampled
+        if "energy_per_layer" in config.shower_flow_inputs
+        else None,
     )
-
-    # same but in log scale
-    ax = fig.add_subplot(gs[1])
-    h = plt.hist(num_points.flatten(), bins=100, color="lightgrey")
-    plt.hist(
-        num_points_sampled.flatten(),
-        bins=h[1],
-        histtype="step",
-        lw=2,
-        color="tab:orange",
-    )
-    plt.yscale("log")
-    plt.ylim(1, 1e5)
-
-    plt.suptitle("Number of points per event")
-    plt.savefig("ShowerFlow_eval_1.png")
-    plt.close()
-
-    fig = plt.figure(figsize=(12, 6))
-    gs = gridspec.GridSpec(1, 2)
-
-    ax = fig.add_subplot(gs[0])
-    h = plt.hist(visible_energy.flatten(), bins=100, color="lightgrey")
-    plt.hist(
-        visible_energy_sampled.flatten(),
-        bins=h[1],
-        histtype="step",
-        lw=2,
-        color="tab:orange",
-    )
-
-    # same but in log scale
-    ax = fig.add_subplot(gs[1])
-    h = plt.hist(visible_energy.flatten(), bins=100, color="lightgrey")
-    plt.hist(
-        visible_energy_sampled.flatten(),
-        bins=h[1],
-        histtype="step",
-        lw=2,
-        color="tab:orange",
-    )
-    plt.yscale("log")
-    plt.ylim(1, 1e5)
-
-    plt.suptitle("visible energy")
-    plt.savefig("ShowerFlow_eval_2.png")
-    plt.close()
-
-    # sampling fraction
-    fig = plt.figure(figsize=(12, 6))
-    gs = gridspec.GridSpec(1, 2)
-
-    ax = fig.add_subplot(gs[0])
-    h = plt.hist(
-        visible_energy.flatten() / E_true.flatten(), bins=100, color="lightgrey"
-    )
-    plt.hist(
-        visible_energy_sampled.flatten() / E_true.flatten(),
-        bins=h[1],
-        histtype="step",
-        lw=2,
-        color="tab:orange",
-    )
-
-    # same but in log scale
-    ax = fig.add_subplot(gs[1])
-    h = plt.hist(
-        visible_energy.flatten() / E_true.flatten(), bins=100, color="lightgrey"
-    )
-    plt.hist(
-        visible_energy_sampled.flatten() / E_true.flatten(),
-        bins=h[1],
-        histtype="step",
-        lw=2,
-        color="tab:orange",
-    )
-    plt.yscale("log")
-    plt.ylim(1, 1e5)
-
-    # title over all subplots
-    fig.suptitle("Sampling fraction")
-    plt.savefig("ShowerFlow_eval_3.png")
-    plt.close()
-
-    fig = plt.figure(figsize=(12, 6))
-    gs = gridspec.GridSpec(1, 2)
-
-    ax = fig.add_subplot(gs[0])
-    h = plt.hist(cog_x.flatten(), bins=100, color="lightgrey")
-    plt.hist(
-        cog_x_sampled.flatten(), bins=h[1], histtype="step", lw=2, color="tab:orange"
-    )
-    plt.xlim(-20, 20)
-
-    # same but in log scale
-    ax = fig.add_subplot(gs[1])
-    h = plt.hist(cog_x.flatten(), bins=100, color="lightgrey")
-    plt.hist(
-        cog_x_sampled.flatten(), bins=h[1], histtype="step", lw=2, color="tab:orange"
-    )
-    plt.yscale("log")
-    plt.ylim(1, 1e6)
-    plt.xlim(-20, 20)
-
-    plt.suptitle("center of gravity x")
-    plt.savefig("ShowerFlow_eval_4.png")
-    plt.close()
-
-    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 6))
-
-    h = ax1.hist(cog_y.flatten(), bins=100, color="lightgrey")
-    ax1.hist(
-        cog_y_sampled.flatten(), bins=h[1], histtype="step", lw=2, color="tab:orange"
-    )
-    # ax1.xlim(5,30)
-
-    # same but in log scale
-    h = ax2.hist(cog_y.flatten(), bins=100, color="lightgrey")
-    ax2.hist(
-        cog_y_sampled.flatten(), bins=h[1], histtype="step", lw=2, color="tab:orange"
-    )
-    plt.yscale("log")
-    # plt.ylim(1, 1e6)
-    # plt.xlim(5,30)
-
-    plt.suptitle("center of gravity y")
-    plt.savefig("ShowerFlow_eval_5.png")
-    plt.close()
-
-    fig = plt.figure(figsize=(12, 6))
-    gs = gridspec.GridSpec(1, 2)
-
-    ax = fig.add_subplot(gs[0])
-    h = plt.hist(cog_z.flatten(), bins=100, color="lightgrey")
-    plt.hist(
-        cog_z_sampled.flatten(), bins=h[1], histtype="step", lw=2, color="tab:orange"
-    )
-    # plt.xlim(25,60)
-
-    # same but in log scale
-    ax = fig.add_subplot(gs[1])
-    h = ax.hist(cog_z.flatten(), bins=100, color="lightgrey")
-    ax.hist(
-        cog_z_sampled.flatten(), bins=h[1], histtype="step", lw=2, color="tab:orange"
-    )
-    ax.semilogy()
-    # plt.ylim(1, 1e6)
-    # plt.xlim(25,60)
-
-    plt.suptitle("center of gravity z")
-    plt.savefig("ShowerFlow_eval_6.png")
-    plt.close()
-
-    fig = plt.figure(figsize=(12, 12))
-    gs = gridspec.GridSpec(6, 5)
-
-    for i in range(30):
-        fig.add_subplot(gs[i])
-        h = plt.hist(
-            clusters_per_layer[:, i].flatten(),
-            bins=100,
-            color="lightgrey",
-            range=[-0.2, 1.2],
-        )
-        plt.hist(
-            clusters_per_layer_sampled[:, i].flatten(),
-            bins=h[1],
-            histtype="step",
-            lw=1,
-            color="tab:orange",
-        )
-
-    plt.suptitle("clusters per layer")
-    plt.savefig("ShowerFlow_eval_7.png")
-    plt.close()
-
-    fig = plt.figure(figsize=(12, 12))
-    gs = gridspec.GridSpec(6, 5)
-
-    for i in range(30):
-        fig.add_subplot(gs[i])
-        h = plt.hist(
-            clusters_per_layer[:, i].flatten(),
-            bins=100,
-            color="lightgrey",
-            range=[-0.2, 1.2],
-        )
-        plt.hist(
-            clusters_per_layer_sampled[:, i].flatten(),
-            bins=h[1],
-            histtype="step",
-            lw=1,
-            color="tab:orange",
-        )
-        plt.yscale("log")
-
-    plt.suptitle("clusters per layer (log scale)")
-    plt.savefig("ShowerFlow_eval_8.png")
-    plt.close()
-
-    fig = plt.figure(figsize=(12, 12))
-    gs = gridspec.GridSpec(6, 5)
-
-    for i in range(30):
-        fig.add_subplot(gs[i])
-        h = plt.hist(
-            e_per_layer[:, i].flatten(), bins=100, color="lightgrey", range=[-0.2, 1.2]
-        )
-        plt.hist(
-            e_per_layer_sampled[:, i].flatten(),
-            bins=h[1],
-            histtype="step",
-            lw=1,
-            color="tab:orange",
-        )
-        # plt.yscale('log')
-
-    plt.suptitle("energy per layer")
-    plt.savefig("ShowerFlow_eval_9.png")
-    plt.close()
-
-    fig = plt.figure(figsize=(12, 12))
-    gs = gridspec.GridSpec(6, 5)
-
-    for i in range(30):
-        fig.add_subplot(gs[i])
-        h = plt.hist(
-            e_per_layer[:, i].flatten(), bins=100, color="lightgrey", range=[-0.2, 1.2]
-        )
-        plt.hist(
-            e_per_layer_sampled[:, i].flatten(),
-            bins=h[1],
-            histtype="step",
-            lw=1,
-            color="tab:orange",
-        )
-        plt.yscale("log")
-
-    plt.suptitle("energy per layer (log scale)")
-    plt.savefig("ShowerFlow_eval_10.png")
-    plt.close()
     return best_model_path, best_data_path, history_data_path
 
 

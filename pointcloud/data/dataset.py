@@ -1,13 +1,15 @@
-from torch.utils.data import Dataset
+import os
 import warnings
-import numpy as np
+
 import h5py
+import numpy as np
+from torch.utils.data import Dataset
 
 from ..configs import Configs
-from ..utils.metadata import Metadata
 from ..utils.detector_map import floors_ceilings
-from .read_write import get_files, events_to_local
+from ..utils.metadata import Metadata
 from .conditioning import get_cond_features_names, padding_position
+from .read_write import events_to_local, get_files
 
 
 class PointCloudDataset(Dataset):
@@ -485,26 +487,91 @@ class PointCloudAngular(PointCloudDataset):
     }
     # correct for the sim-E... datasets
     metadata = Metadata(Configs())
-    Xmean, Ymean, Zmean = metadata.mean_xs, metadata.mean_ys, metadata.mean_zs
-    Xstd, Ystd, Zstd = metadata.std_xs, metadata.std_ys, metadata.std_zs
-    Emean, Estd = metadata.mean_log_es, metadata.std_log_es
+
+    # Legacy stats from metadata (keep for reference / old scripts)
+    # Xmean, Ymean, Zmean = metadata.mean_xs, metadata.mean_ys, metadata.mean_zs
+    # Xstd, Ystd, Zstd = metadata.std_xs, metadata.std_ys, metadata.std_zs
+    # Emean, Estd = metadata.mean_log_es, metadata.std_log_es
+
+    # Dynamic stats — computed from data and saved to disk
+    Xmean = Ymean = Zmean = None
+    Xstd = Ystd = Zstd = None
+    Emean = Estd = None
+
+    @classmethod
+    def _get_norm_stats_path(cls):
+        config = Configs()
+        dataset_tag = os.path.basename(os.path.dirname(config._dataset_path))
+        print(dataset_tag)
+        return os.path.join(config.metadata_folder, f"norm_stats_{dataset_tag}.npz")
+
+    @classmethod
+    def load_normalization_stats(cls):
+        path = cls._get_norm_stats_path()
+        if not os.path.exists(path):
+            return False
+        stats = np.load(path)
+        cls.Xmean, cls.Ymean, cls.Zmean = (
+            float(stats["Xmean"]),
+            float(stats["Ymean"]),
+            float(stats["Zmean"]),
+        )
+        cls.Xstd, cls.Ystd, cls.Zstd = (
+            float(stats["Xstd"]),
+            float(stats["Ystd"]),
+            float(stats["Zstd"]),
+        )
+        cls.Emean, cls.Estd = float(stats["Emean"]), float(stats["Estd"])
+        print(f"Norm stats loaded from {path}")
+        cls._print_stats()
+        return True
+
+    @classmethod
+    def compute_and_save_normalization_stats(cls, events):
+        path = cls._get_norm_stats_path()
+        if os.path.exists(path):
+            print(f"Norm stats already exist at {path}, skipping computation.")
+            cls.load_normalization_stats()
+            return
+        cls.Xmean = float(events[..., 0].mean())
+        cls.Ymean = float(events[..., 1].mean())
+        cls.Zmean = float(events[..., 2].mean())
+        cls.Xstd = float(events[..., 0].std())
+        cls.Ystd = float(events[..., 1].std())
+        cls.Zstd = float(events[..., 2].std())
+        cls.Emean = float(np.log(events[..., 3] + 1e-12).mean())
+        cls.Estd = float(np.log(events[..., 3] + 1e-12).std())
+        np.savez(
+            path,
+            Xmean=cls.Xmean,
+            Ymean=cls.Ymean,
+            Zmean=cls.Zmean,
+            Xstd=cls.Xstd,
+            Ystd=cls.Ystd,
+            Zstd=cls.Zstd,
+            Emean=cls.Emean,
+            Estd=cls.Estd,
+        )
+        print(f"Norm stats computed and saved to {path}")
+        cls._print_stats()
+
+    @classmethod
+    def _print_stats(cls):
+        print(f"  Xmean={cls.Xmean:.4f}, Ymean={cls.Ymean:.4f}, Zmean={cls.Zmean:.4f}")
+        print(f"  Xstd={cls.Xstd:.4f},  Ystd={cls.Ystd:.4f},  Zstd={cls.Zstd:.4f}")
+        print(f"  Emean={cls.Emean:.4f}, Estd={cls.Estd:.4f}")
 
     @classmethod
     def normalize_xyze(cls, event, fuzz_perpendicular=False):
         assert fuzz_perpendicular is False, "Assumption is that this is fuzzed on disk"
-        event[..., 3] = (
-            (np.log(event[..., 3] + 1e-12) - cls.Emean) / cls.Estd / 2
-        )  # energy transformation
-
-        event[..., 0] = (
-            (event[..., 0] - cls.Xmean) / cls.Xstd / 2
-        )  # x coordinate normalization
-        event[..., 1] = (
-            (event[..., 1] - cls.Ymean) / cls.Ystd / 2
-        )  # y coordinate normalization
-        event[..., 2] = (
-            (event[..., 2] - cls.Zmean) / cls.Zstd / 2
-        )  # z coordinate normalization
+        assert cls.Xmean is not None, (
+            "Norm stats not loaded. Call compute_and_save_normalization_stats() "
+            "or load_normalization_stats() before normalizing."
+        )
+        event[..., 3] = (np.log(event[..., 3] + 1e-12) - cls.Emean) / cls.Estd / 2
+        event[..., 0] = (event[..., 0] - cls.Xmean) / cls.Xstd / 2
+        event[..., 1] = (event[..., 1] - cls.Ymean) / cls.Ystd / 2
+        event[..., 2] = (event[..., 2] - cls.Zmean) / cls.Zstd / 2
 
 
 class CaloChallangeDataset(Dataset):

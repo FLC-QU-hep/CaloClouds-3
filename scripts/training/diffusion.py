@@ -1,16 +1,15 @@
 import time
-import torch
-from torch.utils.data import DataLoader
-from torch.nn.utils import clip_grad_norm_
 
-from pointcloud.utils import misc, training
-from pointcloud.data import dataset
-from pointcloud.models.diffusion import Diffusion
+import k_diffusion as K
+import torch
 
 # from configs import Configs
 from pointcloud.configs import Configs
-
-import k_diffusion as K
+from pointcloud.data import dataset
+from pointcloud.models.diffusion import Diffusion
+from pointcloud.utils import misc, training
+from torch.nn.utils import clip_grad_norm_
+from torch.utils.data import DataLoader
 
 
 # Train, validate and test
@@ -119,6 +118,7 @@ def main(cfg=Configs()):
     )
 
     # Model
+    cfg.device = "cpu"
     model = Diffusion(cfg).to(cfg.device)
     model_ema = Diffusion(cfg).to(cfg.device)
     # checkpoint = torch.load(cfg.logdir+cfg.model_path,

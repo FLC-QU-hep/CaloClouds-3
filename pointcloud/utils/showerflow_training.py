@@ -2,14 +2,14 @@
 #
 # utilty functions for scripts/Showerflow.py
 
-import torch
-import numpy as np
 import os
 
-from pointcloud.utils.metadata import Metadata
+import numpy as np
+import torch
 from pointcloud.data.read_write import get_n_events, read_raw_regaxes
 from pointcloud.utils.detector_map import floors_ceilings
 from pointcloud.utils.gen_utils import get_cog as cog_from_kinematics
+from pointcloud.utils.metadata import Metadata
 
 from ..data.conditioning import get_cond_features_names
 
@@ -56,7 +56,7 @@ def get_incident_npts_visible(
         num_points = np.zeros(n_events)
         visible_energy = np.zeros(n_events)
         for start_idx in range(0, n_events, local_batch_size):
-            print(f"{start_idx/n_events:.0%}", end="\r")
+            print(f"{start_idx / n_events:.0%}", end="\r")
             my_slice = slice(start_idx, start_idx + local_batch_size)
             energies_batch, events_batch = read_raw_regaxes(
                 config, pick_events=my_slice
@@ -109,7 +109,7 @@ def get_gun_direction(config, showerflow_dir, redo=False, local_batch_size=10_00
         gun_direction = np.zeros((n_events, 3))
         try:
             for start_idx in range(0, n_events, local_batch_size):
-                print(f"{start_idx/n_events:.0%}", end="\r")
+                print(f"{start_idx / n_events:.0%}", end="\r")
                 my_slice = slice(start_idx, start_idx + local_batch_size)
                 per_event_batch, _ = read_raw_regaxes(
                     config, pick_events=my_slice, per_event_cols=["p_norm_local"]
@@ -129,7 +129,9 @@ def get_gun_direction(config, showerflow_dir, redo=False, local_batch_size=10_00
     return direction_path
 
 
-def get_clusters_per_layer(config, showerflow_dir, redo=False, local_batch_size=10_000):
+def get_clusters_per_layer(
+    config, showerflow_dir, redo=False, local_batch_size=10_000, layer_index=2
+):
     """
     Save and return the number of clusters in each layer for all showers
     in the dataset. If found on disk, will just return.
@@ -166,14 +168,16 @@ def get_clusters_per_layer(config, showerflow_dir, redo=False, local_batch_size=
         )
         clusters_per_layer = np.zeros((n_events, len(floors)))
         for start_idx in range(0, n_events, local_batch_size):
-            print(f"{start_idx/n_events:.0%}", end="\r")
+            print(f"{start_idx / n_events:.0%}", end="\r")
             my_slice = slice(start_idx, start_idx + local_batch_size)
             _, events_batch = read_raw_regaxes(config, pick_events=my_slice)
             mask = events_batch[:, :, 3] > 0
             clusters_here = [
-                ((events_batch[:, :, 2] < c) & (events_batch[:, :, 2] > f) & mask).sum(
-                    axis=1
-                )
+                (
+                    (events_batch[:, :, layer_index] < c)
+                    & (events_batch[:, :, layer_index] > f)
+                    & mask
+                ).sum(axis=1)
                 for f, c in zip(floors, ceilings)
             ]
             clusters_per_layer[my_slice] = np.vstack(clusters_here).T
@@ -225,7 +229,7 @@ def get_energy_per_layer(config, showerflow_dir, redo=False, local_batch_size=10
         )
         energy_per_layer = np.zeros((n_events, len(floors)))
         for start_idx in range(0, n_events, local_batch_size):
-            print(f"{start_idx/n_events:.0%}", end="\r")
+            print(f"{start_idx / n_events:.0%}", end="\r")
             my_slice = slice(start_idx, start_idx + local_batch_size)
             _, events_batch = read_raw_regaxes(config, pick_events=my_slice)
             energy_here = [
@@ -292,7 +296,7 @@ def get_cog(config, showerflow_dir, redo=False, local_batch_size=10_000):
         print("Recalculating cog", flush=True)
         cog = np.zeros((n_events, 3))
         for start_idx in range(0, n_events, local_batch_size):
-            print(f"{start_idx/n_events:.0%}", end="\r")
+            print(f"{start_idx / n_events:.0%}", end="\r")
             my_slice = slice(start_idx, start_idx + local_batch_size)
             _, events_batch = read_raw_regaxes(config, pick_events=my_slice)
             cog_batch = cog_from_kinematics(
@@ -427,11 +431,28 @@ def _train_ds_function_factory(
     device = config.device
 
     if getattr(config, "shower_flow_fixed_input_norms", False):
+        print(
+            "Using not rescaled clusters and energy per layer as inputs, and normalizing by fixed constants"
+        )
         clusters_per_layer_key = "clusters_per_layer"
         energy_per_layer_key = "energy_per_layer"
         n_layers = len(meta.layer_bottom_pos_hdf5)
-        clusters_per_layer_norm = n_layers / meta.n_pts_rescale
-        energy_per_layer_norm = n_layers / meta.vis_eng_rescale
+        # compute n_pts_rescale on the fly
+        n_pts_rescale = np.load(clusters_per_layer_path, mmap_mode="r")[
+            clusters_per_layer_key
+        ].max()
+        vis_eng_rescale = np.load(energy_per_layer_path, mmap_mode="r")[
+            energy_per_layer_key
+        ].max()
+        clusters_per_layer_norm = n_layers / n_pts_rescale
+        energy_per_layer_norm = n_layers / vis_eng_rescale
+        print(n_pts_rescale, vis_eng_rescale)
+        if np.isnan(
+            np.load(clusters_per_layer_path, mmap_mode="r")[clusters_per_layer_key]
+        ).any() or np.isnan(
+            np.load(energy_per_layer_path, mmap_mode="r")[energy_per_layer_key]
+        ).any():
+            raise ValueError("Found NaN in data")
     else:
         clusters_per_layer_key = "rescaled_clusters_per_layer"
         energy_per_layer_key = "rescaled_energy_per_layer"
@@ -503,6 +524,10 @@ def _train_ds_function_factory(
                 torch.tensor(clusters[clusters_per_layer_key][my_slice]).to(device)
                 * clusters_per_layer_norm
             )
+            if torch.any(torch.isnan(clusters_per_layer)):
+                print(
+                    "Found NaNs in clusters per layer, check the data and normalization"
+                )
             output.append(clusters_per_layer)
         if "energy_per_layer" in config.shower_flow_inputs:
             energies = np.load(energy_per_layer_path, mmap_mode="r")
@@ -510,6 +535,10 @@ def _train_ds_function_factory(
                 torch.tensor(energies[energy_per_layer_key][my_slice]).to(device)
                 * energy_per_layer_norm
             )
+            if torch.any(torch.isnan(e_per_layer)):
+                print(
+                    "Found NaNs in energy per layer, check the data and normalization"
+                )
             output.append(e_per_layer)
 
         for values in output:
