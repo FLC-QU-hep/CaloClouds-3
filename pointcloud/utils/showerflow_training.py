@@ -438,21 +438,36 @@ def _train_ds_function_factory(
         energy_per_layer_key = "energy_per_layer"
         n_layers = len(meta.layer_bottom_pos_hdf5)
         # compute n_pts_rescale on the fly
-        n_pts_rescale = np.load(clusters_per_layer_path, mmap_mode="r")[
-            clusters_per_layer_key
-        ].max()
-        vis_eng_rescale = np.load(energy_per_layer_path, mmap_mode="r")[
-            energy_per_layer_key
-        ].max()
+        n_pts_rescale = (
+            np.load(clusters_per_layer_path, mmap_mode="r")[clusters_per_layer_key]
+            .sum(axis=1)
+            .max()
+        )
+        print(
+            f"Max number of clusters in a layer across the dataset is {n_pts_rescale}"
+        )
+        vis_eng_rescale = (
+            np.load(energy_per_layer_path, mmap_mode="r")[energy_per_layer_key]
+            .sum(axis=1)
+            .max()
+        )
+        print(f"Max visible energy in a layer across the dataset is {vis_eng_rescale}")
         clusters_per_layer_norm = n_layers / n_pts_rescale
         energy_per_layer_norm = n_layers / vis_eng_rescale
-        print(n_pts_rescale, vis_eng_rescale)
-        if np.isnan(
-            np.load(clusters_per_layer_path, mmap_mode="r")[clusters_per_layer_key]
-        ).any() or np.isnan(
-            np.load(energy_per_layer_path, mmap_mode="r")[energy_per_layer_key]
-        ).any():
-            raise ValueError("Found NaN in data")
+
+        # save inside clusters_per_layer_path parent dir the two values for cluster_per_layer_norm and energy_per_layer_norm, so that they can be reused for inference
+        norm_path = os.path.join(
+            os.path.dirname(clusters_per_layer_path), "input_norms.npz"
+        )
+        np.savez(
+            norm_path,
+            clusters_per_layer_norm=clusters_per_layer_norm,
+            energy_per_layer_norm=energy_per_layer_norm,
+        )
+
+        # before
+        # clusters_per_layer_norm = n_layers / meta.n_pts_rescale
+        # energy_per_layer_norm = n_layers / meta.vis_eng_rescale
     else:
         clusters_per_layer_key = "rescaled_clusters_per_layer"
         energy_per_layer_key = "rescaled_energy_per_layer"

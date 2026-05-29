@@ -411,18 +411,17 @@ def main(config, batch_size=2048, total_epochs=3_000, shuffle=True):
     # They should be normalised between 0 and 1 for the training.
     # After this we will visulise a little data for a sanity check.
 
-    if n_events > 10:
-        start_event = 5
-        clusters = np.load(clusters_per_layer_path, mmap_mode="r")
-        energies = np.load(energy_per_layer_path, mmap_mode="r")
-        for i in range(start_event, start_event + 5):
-            clu = clusters["rescaled_clusters_per_layer"][i]
-            e = energies["rescaled_energy_per_layer"][i]
-            print(f"Event {i} has {np.sum(clu)} clusters")
-            print(f"Event {i} has {np.sum(e)} energy")
+    # if n_events > 10:
+    #     start_event = 5
+    #     clusters = np.load(clusters_per_layer_path, mmap_mode="r")
+    #     energies = np.load(energy_per_layer_path, mmap_mode="r")
+    #     for i in range(start_event, start_event + 5):
+    #         clu = clusters["rescaled_clusters_per_layer"][i]
+    #         e = energies["rescaled_energy_per_layer"][i]
+    #         print(f"Event {i} has {np.sum(clu)} clusters")
+    #         print(f"Event {i} has {np.sum(e)} energy")
 
     # center of gravity
-
     cog_path, cog = showerflow_training.get_cog(
         config, showerflow_dir, redo=False, local_batch_size=local_batch_size
     )
@@ -554,6 +553,8 @@ def main(config, batch_size=2048, total_epochs=3_000, shuffle=True):
     # The data is now all loaded, and ready to train on.
     # If we had a previous best epoch it's loaded and we will start there.
     model.train()
+    if torch.stack([torch.isnan(p).any() for p in model.parameters()]).any():
+        print("model has nan weights before training!")
 
     batch_len = len(train_loader)
     mean_loss = np.inf
@@ -582,13 +583,13 @@ def main(config, batch_size=2048, total_epochs=3_000, shuffle=True):
                 print(f"NaN in context! Shape: {context.shape}")
             if batch_idx % 10 == 0:
                 print(f"{batch_idx / batch_len:.0%}", end="\r")
-
             # with additional features in latent space (e.g. Esum)
             optimizer.zero_grad()
 
             # check if any of the weights are nans
             if torch.stack([torch.isnan(p).any() for p in model.parameters()]).any():
                 print("Weights are nan!")
+                print(torch.isnan(input_data).any())
                 # load recent model
                 # model.load_state_dict(torch.load(latest_model_path)["model"])
                 model.load_state_dict(

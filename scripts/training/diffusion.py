@@ -113,6 +113,9 @@ def main(cfg=Configs()):
         )
 
     train_dset = dataset.PointCloudAngular(file_path=cfg.dataset_path, bs=cfg.train_bs)
+    # the first time it creates the dataloader it creates on the fly the metrics to normalize.
+    # so first, use a huge batch size and a single worker to properly save the metrics
+    dataloader = DataLoader(train_dset, batch_size=10000, num_workers=0, shuffle=False)
     dataloader = DataLoader(
         train_dset, batch_size=1, num_workers=cfg.workers, shuffle=cfg.shuffle
     )

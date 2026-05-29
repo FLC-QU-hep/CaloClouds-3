@@ -19,7 +19,8 @@ class Configs(default.Configs):
         self._logdir = "CaloClouds-3/log_dir"
 
         self.workers = 5
-        self.max_points = 4_000
+        self.max_points = 50_000
+        self.log_iter = 1000
 
         self.cond_features = 4  # number of conditioning features (i.e. energy+points=2)
         self.cond_features_names = ["energy", "p_norm_local"]

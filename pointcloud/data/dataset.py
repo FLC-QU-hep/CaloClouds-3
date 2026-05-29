@@ -418,12 +418,20 @@ class PointCloudDataset(Dataset):
                 continue
 
             padding = self._prior_event_axes[name_in_batch]
-            data = np.array(
-                [
-                    self.open_files[file_n][name_on_disk][(*padding, event_n)]
-                    for n_pts, file_n, event_n in self.index_list[idxs]
-                ]
-            )
+            items = [
+                self.open_files[file_n][name_on_disk][(*padding, event_n)]
+                for n_pts, file_n, event_n in self.index_list[idxs]
+            ]
+            if any(x.shape != items[0].shape for x in items):
+                max_n = max(x.shape[0] for x in items)
+                padded = np.zeros(
+                    (len(items), max_n, items[0].shape[-1]), dtype=items[0].dtype
+                )
+                for i, x in enumerate(items):
+                    padded[i, : x.shape[0]] = x
+                data = padded
+            else:
+                data = np.array(items)
 
             if name_in_batch == "event":
                 data = self._event_processing(data)
@@ -502,7 +510,6 @@ class PointCloudAngular(PointCloudDataset):
     def _get_norm_stats_path(cls):
         config = Configs()
         dataset_tag = os.path.basename(os.path.dirname(config._dataset_path))
-        print(dataset_tag)
         return os.path.join(config.metadata_folder, f"norm_stats_{dataset_tag}.npz")
 
     @classmethod
@@ -522,15 +529,13 @@ class PointCloudAngular(PointCloudDataset):
             float(stats["Zstd"]),
         )
         cls.Emean, cls.Estd = float(stats["Emean"]), float(stats["Estd"])
-        print(f"Norm stats loaded from {path}")
-        cls._print_stats()
+        # cls._print_stats()
         return True
 
     @classmethod
     def compute_and_save_normalization_stats(cls, events):
         path = cls._get_norm_stats_path()
         if os.path.exists(path):
-            print(f"Norm stats already exist at {path}, skipping computation.")
             cls.load_normalization_stats()
             return
         cls.Xmean = float(events[..., 0].mean())
@@ -563,11 +568,17 @@ class PointCloudAngular(PointCloudDataset):
 
     @classmethod
     def normalize_xyze(cls, event, fuzz_perpendicular=False):
+        cls.compute_and_save_normalization_stats(event)
         assert fuzz_perpendicular is False, "Assumption is that this is fuzzed on disk"
-        assert cls.Xmean is not None, (
-            "Norm stats not loaded. Call compute_and_save_normalization_stats() "
-            "or load_normalization_stats() before normalizing."
+        assert cls.Emean is not None, (
+            "cls.Emean is None — normalization stats not initialized"
         )
+        assert cls.Estd is not None, (
+            "cls.Estd is None — normalization stats not initialized"
+        )
+
+        if cls.Xmean is None:
+            cls.load_normalization_stats()
         event[..., 3] = (np.log(event[..., 3] + 1e-12) - cls.Emean) / cls.Estd / 2
         event[..., 0] = (event[..., 0] - cls.Xmean) / cls.Xstd / 2
         event[..., 1] = (event[..., 1] - cls.Ymean) / cls.Ystd / 2
