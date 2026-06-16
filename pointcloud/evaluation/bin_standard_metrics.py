@@ -1,17 +1,15 @@
-import numpy as np
-import torch
 import os
 import warnings
 
-from pointcloud.utils.metadata import Metadata
-from pointcloud.utils import detector_map
-from pointcloud.data.conditioning import read_raw_regaxes_withcond, get_cond_dim
-from pointcloud.utils import showerflow_utils
-from pointcloud.models.shower_flow import versions_dict
-from pointcloud.models.load import get_model_class
-from pointcloud.utils.gen_utils import gen_cond_showers_batch
-
+import numpy as np
+import torch
 from pointcloud.configs import Configs
+from pointcloud.data.conditioning import get_cond_dim, read_raw_regaxes_withcond
+from pointcloud.models.load import get_model_class
+from pointcloud.models.shower_flow import versions_dict
+from pointcloud.utils import detector_map, showerflow_utils
+from pointcloud.utils.gen_utils import gen_cond_showers_batch
+from pointcloud.utils.metadata import Metadata
 
 
 def try_mkdir(dir_name):
@@ -85,10 +83,10 @@ class BinnedErrors:
     @classmethod
     def load(cls, binned_data_paths):
         if "proj" in binned_data_paths[0].lower():
-            print(f"Loading detector binned data")
+            print("Loading detector binned data")
             binned_class = DetectorBinnedData
         else:
-            print(f"Loading binned data")
+            print("Loading binned data")
             binned_class = BinnedData
         binned_data_list = []
         for binned_data_path in binned_data_paths:
@@ -212,12 +210,12 @@ class BinnedData:
     @staticmethod
     def sanity_layer_box(layer_bottom_pos, xyz_limits):
         z_range = xyz_limits[2][1] - xyz_limits[2][0]
-        assert (
-            abs(layer_bottom_pos[0] - xyz_limits[2][0]) < z_range / 100
-        ), f"{layer_bottom_pos[0]=} not close to {xyz_limits[2][0]=}"
-        assert (
-            abs(layer_bottom_pos[-1] - xyz_limits[2][1]) < z_range / 10
-        ), f"{layer_bottom_pos[-1]=} not close to {xyz_limits[2][1]=}"
+        assert abs(layer_bottom_pos[0] - xyz_limits[2][0]) < z_range / 100, (
+            f"{layer_bottom_pos[0]=} not close to {xyz_limits[2][0]=}"
+        )
+        assert abs(layer_bottom_pos[-1] - xyz_limits[2][1]) < z_range / 10, (
+            f"{layer_bottom_pos[-1]=} not close to {xyz_limits[2][1]=}"
+        )
 
     def get_gunshift(self):
         """
@@ -978,7 +976,7 @@ def sample_g4(config, binned, n_events):
     n_batches = np.ceil(n_events / batch_len)
 
     for b, start in enumerate(batch_starts):
-        print(f"{b/n_batches:.1%}", end="\r", flush=True)
+        print(f"{b / n_batches:.1%}", end="\r", flush=True)
         cond, events = read_raw_regaxes_withcond(
             config, pick_events=slice(start, start + batch_len)
         )
@@ -1071,7 +1069,7 @@ def conditioned_sample_model(model_config, binned, cond, model, shower_flow=None
     n_batches = np.ceil(n_events / batch_len)
 
     for b, start in enumerate(batch_starts):
-        print(f"{b/n_batches:.1%}", end="\r", flush=True)
+        print(f"{b / n_batches:.1%}", end="\r", flush=True)
         if isinstance(cond, dict):
             cond_here = {key: cond[key][start : start + batch_len] for key in cond}
         else:
@@ -1208,6 +1206,7 @@ def get_caloclouds_models(
                 num_blocks=showerflow_config.shower_flow_num_blocks,
                 num_inputs=np.sum(input_mask),
                 num_cond_inputs=get_cond_dim(showerflow_config, "showerflow"),
+                af_dim=showerflow_config.af_dim,
                 device=device,
             )
             print(showerflow_path)

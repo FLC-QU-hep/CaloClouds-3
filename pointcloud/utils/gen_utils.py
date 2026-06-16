@@ -16,6 +16,26 @@ from ..data.conditioning import (
 )
 
 
+def _is_angular_config(config):
+    """Return True if the config uses PointCloudAngular (Z-score) normalisation."""
+    from ..data.conditioning import get_cond_features_names
+    return (
+        getattr(config, "dataset", None) in ("x36_grid", "clustered")
+        and "p_norm_local" in get_cond_features_names(config, "diffusion")
+    )
+
+
+def _load_angular_norm_stats(config):
+    """Load PointCloudAngular norm stats using the actual config's paths."""
+    import os
+    from .metadata import get_metadata_folder
+    dataset_tag = os.path.basename(os.path.dirname(config._dataset_path))
+    folder = get_metadata_folder(config)
+    path = os.path.join(folder, f"norm_stats_{dataset_tag}.npz")
+    stats = np.load(path)
+    return {k: float(stats[k]) for k in stats}
+
+
 def get_cog(x, y, z, e):
     """
     Calculate the center of gravity of a shower.
@@ -693,11 +713,17 @@ def gen_v1_inner_batch(
     fake_showers = fake_showers.detach().cpu().numpy()
     if is_cc2_diffusion(config):
         fake_showers = rotate_cc2_diffusion_output(fake_showers)
-    else:  # its CC3 and we need to un-log the energy
-        fake_showers[:, :, 3] = np.exp(
-            fake_showers[:, :, 3] * metadata.log_incident_std * 2
-            + metadata.log_incident_mean
-        )
+    else:
+        if _is_angular_config(config):
+            ns = _load_angular_norm_stats(config)
+            fake_showers[:, :, 3] = np.exp(
+                fake_showers[:, :, 3] * 2 * ns["Estd"] + ns["Emean"]
+            )
+        else:
+            fake_showers[:, :, 3] = np.exp(
+                fake_showers[:, :, 3] * metadata.log_incident_std * 2
+                + metadata.log_incident_mean
+            )
 
     # if np.isnan(fake_showers).sum() != 0:
     #       return fake_showers
@@ -752,39 +778,46 @@ def gen_v1_inner_batch(
         (fake_showers, np.zeros((bs, length, 4))), axis=1
     )  # B, max_points, 4
 
-    # move to be roughly bettween 0 and 1
-    fake_showers[:, :, 0] = (fake_showers[:, :, 0] + 1) / 2
-    fake_showers[:, :, 1] = (fake_showers[:, :, 1] + 1) / 2
-
-    assert metadata.orientation[:16] == "hdf5:xyz==local:"
-    assert metadata.orientation_global[:17] == "hdf5:xyz==global:"
-    local_ori = metadata.orientation[16:]
-    global_ori = metadata.orientation_global[17:]
-    if global_ori[local_ori.index("x")] == "z":
-        assert global_ori[local_ori.index("y")] == "x"
-        # rotated coordinates mean local x==global z and local y==global x and local z==global y
-        fake_showers[:, :, 0] = (
-            fake_showers[:, :, 0] * (metadata.Zmin_global - metadata.Zmax_global)
-            + metadata.Zmax_global
-        )
-        fake_showers[:, :, 1] = (
-            fake_showers[:, :, 1] * (metadata.Xmin_global - metadata.Xmax_global)
-            + metadata.Xmax_global
-        )
-    elif global_ori[local_ori.index("x")] == "x":
-        assert global_ori[local_ori.index("y")] == "z"
-        fake_showers[:, :, 0] = (
-            fake_showers[:, :, 0] * (metadata.Xmin_global - metadata.Xmax_global)
-            + metadata.Xmax_global
-        )
-        fake_showers[:, :, 1] = (
-            fake_showers[:, :, 1] * (metadata.Zmin_global - metadata.Zmax_global)
-            + metadata.Zmax_global
-        )
+    if _is_angular_config(config):
+        # Model was trained with PointCloudAngular Z-score normalisation.
+        # Invert: x_model = (x_h5 - mean) / std / 2  →  x_h5 = x_model * 2 * std + mean
+        ns = _load_angular_norm_stats(config)
+        fake_showers[:, :, 0] = fake_showers[:, :, 0] * 2 * ns["Xstd"] + ns["Xmean"]
+        fake_showers[:, :, 1] = fake_showers[:, :, 1] * 2 * ns["Ystd"] + ns["Ymean"]
     else:
-        raise NotImplementedError(
-            f"Global orientation {global_ori} not supported for local orientation {local_ori}"
-        )
+        # Global-bounds normalisation (PointCloudDataset).
+        # move to be roughly between 0 and 1
+        fake_showers[:, :, 0] = (fake_showers[:, :, 0] + 1) / 2
+        fake_showers[:, :, 1] = (fake_showers[:, :, 1] + 1) / 2
+
+        assert metadata.orientation[:16] == "hdf5:xyz==local:"
+        assert metadata.orientation_global[:17] == "hdf5:xyz==global:"
+        local_ori = metadata.orientation[16:]
+        global_ori = metadata.orientation_global[17:]
+        if global_ori[local_ori.index("x")] == "z":
+            assert global_ori[local_ori.index("y")] == "x"
+            fake_showers[:, :, 0] = (
+                fake_showers[:, :, 0] * (metadata.Zmin_global - metadata.Zmax_global)
+                + metadata.Zmax_global
+            )
+            fake_showers[:, :, 1] = (
+                fake_showers[:, :, 1] * (metadata.Xmin_global - metadata.Xmax_global)
+                + metadata.Xmax_global
+            )
+        elif global_ori[local_ori.index("x")] == "x":
+            assert global_ori[local_ori.index("y")] == "z"
+            fake_showers[:, :, 0] = (
+                fake_showers[:, :, 0] * (metadata.Xmin_global - metadata.Xmax_global)
+                + metadata.Xmax_global
+            )
+            fake_showers[:, :, 1] = (
+                fake_showers[:, :, 1] * (metadata.Zmin_global - metadata.Zmax_global)
+                + metadata.Zmax_global
+            )
+        else:
+            raise NotImplementedError(
+                f"Global orientation {global_ori} not supported for local orientation {local_ori}"
+            )
 
     if getattr(config, "cog_calibration", True):
         # CoG calibration

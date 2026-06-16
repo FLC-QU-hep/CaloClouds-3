@@ -121,7 +121,7 @@ def main(cfg=Configs()):
     )
 
     # Model
-    cfg.device = "cpu"
+    cfg.device = "cuda" if torch.cuda.is_available() else "cpu"
     model = Diffusion(cfg).to(cfg.device)
     model_ema = Diffusion(cfg).to(cfg.device)
     # checkpoint = torch.load(cfg.logdir+cfg.model_path,
@@ -178,6 +178,8 @@ def main(cfg=Configs()):
         "experiment": experiment,
     }
 
+    print("device: ", cfg.device)
+
     # Main loop
     print("Start training...")
 
@@ -197,12 +199,14 @@ def main(cfg=Configs()):
                 }
                 ckpt_mgr.save(model, cfg, 0, others=opt_states, step=it)
                 if cfg.log_comet:
-                    experiment.log_image(
-                        log_dir + f"/iter_{it}_1d_hist.png", name="1d_hist"
-                    )
-                    experiment.log_image(
-                        log_dir + f"/iter_{it}_energy_hist.png", name="energy_hist"
-                    )
+                    import os
+                    for img_name, comet_name in [
+                        (f"iter_{it}_1d_hist.png", "1d_hist"),
+                        (f"iter_{it}_energy_hist.png", "energy_hist"),
+                    ]:
+                        img_path = os.path.join(log_dir, img_name)
+                        if os.path.isfile(img_path):
+                            experiment.log_image(img_path, name=comet_name)
             if it >= cfg.max_iters:
                 stop = True
                 break

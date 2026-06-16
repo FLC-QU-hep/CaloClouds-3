@@ -263,8 +263,9 @@ def read_raw_regaxes_withcond(
     conditioning feature and not present in the dataset.
     """
     if isinstance(for_model, str):
+        cond_names_per_model = [get_cond_features_names(config, for_model)]
         for_model = [for_model]
-        cond_names = get_cond_features_names(config, for_model)
+        cond_names = list(set(sum(cond_names_per_model, [])))
     else:
         cond_names_per_model = [get_cond_features_names(config, m) for m in for_model]
         cond_names = list(set(sum(cond_names_per_model, [])))

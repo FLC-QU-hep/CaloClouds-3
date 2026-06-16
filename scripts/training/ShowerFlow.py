@@ -862,30 +862,32 @@ def main(config, batch_size=2048, total_epochs=3_000, shuffle=True):
 
 
 if __name__ == "__main__":
-    # check user input
-    # and if not given get it from the user
+    import importlib.util
 
-    chosen = None
-    if len(sys.argv) > 1:
-        chosen = sys.argv[1].strip()
-    else:
-        chosen = "default"
-
-    config_choices = {
-        "caloclouds_2": caloclouds_2,
-        "caloclouds_3": caloclouds_3,
-        "example": example,
-        "default": default_configs,
-    }
-
-    if chosen not in config_choices:
-        chosen = input(f"Choose a version from {list(config_choices.keys())}:")
-        if chosen not in config_choices:
-            print("Invalid choice")
+    chosen = sys.argv[1].strip() if len(sys.argv) > 1 else "default"
 
     config_kwargs = {
-        a.split("=")[0].strip(): a.split("=")[1].strip() for a in sys.argv[2:]
+        a.split("=")[0].strip(): a.split("=")[1].strip()
+        for a in sys.argv[2:]
+        if "=" in a
     }
-    config = config_choices[chosen].Configs(**config_kwargs)
+
+    if chosen.endswith(".py"):
+        # Load any config file by path, e.g.:
+        #   python ShowerFlow.py pointcloud/config_varients/caloclouds_3_S2P_hdbscan.py
+        spec = importlib.util.spec_from_file_location("_user_config", os.path.abspath(chosen))
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        config = mod.Configs(**config_kwargs)
+    else:
+        config_choices = {
+            "caloclouds_2": caloclouds_2,
+            "caloclouds_3": caloclouds_3,
+            "example": example,
+            "default": default_configs,
+        }
+        if chosen not in config_choices:
+            chosen = input(f"Choose a version from {list(config_choices.keys())}: ")
+        config = config_choices[chosen].Configs(**config_kwargs)
 
     main(config)

@@ -1,11 +1,10 @@
 import numpy as np
 import torch
-
 from pointcloud.configs import Configs
-from pointcloud.models.diffusion import Diffusion
+from pointcloud.data.conditioning import get_cond_dim
 from pointcloud.models import shower_flow
+from pointcloud.models.diffusion import Diffusion
 from pointcloud.utils import showerflow_utils
-from pointcloud.data.conditioning import get_cond_features_names, get_cond_dim
 
 
 def load_flow_model(
@@ -43,6 +42,7 @@ def load_flow_model(
 
     flow, distribution, transforms = shower_flow.versions_dict[version](
         num_blocks=config.shower_flow_num_blocks,
+        af_dim=config.af_dim,
         # when 'condioning' on additional Esum,
         # Nhits etc add them on as inputs rather than
         # adding 30 e layers
@@ -97,6 +97,7 @@ def load_diffusion_model(
     checkpoint = torch.load(
         model_path,
         map_location=torch.device(config.device),
+        weights_only=False,
     )  # max 5200000
     model_class = get_model_class(config)
     model = model_class(config).to(config.device)
@@ -112,6 +113,6 @@ def get_model_class(config):
         m_class = Diffusion
     else:
         raise NotImplementedError(
-            f"Model {config.model_name} not implemented, known models: " "Diffuson"
+            f"Model {config.model_name} not implemented, known models: Diffuson"
         )
     return m_class

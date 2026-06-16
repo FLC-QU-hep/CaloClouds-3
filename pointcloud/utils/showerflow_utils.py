@@ -29,7 +29,18 @@ def get_data_dir(config, last_resort="/home/{}/Data/"):
 def get_showerflow_dir(config):
     dataset_path = config.dataset_path
     base_path = get_data_dir(config)
-    dataset_name_key = dataset_name_from_path(dataset_path)
+
+    file_stem = dataset_name_from_path(dataset_path)   # e.g. "input_cc3"
+    parent_dir = os.path.basename(os.path.dirname(dataset_path))  # e.g. "cc3input_hdbscan"
+
+    # Rearrange "cc3input_X" → "input_cc3_X" to match the existing showerFlow
+    # directory convention (input_cc3_hdbscan, input_cc3_withincell, …).
+    # For any other parent-dir name, use it as-is so new configs get unique dirs.
+    if parent_dir.startswith("cc3input"):
+        suffix = parent_dir[len("cc3input"):].lstrip("_")
+        dataset_name_key = f"{file_stem}_{suffix}" if suffix else file_stem
+    else:
+        dataset_name_key = parent_dir if parent_dir else file_stem
 
     showerflow_dir = os.path.join(base_path, "showerFlow", dataset_name_key)
     return showerflow_dir
@@ -342,7 +353,13 @@ def truescale_showerflow_output(samples, config):
     if np.any(inputs_mask[5 : 5 + n_layers]):
         clusters_per_layer_gen = samples[:, cluster_start:cluster_end]
         if getattr(config, "shower_flow_fixed_input_norms", False):
-            clusters_per_layer_gen *= metadata.n_pts_rescale / n_layers
+            # Use saved per-layer normalisers if provided via config, otherwise
+            # fall back to the metadata-based formula.
+            c_norm = getattr(config, "shower_flow_clusters_per_layer_norm", None)
+            if c_norm is not None:
+                clusters_per_layer_gen /= c_norm
+            else:
+                clusters_per_layer_gen *= metadata.n_pts_rescale / n_layers
             clusters_per_layer_gen = np.clip(clusters_per_layer_gen, 0, None)
         else:
             clusters_per_layer_gen = np.clip(clusters_per_layer_gen, 0, 1)
@@ -351,7 +368,12 @@ def truescale_showerflow_output(samples, config):
     if np.any(inputs_mask[35:]):
         e_per_layer_gen = samples[:, cluster_end:]
         if getattr(config, "shower_flow_fixed_input_norms", False):
-            e_per_layer_gen *= gev_to_mev * metadata.vis_eng_rescale / n_layers
+            e_norm = getattr(config, "shower_flow_energy_per_layer_norm", None)
+            if e_norm is not None:
+                e_per_layer_gen /= e_norm
+                e_per_layer_gen *= gev_to_mev
+            else:
+                e_per_layer_gen *= gev_to_mev * metadata.vis_eng_rescale / n_layers
             e_per_layer_gen = np.clip(e_per_layer_gen, 0, None)
         else:
             e_per_layer_gen = np.clip(e_per_layer_gen, 0, 1)

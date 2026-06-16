@@ -2,7 +2,6 @@ import numpy as np
 import torch
 
 from ..models.load import get_model_class
-from ..config_varients.wish import Configs
 from ..utils.gen_utils import get_shower
 from ..utils.metadata import Metadata
 from ..data.conditioning import read_raw_regaxes_withcond
