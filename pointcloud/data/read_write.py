@@ -3,6 +3,7 @@ Read and write dat aon disk, creates a common interface.
 """
 
 import glob
+import re
 from functools import lru_cache
 
 import h5py
@@ -34,9 +35,16 @@ def get_possible_files(dataset_path):
     FileNotFoundError
         If no files are found with the pattern
     """
-    replacements = ["*" for _ in range(dataset_path.count("{"))]
-    subbed_name = dataset_path.format(*replacements)
-    matching_files = sorted(glob.glob(subbed_name))
+    n_placeholders = dataset_path.count("{")
+    subbed_name = dataset_path.format(*["*" for _ in range(n_placeholders)])
+    candidates = glob.glob(subbed_name)
+    # glob's "*" also matches stray derivative files (e.g. "..._0_ddml.h5") that
+    # share the same prefix/suffix, so only keep files where each placeholder is
+    # filled by digits only, e.g. "data_0.h5" not "data_0_ddml.h5".
+    pattern = re.compile(
+        "^" + "(\\d+)".join(re.escape(part) for part in dataset_path.split("{}")) + "$"
+    )
+    matching_files = sorted(f for f in candidates if pattern.match(f))
     if not matching_files:
         raise FileNotFoundError(f"No files found with pattern {subbed_name}")
     return matching_files

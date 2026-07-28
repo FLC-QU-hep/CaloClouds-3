@@ -1,3 +1,5 @@
+import os
+import re
 import time
 
 import k_diffusion as K
@@ -10,6 +12,14 @@ from pointcloud.models.diffusion import Diffusion
 from pointcloud.utils import misc, training
 from torch.nn.utils import clip_grad_norm_
 from torch.utils.data import DataLoader
+
+
+def _name_from_dataset_path(dataset_path):
+    """Derive a run name from the dataset's parent folder, e.g. a folder
+    'cc3input_hdbscan_ms3_mcs10' yields the name 'hdbscan_ms3_mcs10'."""
+    folder_name = os.path.basename(os.path.dirname(dataset_path))
+    match = re.match(r"cc3input_(.+)", folder_name)
+    return match.group(1) if match else folder_name
 
 
 # Train, validate and test
@@ -77,6 +87,8 @@ def train(batch, it, **setup):
 def main(cfg=Configs()):
     misc.seed_all(seed=cfg.seed)
     start_time = time.localtime()
+
+    cfg.name = _name_from_dataset_path(cfg.dataset_path) + "_"
 
     if cfg.log_comet:
         from comet_ml import Experiment

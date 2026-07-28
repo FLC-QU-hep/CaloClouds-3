@@ -62,7 +62,11 @@ class PointCloudDataset(Dataset):
             If it's 0, then the file_path should be a
             single file.
         """
-        self.open_files = self._open_data_files(file_path, n_files)
+        self._file_paths = get_files(file_path, n_files)
+        if not self._file_paths:
+            raise FileNotFoundError(f"No files found at {file_path}")
+        self._open_files_cache = None
+        self._open_files_pid = None
 
         event_key = self.keys_to_include["event"]
         self._roll_axis = False
@@ -91,38 +95,25 @@ class PointCloudDataset(Dataset):
         # avoid repeat calculation
         self._len = len(self.index_list)
 
-    def _open_data_files(self, file_path, n_files):
+    @property
+    def open_files(self):
         """
-        Open all the data files, and return them.
-        We don't bother closing them, because they are
-        read-only and will be closed when the program
-        exits.
-        N.B. if we end up with memory issues,
-        we might need to rethink this.
+        HDF5 file handles, opened lazily and re-opened per process.
 
-        Parameters
-        ----------
-        file_path : str
-            Path to the HDF5 file containing the dataset.
-            If n_files is > 0, then the file_path should
-            contain one or more "{}" to be formatted with
-            the file number.
-        n_files : int
-            If this is > 0, then the file_path should
-            contain one or more "{}" to be formatted with
-            the file number.
-            If it's 0, then the file_path should be a
-            single file.
-
-        Returns
-        -------
-        list
-            List of h5py.File objects.
+        The HDF5 C library isn't fork-safe: if these handles were opened
+        once in the main process and then inherited by DataLoader worker
+        processes (via fork), concurrent reads from multiple processes
+        sharing the same underlying handles can crash (e.g. Bus error).
+        Re-opening fresh handles in whichever process first asks for them
+        avoids sharing handles across processes.
         """
-        all_files = [h5py.File(path, "r") for path in get_files(file_path, n_files)]
-        if not all_files:
-            raise FileNotFoundError(f"No files found at {file_path}")
-        return all_files
+        pid = os.getpid()
+        if self._open_files_pid != pid:
+            self._open_files_cache = [
+                h5py.File(path, "r") for path in self._file_paths
+            ]
+            self._open_files_pid = pid
+        return self._open_files_cache
 
     def _make_index_list(self):
         """
@@ -471,7 +462,11 @@ class PointCloudDatasetGH(PointCloudDataset):
     def __init__(self, file_path, bs=32, max_ds_seq_len=1700, n_files=0):
         self._roll_axis = False  # no need to roll axis for GH dataset
         self.max_ds_seq_len = max_ds_seq_len
-        self.open_files = self._open_data_files(file_path, n_files)
+        self._file_paths = get_files(file_path, n_files)
+        if not self._file_paths:
+            raise FileNotFoundError(f"No files found at {file_path}")
+        self._open_files_cache = None
+        self._open_files_pid = None
         self._prior_event_axes = self._get_prior_event_axes()
         self.index_list = self._make_index_list()
         self.front_padded = self._is_front_padded()
@@ -538,14 +533,42 @@ class PointCloudAngular(PointCloudDataset):
         if os.path.exists(path):
             cls.load_normalization_stats()
             return
-        cls.Xmean = float(events[..., 0].mean())
-        cls.Ymean = float(events[..., 1].mean())
-        cls.Zmean = float(events[..., 2].mean())
-        cls.Xstd = float(events[..., 0].std())
-        cls.Ystd = float(events[..., 1].std())
-        cls.Zstd = float(events[..., 2].std())
-        cls.Emean = float(np.log(events[..., 3] + 1e-12).mean())
-        cls.Estd = float(np.log(events[..., 3] + 1e-12).std())
+        # First time this dataset is seen (no cached norm_stats yet): scan the
+        # full dataset rather than just the batch that happened to trigger this,
+        # and mask out zero-padded hit slots so they don't bias the mean/std
+        # towards zero by an amount that depends on each dataset's occupancy.
+        # Done in event-chunks (rather than loading whole files at once) and
+        # with running sums (rather than concatenating all hits) to keep peak
+        # memory small regardless of dataset size.
+        config = Configs()
+        chunk_size = 2000
+        count = 0
+        sums = np.zeros(4, dtype=np.float64)
+        sumsqs = np.zeros(4, dtype=np.float64)
+        for file_name in get_files(config.dataset_path, config.n_dataset_files):
+            with h5py.File(file_name, "r") as on_disk:
+                n_events = on_disk["events"].shape[0]
+                for start in range(0, n_events, chunk_size):
+                    chunk = np.asarray(
+                        on_disk["events"][start : start + chunk_size], dtype=np.float64
+                    )
+                    mask = chunk[:, :, 3] > 0
+                    log_e = np.log(chunk[:, :, 3][mask] + 1e-12)
+                    for axis, values in enumerate(
+                        (
+                            chunk[:, :, 0][mask],
+                            chunk[:, :, 1][mask],
+                            chunk[:, :, 2][mask],
+                            log_e,
+                        )
+                    ):
+                        sums[axis] += values.sum()
+                        sumsqs[axis] += np.square(values).sum()
+                    count += mask.sum()
+        means = sums / count
+        stds = np.sqrt(sumsqs / count - np.square(means))
+        cls.Xmean, cls.Ymean, cls.Zmean, cls.Emean = (float(m) for m in means)
+        cls.Xstd, cls.Ystd, cls.Zstd, cls.Estd = (float(s) for s in stds)
         np.savez(
             path,
             Xmean=cls.Xmean,
@@ -557,7 +580,7 @@ class PointCloudAngular(PointCloudDataset):
             Emean=cls.Emean,
             Estd=cls.Estd,
         )
-        print(f"Norm stats computed and saved to {path}")
+        print(f"Norm stats computed (full dataset, padding masked) and saved to {path}")
         cls._print_stats()
 
     @classmethod

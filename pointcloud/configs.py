@@ -1,1 +1,1 @@
-config_varients/caloclouds_3_S2P_hdbscan_ms8_mcs40.py
+config_varients/caloclouds_3_S2P_subcell_6kcut.py

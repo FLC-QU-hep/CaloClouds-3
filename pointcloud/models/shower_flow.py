@@ -211,6 +211,7 @@ def compile_HybridTanH_model(num_blocks, num_inputs, num_cond_inputs, af_dim, de
 def compile_HybridTanH_alt1(num_blocks, num_inputs, num_cond_inputs, af_dim, device):
     factory = HybridTanH_factory(num_inputs, num_cond_inputs, af_dim, device)
 
+    # original 
     transform_pattern = [
         "affine_coupling",
         "permutation",
@@ -227,9 +228,21 @@ def compile_HybridTanH_alt1(num_blocks, num_inputs, num_cond_inputs, af_dim, dev
         "affine_coupling",
         "permutation",
     ]
+    
+    # afterwards
+    # transform_pattern = [
+    #     "affine_coupling",
+    #     "permutation",
+    #     "affine_coupling",
+    #     "permutation",
+    #     "spline_coupling",
+    #     "permutation",
+    #     "affine_coupling",
+    #     "permutation",
+    # ]
 
     model, flow_dist, transforms = factory.create(
-        num_blocks, transform_pattern, count_bins=8
+        num_blocks, transform_pattern, count_bins=4 # original was 8
     )
     return model, flow_dist, transforms
 

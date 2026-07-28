@@ -831,16 +831,48 @@ def main(config, batch_size=2048, total_epochs=3_000, shuffle=True):
         # np.clip(samples[:, i : i + 30], 0, 1)
         i += 30
 
+    # When the flow isn't trained directly on the totals, derive them by
+    # summing the (fixed-norm) per-layer values, so we can still compare
+    # the model's total points/energy against the truth.
+    have_num_points = "total_clusters" in config.shower_flow_inputs
+    have_visible_energy = "total_energy" in config.shower_flow_inputs
+    if (
+        not have_num_points
+        and "clusters_per_layer" in config.shower_flow_inputs
+        and getattr(config, "shower_flow_fixed_input_norms", False)
+    ):
+        clusters_per_layer_norm = np.load(
+            os.path.join(showerflow_dir, "input_norms.npz")
+        )["clusters_per_layer_norm"]
+        num_points = clusters_per_layer.sum(axis=1) / clusters_per_layer_norm
+        num_points_sampled = (
+            clusters_per_layer_sampled.sum(axis=1) / clusters_per_layer_norm
+        )
+        have_num_points = True
+    if (
+        not have_visible_energy
+        and "energy_per_layer" in config.shower_flow_inputs
+        and getattr(config, "shower_flow_fixed_input_norms", False)
+    ):
+        energy_per_layer_norm = np.load(
+            os.path.join(showerflow_dir, "input_norms.npz")
+        )["energy_per_layer_norm"]
+        visible_energy = e_per_layer.sum(axis=1) / energy_per_layer_norm
+        visible_energy_sampled = (
+            e_per_layer_sampled.sum(axis=1) / energy_per_layer_norm
+        )
+        have_visible_energy = True
+
     E_true = raw_E_true * meta.incident_rescale
     meta.vis_eng_rescale
 
     plot_shower_flow_eval(
         showerflow_dir + "/",
         E_true,
-        num_points if "total_clusters" in config.shower_flow_inputs else None,
-        num_points_sampled if "total_clusters" in config.shower_flow_inputs else None,
-        visible_energy if "total_energy" in config.shower_flow_inputs else None,
-        visible_energy_sampled if "total_energy" in config.shower_flow_inputs else None,
+        num_points if have_num_points else None,
+        num_points_sampled if have_num_points else None,
+        visible_energy if have_visible_energy else None,
+        visible_energy_sampled if have_visible_energy else None,
         cog_x if "cog_x" in config.shower_flow_inputs else None,
         cog_x_sampled if "cog_x" in config.shower_flow_inputs else None,
         cog_y if "cog_y" in config.shower_flow_inputs else None,

@@ -150,6 +150,5 @@ testbed.ipynb
 *.swp
 *.npy
 log_dir/
-slurm_script/
 comet_api_key.txt
 generated_showers/

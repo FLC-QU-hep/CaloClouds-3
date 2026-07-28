@@ -40,7 +40,6 @@ static_dataset = "/data/dust/user/dayhallh/data/ILCsoftEvents/highGran_g40_p22_t
 static_n_files = 10
 #trim_edges[:] = 0
 
-
 angular_dataset = caloclouds_3.Configs().dataset_path
 angular_n_files = caloclouds_3.Configs().n_dataset_files
 

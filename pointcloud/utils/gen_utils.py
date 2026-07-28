@@ -733,7 +733,6 @@ def gen_v1_inner_batch(
 
     # loop over events
     z_positions = metadata.layer_bottom_pos_global + metadata.cell_thickness_global / 2
-    layer_indices = np.arange(len(z_positions))
     for i, hits_per_layer in enumerate(clusters_per_layer_gen):
         # for i, (hits_per_layer, e_per_layer) in enumerate(
         #     zip(clusters_per_layer_gen, e_per_layer_gen)
@@ -762,6 +761,7 @@ def gen_v1_inner_batch(
             axis=1
         )
 
+        layer_indices = np.arange(len(z_positions))
         layer_sums = (
             fake_showers[i, :, -1, None] * (closest_layer[:, None] == layer_indices)
         ).sum(axis=0)
@@ -829,7 +829,13 @@ def gen_v1_inner_batch(
         )
         fake_showers[:, :, 0] -= (cog[0] - cog_x)[:, None]
         fake_showers[:, :, 1] -= (cog[1] - cog_y)[:, None]
-    else:
+    elif not _is_angular_config(config):
+        # For PointCloudAngular (angular) configs, x/y are already correctly
+        # centered by the Xmean/Ymean de-normalisation above (sourced from
+        # this dataset's own norm_stats_*.npz). Applying metadata.mean_cog
+        # here too would double-shift with an unrelated, dataset-mismatched
+        # value (rescales.npy is shared across dataset variants and not
+        # derived from this dataset's actual per-event CoG).
         cog_x_shift = metadata.mean_cog[0]
         cog_y_shift = metadata.mean_cog[1]
         cog_z_shift = metadata.mean_cog[2]
