@@ -1,1 +1,1 @@
-config_varients/caloclouds_3_S2P_subcell_6kcut.py
+config_varients/caloclouds_3_S2P_subcell.py

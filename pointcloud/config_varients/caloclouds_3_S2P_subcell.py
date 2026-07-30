@@ -13,7 +13,7 @@ class Configs(default.Configs):
         self.storage_base = "/eos/user/m/mamozzan/"
         self._dataset_path = "/eos/user/m/mamozzan/step2point/outputs/cc3input_merge_within_regular_subcell/input_cc3_file_{}.h5"
         self.metadata_folder = "/eos/user/m/mamozzan/CaloClouds-3/pointcloud/metadata/metadata_p22_th45-135_ph79-109_en5-130"
-        self.n_dataset_files = 10
+        self.n_dataset_files = 22
         self.Acomment = (
             "Running on the p22_th45-135_ph79-109_en5-130 dataset, first 10 files"
         )
@@ -36,7 +36,7 @@ class Configs(default.Configs):
             "energy_per_layer",
         ]
         self.shower_flow_num_blocks = 2
-        self.af_dim = 4
+        self.af_dim = 6
         self.shower_flow_fixed_input_norms = True
 
         self.process_kwargs(kwargs)

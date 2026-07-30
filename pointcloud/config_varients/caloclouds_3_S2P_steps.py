@@ -36,7 +36,7 @@ class Configs(default.Configs):
             "energy_per_layer",
         ]
         self.shower_flow_num_blocks = 2
-        self.af_dim = 4
+        self.af_dim = 6
         self.shower_flow_fixed_input_norms = True
 
         self.process_kwargs(kwargs)
