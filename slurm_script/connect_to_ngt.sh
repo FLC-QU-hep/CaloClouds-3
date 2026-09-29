@@ -10,7 +10,7 @@ kubectl create -f session.yaml
 kubectl get po
 
 # connect
-ssh session-5@ngt.cern.ch
+ssh session-1@ngt.cern.ch 
 
 # deleting a session
 kubectl delete po session-1

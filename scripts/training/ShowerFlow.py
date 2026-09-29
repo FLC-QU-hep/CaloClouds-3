@@ -331,8 +331,6 @@ def main(config, batch_size=2048, total_epochs=3_000, shuffle=True):
     """
     Really this is a script, but for ease of testing, it's the main function.
     """
-    shower_flow_compiler = shower_flow.versions_dict[config.shower_flow_version]
-
     cond_dim = get_cond_dim(config, "showerflow")
     inputs_used = showerflow_utils.get_input_mask(config)
     cut_inputs = np.where(~inputs_used)[0]
@@ -346,19 +344,6 @@ def main(config, batch_size=2048, total_epochs=3_000, shuffle=True):
     device = torch.device(config.device)
 
     meta = Metadata(config)
-    model, distribution, transforms = shower_flow_compiler(
-        num_blocks=config.shower_flow_num_blocks,
-        num_inputs=input_dim,
-        num_cond_inputs=cond_dim,
-        af_dim=config.af_dim,
-        device=device,
-    )  # num_cond_inputs
-
-    # print out the number of parameters
-    total_params = sum(p.numel() for p in model.parameters())
-    trainable_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
-    print(f"Total parameters:     {total_params:,}")
-    print(f"Trainable parameters: {trainable_params:,}")
     # ## Setup
     #
     # Load the data and check it's properties.
@@ -466,6 +451,29 @@ def main(config, batch_size=2048, total_epochs=3_000, shuffle=True):
         config,
         direction_path=direction_path,
     )
+
+    # The flow is built HERE, not earlier: shower_flow_version "log1_stable" is
+    # registered against per-dataset log-space statistics derived from
+    # clusters_per_layer.npz / energy_per_layer.npz / input_norms.npz, and
+    # input_norms.npz is only written by train_ds_function_factory just above.
+    # Building the model before this point works for the linear versions but
+    # cannot work for log1_stable on a dataset whose caches are not built yet.
+    showerflow_utils.ensure_version_registered(config)
+    shower_flow_compiler = shower_flow.versions_dict[config.shower_flow_version]
+
+    model, distribution, transforms = shower_flow_compiler(
+        num_blocks=config.shower_flow_num_blocks,
+        num_inputs=input_dim,
+        num_cond_inputs=cond_dim,
+        af_dim=config.af_dim,
+        device=device,
+    )  # num_cond_inputs
+
+    # print out the number of parameters
+    total_params = sum(p.numel() for p in model.parameters())
+    trainable_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
+    print(f"Total parameters:     {total_params:,}")
+    print(f"Trainable parameters: {trainable_params:,}")
 
     start_points = np.arange(0, n_events, local_batch_size)
     # try it out

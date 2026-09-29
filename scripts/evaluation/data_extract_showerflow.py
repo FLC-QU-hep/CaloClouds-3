@@ -35,6 +35,7 @@ def get_data(config, model_path, batch_size=2048, n_showerflow_events=100_000):
     Really this is a script, but for ease of testing, it's the main function.
     """
 
+    showerflow_utils.ensure_version_registered(config)
     shower_flow_compiler = shower_flow.versions_dict[config.shower_flow_version]
 
     cond_dim = get_cond_dim(config, "showerflow")

@@ -90,32 +90,51 @@ def main(cfg=Configs()):
 
     cfg.name = _name_from_dataset_path(cfg.dataset_path) + "_"
 
+    # Logging: when resuming, reuse the folder of the run being resumed
+    # (same checkpoint dir, same Comet experiment) instead of starting a new one.
+    if cfg.resume_path:
+        log_dir = os.path.join(cfg.logdir, os.path.dirname(cfg.resume_path))
+    else:
+        log_dir = misc.get_new_log_dir(
+            cfg.logdir,
+            prefix=cfg.name,
+            postfix="_" + cfg.tag if cfg.tag is not None else "",
+            start_time=start_time,
+        )
+    ckpt_mgr = misc.CheckpointManager(log_dir)
+
+    comet_key_file = os.path.join(log_dir, "comet_experiment_key.txt")
     if cfg.log_comet:
-        from comet_ml import Experiment
+        from comet_ml import Experiment, ExistingExperiment
 
         with open("comet_api_key.txt", "r") as file:
-            key = file.read()
-        experiment = Experiment(
-            project_name=cfg.comet_project,
-            auto_metric_logging=False,
-            api_key=key,
-        )
-        experiment.log_parameters(cfg.__dict__)
-        experiment.set_name(cfg.name + time.strftime("%Y_%m_%d__%H_%M_%S", start_time))
+            key = file.read().strip()
 
-        # Log the code
-        experiment.log_code()
+        if cfg.resume_path and os.path.isfile(comet_key_file):
+            with open(comet_key_file, "r") as file:
+                experiment_key = file.read().strip()
+            experiment = ExistingExperiment(
+                api_key=key,
+                experiment_key=experiment_key,
+                project_name=cfg.comet_project,
+            )
+            print(f"Resuming Comet experiment {experiment_key}")
+        else:
+            experiment = Experiment(
+                project_name=cfg.comet_project,
+                auto_metric_logging=False,
+                api_key=key,
+            )
+            experiment.log_parameters(cfg.__dict__)
+            experiment.set_name(os.path.basename(log_dir))
+
+            # Log the code
+            experiment.log_code()
+
+            with open(comet_key_file, "w") as file:
+                file.write(experiment.get_key())
     else:
         experiment = None
-
-    # Logging
-    log_dir = misc.get_new_log_dir(
-        cfg.logdir,
-        prefix=cfg.name,
-        postfix="_" + cfg.tag if cfg.tag is not None else "",
-        start_time=start_time,
-    )
-    ckpt_mgr = misc.CheckpointManager(log_dir)
 
     # Datasets and loaders
     if not cfg.quantized_pos:
@@ -136,15 +155,31 @@ def main(cfg=Configs()):
     cfg.device = "cuda" if torch.cuda.is_available() else "cpu"
     model = Diffusion(cfg).to(cfg.device)
     model_ema = Diffusion(cfg).to(cfg.device)
-    # checkpoint = torch.load(cfg.logdir+cfg.model_path,
-    #                       map_location=torch.device(cfg.device))
-    # model.load_state_dict(checkpoint['state_dict'])
+
+    resume_ckpt = None
+    start_it = 1
+    if cfg.resume_path:
+        resume_ckpt_file = os.path.join(cfg.logdir, cfg.resume_path)
+        print(f"Resuming training from checkpoint: {resume_ckpt_file}")
+        resume_ckpt = torch.load(
+            resume_ckpt_file, map_location=torch.device(cfg.device), weights_only=False
+        )
+        model.load_state_dict(resume_ckpt["state_dict"])
+        # checkpoint files are named "ckpt_<score>_<step>.pt" (see misc.CheckpointManager.save)
+        _, _, step_part = os.path.basename(cfg.resume_path).split("_")
+        start_it = int(step_part.split(".")[0])
+        print(f"Resuming at iteration {start_it}")
 
     # initiate EMA (exponential moving average) model
-    model_ema.load_state_dict(model.state_dict())
+    if resume_ckpt is not None:
+        model_ema.load_state_dict(resume_ckpt["others"]["model_ema"])
+    else:
+        model_ema.load_state_dict(model.state_dict())
     model_ema.eval().requires_grad_(False)
     assert cfg.ema_type == "inverse"
     ema_sched = K.utils.EMAWarmup(power=cfg.ema_power, max_value=cfg.ema_max_value)
+    if resume_ckpt is not None:
+        ema_sched.load_state_dict(resume_ckpt["others"]["ema_sched"])
 
     # Sigma (time step) distibution --> lognormal distribution, so minimum value is 0
     sample_density = K.config.make_sample_density(cfg.__dict__["model"])
@@ -178,6 +213,9 @@ def main(cfg=Configs()):
         start_lr=cfg.lr,
         end_lr=cfg.end_lr,
     )
+    if resume_ckpt is not None:
+        optimizer.load_state_dict(resume_ckpt["others"]["optimizer"])
+        scheduler.load_state_dict(resume_ckpt["others"]["scheduler"])
 
     setup = {
         "model": model,
@@ -196,7 +234,7 @@ def main(cfg=Configs()):
     print("Start training...")
 
     stop = False
-    it = 1
+    it = start_it
     start_time = time.time()
     while not stop:
         for batch in dataloader:
@@ -211,7 +249,6 @@ def main(cfg=Configs()):
                 }
                 ckpt_mgr.save(model, cfg, 0, others=opt_states, step=it)
                 if cfg.log_comet:
-                    import os
                     for img_name, comet_name in [
                         (f"iter_{it}_1d_hist.png", "1d_hist"),
                         (f"iter_{it}_energy_hist.png", "energy_hist"),

@@ -11,15 +11,19 @@ class Configs(default.Configs):
         self.latent_dim = 0  # no latent flow in new calocloud
         self.dataset_path_in_storage = True
         self.storage_base = "/eos/user/m/mamozzan/"
-        self._dataset_path = "/eos/user/m/mamozzan/step2point/outputs/cc3input_hdbscan_ms8_mcs40/input_cc3_file_{}.h5"
+        self._dataset_path = "/eos/project/f/fast/input_cc3/cc3input_hdbscan_ms8_mcs40/input_cc3_file_{}.h5"
         self.metadata_folder = "/eos/user/m/mamozzan/CaloClouds-3/pointcloud/metadata/metadata_p22_th45-135_ph79-109_en5-130"
-        self.n_dataset_files = 10
+        self.n_dataset_files = 22
         self.Acomment = (
             "Running on the p22_th45-135_ph79-109_en5-130 dataset, first 10 files"
         )
         self._logdir = "CaloClouds-3/log_dir"
-
-        self.workers = 5
+        self.resume_path = (
+            "hdbscan_ms8_mcs40_2026_08_19__14_32_00/"
+            "ckpt_0.000000_530000.pt"
+        )
+        
+        self.workers = 20
         self.max_points = 5_000
         self.log_iter = 1000
 
@@ -29,14 +33,14 @@ class Configs(default.Configs):
         self.logarithmic_point_energy = True
         self.diffusion_pointwise_hidden_l1 = 32
 
-        self.shower_flow_version = "alt1"  # options: ['original', 'alt1', 'alt2']
+        self.shower_flow_version = "log1_stable"  # options: ['original', 'alt1', 'alt2', "log1_stable"]
         self.shower_flow_cond_features = ["energy", "p_norm_local"]
         self.shower_flow_inputs = [
             "clusters_per_layer",
             "energy_per_layer",
         ]
-        self.shower_flow_num_blocks = 2
-        self.af_dim = 6
+        self.shower_flow_num_blocks = 4
+        self.af_dim = 14
         self.shower_flow_fixed_input_norms = True
 
         self.process_kwargs(kwargs)

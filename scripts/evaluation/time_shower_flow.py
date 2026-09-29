@@ -110,6 +110,7 @@ save_path = os.path.join(
 
 
 def model_loader(config, model_path):
+    showerflow_utils.ensure_version_registered(config)
     shower_flow_compiler = versions_dict[config.shower_flow_version]
 
     cond_used = showerflow_utils.get_cond_mask(config)

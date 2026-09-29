@@ -10,12 +10,12 @@ source caloclouds3/bin/activate
 cd pointcloud/
 rm configs.py
 # ln -s config_varients/caloclouds_3_S2P_withincell.py configs.py
-# ln -s config_varients/caloclouds_3_S2P_subcell.py configs.py
+ln -s config_varients/caloclouds_3_S2P_subcell.py configs.py
 # ln -s config_varients/caloclouds_3_S2P_subcell_6kcut.py configs.py
 # ln -s config_varients/caloclouds_3_S2P_hdbscan_ms8_mcs40.py configs.py
-ln -s config_varients/caloclouds_3_S2P_hdbscan_ms3_mcs10.py configs.py
+# ln -s config_varients/caloclouds_3_S2P_hdbscan_ms3_mcs10.py configs.py
+# ln -s config_varients/caloclouds_3_S2P_hdbscan_ms7_mcs7.py configs.py
 # ln -s config_varients/caloclouds_3_S2P_hdbscan_ms12_mcs12.py configs.py
-# ln -s config_varients/caloclouds_3_S2P_hdbscan_ms40_mcs40.py configs.py
 # ln -s config_varients/caloclouds_3_S2P_steps.py configs.py
 cd ..
 
@@ -27,32 +27,31 @@ python scripts/training/diffusion.py
 # to check the genrated showers go inside --> CaloClouds-3/scripts/plotting/inferepy.ipynb
 
 # to run generation
-export data=subcell_6kcut #option [withincell, subcell, hdbscan_ms8_mcs40, hdbscan_ms3_mcs10, hdbscan_ms12_mcs12, hdbscan_ms40_mcs40]
+export data=subcell #option [withincell, subcell, subcell_6kcut, hdbscan_ms8_mcs40, hdbscan_ms3_mcs10, hdbscan_ms12_mcs12]
 
 if [[ "$data" == "withincell" ]]; then
-    export log_dir=merge_within_cell_2026_07_10__15_01_37
-    export file="../step2point/outputs/cc3input_merge_within_cell/input_cc3_file_0.h5"
+    # export log_dir=merge_within_cell_2026_07_10__15_01_37 # only 10 files
+    export log_dir=merge_within_cell_2026_08_13__12_44_33
+    export file="/eos/project/f/fast/input_cc3/cc3input_merge_within_cell/input_cc3_file_0.h5"
 elif [[ "$data" == "subcell" ]]; then
-    export log_dir=merge_within_regular_subcell_2026_07_20__15_35_38
-    export file="../step2point/outputs/cc3input_merge_within_regular_subcell/input_cc3_file_0.h5"
+    export log_dir=merge_within_regular_subcell_2026_08_17__12_22_08
+    export file="/eos/project/f/fast/input_cc3/cc3input_merge_within_regular_subcell/input_cc3_file_0.h5"
 elif [[ "$data" == "subcell_6kcut" ]]; then
-    export log_dir=merge_within_regular_subcell_6kcut_2026_07_24__13_10_06
-    export file="../step2point/outputs/cc3input_merge_within_regular_subcell_6kcut/input_cc3_file_0.h5"
+    export log_dir=merge_within_regular_subcell_6kcut_2026_08_17__13_11_48
+    export file="/eos/project/f/fast/input_cc3/cc3input_merge_within_regular_subcell_6kcut/input_cc3_file_0.h5"
 elif [[ "$data" == "hdbscan_ms8_mcs40" ]]; then
-    export log_dir=hdbscan_ms8_mcs40_2026_07_20__18_29_36 # ms 8 mcs 40
-    export file="../step2point/outputs/cc3input_hdbscan_ms8_mcs40/input_cc3_file_0.h5"
+    export log_dir=hdbscan_ms8_mcs40_2026_08_19__14_32_00 # ms 8 mcs 40
+    export file="/eos/project/f/fast/input_cc3/cc3input_hdbscan_ms8_mcs40/input_cc3_file_0.h5"
 elif [[ "$data" == "hdbscan_ms3_mcs10" ]]; then
-    export log_dir=hdbscan_ms3_mcs10_2026_07_10__15_46_43 # ms 3 mcs 10
-    export file="../step2point/outputs/cc3input_hdbscan_ms3_mcs10/input_cc3_file_0.h5"
+    # export log_dir=hdbscan_ms3_mcs10_2026_07_10__15_46_43 # 10 files
+    export log_dir=hdbscan_ms3_mcs10_2026_07_29__15_31_21
+    export file="/eos/project/f/fast/input_cc3/cc3input_hdbscan_ms3_mcs10/input_cc3_file_0.h5"
 elif [[ "$data" == "hdbscan_ms12_mcs12" ]]; then
     export log_dir=hdbscan_ms12_mcs12_2026_07_21__10_44_53 # ms 12 mcs 12
-    export file="../step2point/outputs/cc3input_hdbscan_ms12_mcs12/input_cc3_file_0.h5" 
-elif [[ "$data" == "hdbscan_ms40_mcs40_2026_06_23__11_24_02" ]]; then
-    export log_dir=hdbscan_ms40_mcs40_2026_06_23__11_24_02 # ms 40 mcs 40
-    export file="../step2point/outputs/cc3input_hdbscan_ms40_mcs40/input_cc3_file_0.h5"
+    export file="/eos/project/f/fast/input_cc3/cc3input_hdbscan_ms12_mcs12/input_cc3_file_0.h5" 
 fi 
 
-export n=15000
+export n=10000
 python scripts/generate_showers.py \
     --log_dir log_dir/$log_dir \
     --n_showers $n \
@@ -74,20 +73,57 @@ python scripts/training/calculate_coef.py \
     --degree 3
 
 
-export n=5000
+export n=10000
 python scripts/generate_showers.py \
-    --log_dir log_dir/$log_dir \
-    --n_showers $n \
-    --chunk_size 2000 \
-    --gen_batch_size 64 \
-    --cond_file $file \
-    --energy_units MeV \
-    --occupancy_fit poly \
-    --output_file generated_showers_poly.h5
+        --log_dir log_dir/$log_dir \
+        --n_showers $n \
+        --chunk_size 2000 \
+        --gen_batch_size 128 \
+        --cond_file $file \
+        --energy_units MeV \
+        --occupancy_fit poly \
+        --output_file generated_showers_poly.h5 
 
-python scripts/plotting/compare_generated_vs_input_cc3.py generated_showers/$log_dir/generated_showers_$n/generated_showers_poly.h5 \
-    --data-used $data \
-    --out-dir generated_showers/$log_dir/generated_showers_$n/poly_fit_plots
+for f in generated_showers/$log_dir/generated_showers_$n/generated_showers_poly.h5; do
+    python scripts/plotting/compare_generated_vs_input_cc3.py "$f" \
+        --data-used $data \
+        --out-dir generated_showers/$log_dir/generated_showers_$n/poly_fit_plots
+done
+
+export n=5000
+# "Fixed-energy / fixed-theta scan comparison" section.
+for E in 10 50 100; do
+    python scripts/generate_showers.py \
+        --log_dir log_dir/$log_dir \
+        --n_showers $n \
+        --chunk_size 2000 \
+        --gen_batch_size 64 \
+        --cond_file $file \
+        --energy_units MeV \
+        --occupancy_fit poly \
+        --output_file generated_showers_poly.h5 \
+        --fixed_energy_gev $E
+done
+for T in 0 20 40; do
+    python scripts/generate_showers.py \
+        --log_dir log_dir/$log_dir \
+        --n_showers $n \
+        --chunk_size 2000 \
+        --gen_batch_size 64 \
+        --cond_file $file \
+        --energy_units MeV \
+        --occupancy_fit poly \
+        --output_file generated_showers_poly.h5 \
+        --fixed_theta_deg $T
+done
+
+
+for f in generated_showers/$log_dir/generated_showers_$n/generated_showers_poly_*.h5; do
+    python scripts/plotting/compare_generated_vs_input_cc3.py "$f" \
+        --data-used $data \
+        --out-dir generated_showers/$log_dir/generated_showers_$n/poly_fit_plots
+done
+
 
 # --------------- NOT NEEDED: NOW WE PROJECT BACK WITH DDML !  ---------------
 # now it is also wrong cause i modified generated showers to give me directly the input for DDML
@@ -112,4 +148,5 @@ python examples/run_step2point_pipeline.py \
 
 
 python ../CaloClouds-3/scripts/plotting/compare_pipeline_outputs.py --output-dir ../CaloClouds-3/generated_showers/comparison_plots
+
 exit

@@ -1201,6 +1201,7 @@ def get_caloclouds_models(
                 )
                 showerflow_config = config
             input_mask = showerflow_utils.get_input_mask(showerflow_config)
+            showerflow_utils.ensure_version_registered(showerflow_config)
             version = versions_dict[showerflow_config.shower_flow_version]
             flow_model, flow_dist, _ = version(
                 num_blocks=showerflow_config.shower_flow_num_blocks,

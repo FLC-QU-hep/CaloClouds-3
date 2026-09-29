@@ -6,12 +6,11 @@ class Configs(default.Configs):
         super().__init__(**kwargs)
 
         self.log_comet = True
-        self.name = "CD_S2P_WithinCell_"
+        self.name = "CD_S2P_HDBScan_ms3_"
         self.storage_base = "/eos/user/m/mamozzan/"
         self.latent_dim = 0  # no latent flow in new calocloud
         self.dataset_path_in_storage = True
-        self.storage_base = "/eos/user/m/mamozzan/"
-        self._dataset_path = "/eos/project/f/fast/input_cc3/cc3input_merge_within_cell/input_cc3_file_{}.h5"
+        self._dataset_path = "/eos/project/f/fast/input_cc3/cc3input_hdbscan_ms7_mcs7/input_cc3_file_{}.h5"
         self.metadata_folder = "/eos/user/m/mamozzan/CaloClouds-3/pointcloud/metadata/metadata_p22_th45-135_ph79-109_en5-130"
         self.n_dataset_files = 22
         self.Acomment = (
@@ -20,7 +19,7 @@ class Configs(default.Configs):
         self._logdir = "CaloClouds-3/log_dir"
 
         self.workers = 5
-        self.max_points = 3_000
+        self.max_points = 5_500  # dataset max 5,473 pts (measured over all 22 files)
         self.log_iter = 1000
 
         self.cond_features = 4  # number of conditioning features (i.e. energy+points=2)
@@ -29,7 +28,10 @@ class Configs(default.Configs):
         self.logarithmic_point_energy = True
         self.diffusion_pointwise_hidden_l1 = 32
 
-        self.shower_flow_version = "log1_stable"  # options: ['original', 'alt1', 'alt2']
+        # ep1500 search trial 10 (best, combined Wasserstein = 13.12).
+        # "log1_stable" is registered at runtime by
+        # showerflow_utils.ensure_version_registered (pointcloud/models/stable_log1.py).
+        self.shower_flow_version = "log1_stable"  # options: ['original', 'alt1', 'alt2', 'log1', 'log1_stable'*]
         self.shower_flow_cond_features = ["energy", "p_norm_local"]
         self.shower_flow_inputs = [
             "clusters_per_layer",

@@ -40,6 +40,7 @@ def load_flow_model(
     inputs_used = showerflow_utils.get_input_mask(config)
     input_dim = np.sum(inputs_used)
 
+    showerflow_utils.ensure_version_registered(config)
     flow, distribution, transforms = shower_flow.versions_dict[version](
         num_blocks=config.shower_flow_num_blocks,
         af_dim=config.af_dim,
