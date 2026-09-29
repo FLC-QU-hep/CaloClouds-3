@@ -1,51 +1,15 @@
 """
-A numerically-stabilized log-scale shower-flow variant.
+A numerically-stabilized log-scale shower-flow variant ("log1_stable").
 
-Lives here (not in shower_flow.py) because it needs per-dataset log-space
-mean/std, so it cannot be a plain entry in the static versions_dict - it is
-registered at runtime instead, see register()/ensure_registered() below.
-shower_flow.py itself is never edited.
+It needs per-dataset log-space mean/std, so it cannot be a static entry of
+shower_flow.versions_dict; register()/ensure_registered() add it to the
+in-memory dict at runtime (shower_flow.py on disk is untouched).
 
-Root cause of the NaN/inf seen in the original "log1". NOTE: an earlier
-version of this note claimed "most of a shower's 30 layers have no hits".
-That is wrong - measured on the cached hdbscan_ms3_mcs10 arrays, exact zeros
-are only 7.2% of the 60 values, concentrated in the shower tail (layer 29 is
-41% zero, layer 0 is 11%, the middle layers are ~0%). The problem is not how
-many zeros there are, it is that they form a point mass, and a continuous
-flow cannot fit an atom: to place finite probability on a delta it has to
-drive its density to infinity there, which sends the log-det term to +-inf.
-
-log(x + eps) with a tiny eps is what turns a mild zero-inflation into a
-fatal one. With eps=1e-6 the atom lands at log(1e-6) = -13.8 and, after the
-z-scoring below, sits 6.2 sigma (median) to 14.6 sigma (max) away from the
-non-zero body - z range [-14.57, +2.13]. In linear space (alt1) that same
-atom sits at 0, at the edge of the data, which is why alt1 trains cleanly
-and every log run here hit NaN training batches.
-
-Fix, all confined to this file:
-  1. LOG_OFFSET (below) instead of a 1e-6 epsilon, which pulls the atom in
-     to a z range of [-5.46, +8.72].
-  2. z-score standardize the 60 log-space values (per-dimension mean/std,
-     computed once from the cached clusters_per_layer.npz / energy_per_layer.npz
-     / input_norms.npz - the same "fixed norm" inputs the real training
-     pipeline uses) via an extra affine bijector inserted right before the
-     log/exp step. Note this cannot remove the atom on its own: an affine map
-     of a point mass is still a point mass, which is why (1) was needed.
-  3. clamp the pre-exp() value (ClampedSafeExpTransform, a local copy of
-     shower_flow.SafeExpTransform with a clamp added) as a hard safety net
-     against overflow, independent of whether (2) is perfectly calibrated.
-
-Still outstanding: the real fix for the atom is dequantization (the cluster
-counts are integers, so log(n + u) with u ~ U(0,1) removes it outright), or
-factorizing out an explicit per-layer emptiness mask. The clusters and energy
-zero-masks are identical - a layer with no hits has no energy - so that mask
-is one 30-dim Bernoulli, not two. See also the log_abs_det_jacobian caveat on
-ClampedSafeExpTransform below.
-
-Registered into pointcloud.models.shower_flow.versions_dict at runtime
-under the key "log1_stable" (register()) - this mutates the in-memory dict
-of the imported module for this process only; it does not write to
-shower_flow.py on disk.
+Fixes the NaN/inf of the original "log1", caused by the empty-layer point mass
+at log(1e-6): (1) LOG_OFFSET instead of a 1e-6 epsilon, (2) z-scoring of the 60
+log-space values, (3) a clamp before exp(). The full analysis, measurements and
+outstanding work are in scripts/training/showerflow_search/README.md
+("Why log1_stable").
 """
 
 import functools
@@ -58,23 +22,9 @@ from torch.distributions import constraints
 
 from pointcloud.models.shower_flow import HybridTanH_factory
 
-# Offset added before the log, and subtracted after the exp. Must be the same
-# value in both the transform and compute_log_stats(), or the standardization
-# stats no longer describe the values the transform actually sees - hence the
-# single constant rather than two defaults that can drift apart.
-#
-# Chosen by measuring the z-scored log inputs on the cached hdbscan_ms3_mcs10
-# arrays. Larger pulls the zero-atom in towards the data body, but also lets a
-# sampled layer undershoot to -LOG_OFFSET:
-#
-#   offset   z range           frac |z|>5   worst undershoot
-#   1e-6     [-14.57, +2.13]   0.00398      -0.00 hits
-#   1e-3     [ -7.85, +4.71]   0.00132      -0.13 hits
-#   1e-2     [ -5.46, +8.72]   0.00020      -1.25 hits   <- best |z|>5
-#   1e-1     [ -3.49, +22.1]   0.00045      -12.5 hits
-#
-# 1e-2 minimizes the tail fraction; -1.25 hits of possible undershoot is
-# negligible against Wasserstein distances of 40-250 hits.
+# Offset added before the log and subtracted after the exp. Must be the same
+# in the transform and compute_log_stats(), hence one constant. 1e-2 minimizes
+# the |z|>5 tail (offset scan in the showerflow_search README).
 LOG_OFFSET = 0.01
 
 

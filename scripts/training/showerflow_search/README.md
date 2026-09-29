@@ -102,3 +102,56 @@ color = score).
   directly in `shower_flow_inputs` - extend it (mirroring the `have_num_points`
   / `have_visible_energy` branches in `ShowerFlow.py`'s eval block) before
   reusing this on those.
+
+## Why log1_stable
+
+Moved here from the docstring of `pointcloud/models/stable_log1.py`.
+
+Root cause of the NaN/inf seen in the original "log1". Measured on the cached
+hdbscan_ms3_mcs10 arrays, exact zeros are only 7.2% of the 60 values,
+concentrated in the shower tail (layer 29 is 41% zero, layer 0 is 11%, the
+middle layers are ~0%). The problem is not how many zeros there are, it is
+that they form a point mass, and a continuous flow cannot fit an atom: to
+place finite probability on a delta it has to drive its density to infinity
+there, which sends the log-det term to +-inf.
+
+log(x + eps) with a tiny eps is what turns a mild zero-inflation into a fatal
+one. With eps=1e-6 the atom lands at log(1e-6) = -13.8 and, after z-scoring,
+sits 6.2 sigma (median) to 14.6 sigma (max) away from the non-zero body - z
+range [-14.57, +2.13]. In linear space (alt1) that same atom sits at 0, at the
+edge of the data, which is why alt1 trains cleanly and every log run hit NaN
+training batches.
+
+Fix, all confined to `stable_log1.py`:
+1. `LOG_OFFSET` instead of a 1e-6 epsilon, which pulls the atom in to a z
+   range of [-5.46, +8.72].
+2. z-score standardize the 60 log-space values (per-dimension mean/std,
+   computed once from the cached clusters_per_layer.npz / energy_per_layer.npz
+   / input_norms.npz - the same "fixed norm" inputs the real training pipeline
+   uses) via an extra affine bijector right before the log/exp step. This
+   cannot remove the atom on its own: an affine map of a point mass is still a
+   point mass, which is why (1) was needed.
+3. clamp the pre-exp() value (`ClampedSafeExpTransform`, a local copy of
+   `shower_flow.SafeExpTransform` with a clamp added) as a hard safety net
+   against overflow.
+
+Choice of `LOG_OFFSET`, measured on the z-scored log inputs of the cached
+hdbscan_ms3_mcs10 arrays. Larger pulls the zero-atom towards the data body,
+but also lets a sampled layer undershoot to -LOG_OFFSET:
+
+| offset | z range         | frac \|z\|>5 | worst undershoot |
+|--------|-----------------|--------------|------------------|
+| 1e-6   | [-14.57, +2.13] | 0.00398      | -0.00 hits       |
+| 1e-3   | [-7.85, +4.71]  | 0.00132      | -0.13 hits       |
+| 1e-2   | [-5.46, +8.72]  | 0.00020      | -1.25 hits (chosen) |
+| 1e-1   | [-3.49, +22.1]  | 0.00045      | -12.5 hits       |
+
+1e-2 minimizes the tail fraction; -1.25 hits of possible undershoot is
+negligible against Wasserstein distances of 40-250 hits.
+
+Still outstanding: the real fix for the atom is dequantization (the cluster
+counts are integers, so log(n + u) with u ~ U(0,1) removes it outright), or
+factorizing out an explicit per-layer emptiness mask. The clusters and energy
+zero-masks are identical - a layer with no hits has no energy - so that mask is
+one 30-dim Bernoulli, not two. See also the log_abs_det_jacobian caveat on
+`ClampedSafeExpTransform`.
