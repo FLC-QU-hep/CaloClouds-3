@@ -140,32 +140,17 @@ _SHOWER_FLOW = {
     },
 }
 
-# Occupancy bias correction (the "fixed scale factor" from the CC3 paper, section 3.3):
-# scale_n = mean(real n_points) / mean(raw generated n_points), computed once per variant
-# from the first 5000 conditioning-matched showers (real: step2point cc3input_<variant>
-# raw h5; generated: this script's own output with the correction disabled). Applied via
-# gen_utils.gen_cond_showers_batch's shower_flow_n_scaling path as a flat multiplicative
-# factor on ShowerFlow's predicted per-layer cluster counts, matching the paper's simplified
-# (vs. CC2's polynomial-fit) approach. Recompute if the underlying model/ShowerFlow changes.
-#
-# STALE - ALL FOUR NUMBERS. Every value below was measured against the old
-# alt1_nb2 shower flows. As of 2026-09-10 all four of these variants generate
-# with a log1_stable_nb4 flow instead (ms3_mcs10 since 2026-09-08; withincell,
-# subcell and ms8_mcs40 once their retrains land), and a different flow has a
-# different occupancy bias, so none of these factors describes the model it is
-# supposed to correct any more.
-#
-# TODO(re-measure): for each variant, regenerate with the correction disabled and
-# take scale_n = mean(real n_points) / mean(raw generated n_points) over the first
-# 5000 conditioning-matched showers - real from
+# Occupancy bias correction (CC3 paper, section 3.3): a flat factor on
+# ShowerFlow's per-layer cluster counts, applied in gen_cond_showers_batch.
+# scale_n = mean(real n_points) / mean(raw generated n_points) over the first 5000
+# conditioning-matched showers: real from
 # /eos/project/f/fast/input_cc3/cc3input_<variant>/input_cc3_file_0.h5, generated
-# from this script's own output. Then update the numbers here.
+# by this script with the correction disabled.
 #
-# Not urgent for the comparison plots: those use the *poly* run
-# (--occupancy_fit poly), whose coefficients calculate_coef.py recomputes per
-# variant from a fresh generation, so it does not read this table at all. It IS
-# urgent for anything reading the base (non-poly) generated_showers.h5, whose
-# absolute hit counts are corrected by these factors.
+# TODO(re-measure): STALE - all four values were measured with the old alt1_nb2
+# flows; the variants now use log1_stable_nb4. Only the base (non-poly)
+# generated_showers.h5 depends on them; the poly run (--occupancy_fit poly) uses
+# calculate_coef.py's per-variant fit instead.
 _OCCUPANCY_SCALE_N = {
     "hdbscan_ms3_mcs10": 1.0350,
     "hdbscan_ms8_mcs40": 1.0408,

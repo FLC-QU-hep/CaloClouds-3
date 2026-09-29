@@ -123,40 +123,9 @@ for label in theta0 theta20 theta40; do
 done
 python plot_scan_comparison.py "${theta_args[@]}" --scan-type theta --geometry all_algorithms
 
-# --> Build a matched Geant4 (real) reference per scan point: filter the raw
-#    (pre-postprocessing) real events near that same energy/theta/phi from
-#    input_cc3_file_N.h5, then grid-project them the same way. A single
-#    shared, unfiltered real reference does NOT work here - it spans the
-#    full energy/angle range, so it swamps any one fixed-conditioning CC3
-#    sample in raw counts and the ratio panels come out near 0 regardless of
-#    CC3 quality (confirmed empirically - see plot_scan_comparison.py's
-#    docstring). Widen the range / add more input_cc3_file_N.h5 if a scan
-#    point's real statistics come out too low (e.g. theta0: real events are
-#    sin(theta)-weighted, so very few land near normal incidence).
-# These reference files already exist in filtered/ (built 2026-08-31) and the real
-# data behind them has only MOVED, not changed, so this block is commented out by
-# default - it is a one-off prerequisite builder, not part of a normal rerun.
-# Uncomment to rebuild them.  NOTE the paths below were repointed: the source used
-# to be step2point/outputs/cc3input_merge_within_cell/, which no longer exists.
-RAW_DIR=/eos/project/f/fast/input_cc3/cc3input_merge_within_cell
-RAW="$RAW_DIR/input_cc3_file_0.h5"
-
-# python filter_real_by_conditioning.py "$RAW" --energy-range-gev 9 11   --label 10GeV
-# python filter_real_by_conditioning.py "$RAW" --energy-range-gev 49 51  --label 50GeV
-# python filter_real_by_conditioning.py "$RAW" --energy-range-gev 99 101 --label 100GeV
-# python filter_real_by_conditioning.py \
-#     "$RAW" "$RAW_DIR/input_cc3_file_1.h5" \
-#     "$RAW_DIR/input_cc3_file_2.h5" \
-#     "$RAW_DIR/input_cc3_file_3.h5" \
-#     "$RAW_DIR/input_cc3_file_10.h5" \
-#     "$RAW_DIR/input_cc3_file_11.h5" \
-#     --theta-range-deg -4 4 --label theta0   # wider window + more files: low real stats near normal incidence
-# python filter_real_by_conditioning.py "$RAW" --theta-range-deg 18 22 --label theta20
-# python filter_real_by_conditioning.py "$RAW" --theta-range-deg 38 42 --label theta40
-#
-# for label in 10GeV 50GeV 100GeV theta0 theta20 theta40; do
-#     python postprocessing.py filtered/real_filtered_${label}.h5
-# done
+# The matched Geant4 references in filtered/ (built 2026-08-31) are a one-off
+# prerequisite, not part of a normal rerun. The exact commands that built them
+# are in the docstring of filter_real_by_conditioning.py.
 
 
 # ============================================================================

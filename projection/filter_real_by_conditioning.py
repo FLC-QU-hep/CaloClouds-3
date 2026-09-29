@@ -29,6 +29,30 @@ Usage:
     # combine windows (all given ones apply together, AND'ed):
     python filter_real_by_conditioning.py input_cc3_file_0.h5 \\
         --theta-range-deg -2 2 --phi-range-deg -2 2 --label theta0
+
+Paper reference samples (filtered/, built 2026-08-31, run from projection/).
+A single unfiltered reference does not work for the scans: it spans the full
+energy/angle range and swamps any fixed-conditioning CC3 sample, so the ratio
+panels come out near 0. theta0 needs a wider window and more files, because
+real events are sin(theta)-weighted and few land near normal incidence. The
+source used to be step2point/outputs/cc3input_merge_within_cell/ (moved, not
+changed).
+
+    RAW_DIR=/eos/project/f/fast/input_cc3/cc3input_merge_within_cell
+    RAW="$RAW_DIR/input_cc3_file_0.h5"
+    python filter_real_by_conditioning.py "$RAW" --energy-range-gev 9 11   --label 10GeV
+    python filter_real_by_conditioning.py "$RAW" --energy-range-gev 49 51  --label 50GeV
+    python filter_real_by_conditioning.py "$RAW" --energy-range-gev 99 101 --label 100GeV
+    python filter_real_by_conditioning.py \\
+        "$RAW" "$RAW_DIR/input_cc3_file_1.h5" "$RAW_DIR/input_cc3_file_2.h5" \\
+        "$RAW_DIR/input_cc3_file_3.h5" "$RAW_DIR/input_cc3_file_10.h5" \\
+        "$RAW_DIR/input_cc3_file_11.h5" \\
+        --theta-range-deg -4 4 --label theta0
+    python filter_real_by_conditioning.py "$RAW" --theta-range-deg 18 22 --label theta20
+    python filter_real_by_conditioning.py "$RAW" --theta-range-deg 38 42 --label theta40
+    for label in 10GeV 50GeV 100GeV theta0 theta20 theta40; do
+        python postprocessing.py filtered/real_filtered_${label}.h5
+    done
 """
 
 from __future__ import annotations
