@@ -19,7 +19,7 @@ class Configs(caloclouds_3.Configs):
         self.dataset_path_in_storage = False
         # dataset path (without the first part, if dataset_path_in_storage is True)
         self.n_dataset_files = 1
-        self._dataset_path = "/eos/user/m/mamozzan/step2point/outputs/cc3input_withincell/input_cc3_file_{}.h5"
+        self._dataset_path = "/eos/project/f/fast/input_cc3/cc3input_withincell/input_cc3_file_{}.h5"
         # path to stor files assocated eith the shower flow
         self.shower_flow_data_dir = self.storage_base + "shower_flow_data/"
         # only determines where the distillation model reads the teacher model from

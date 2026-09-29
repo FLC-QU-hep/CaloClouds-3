@@ -103,6 +103,14 @@ class Configs:
         self.tag = None
         self.log_iter = 100  # log every n iterations, default: 100
 
+        # Resume diffusion.py training from a checkpoint saved by CheckpointManager.
+        # Path relative to `logdir`, e.g.
+        # "hdbscan_ms3_mcs10_2026_07_29__15_31_21/ckpt_0.000000_180000.pt".
+        # If None (default), training starts from scratch.
+        # (Kept separate from `model_path`, which cd.py uses to load a frozen
+        # teacher model for consistency distillation, not to resume itself.)
+        self.resume_path = None
+
         # EMA scheduler
         self.ema_type = "inverse"
         self.ema_power = 0.6667  # depends on the number of iterations, 2/3=0.6667 good for 1e6 iterations, 3/4=0.75 good for less

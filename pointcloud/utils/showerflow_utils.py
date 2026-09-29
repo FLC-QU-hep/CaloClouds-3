@@ -46,6 +46,32 @@ def get_showerflow_dir(config):
     return showerflow_dir
 
 
+# Versions that are not plain entries in shower_flow.versions_dict because they
+# need per-dataset statistics, so they have to be built and registered against a
+# specific dataset before the dict can be indexed.
+RUNTIME_REGISTERED_VERSIONS = ("log1_stable",)
+
+
+def ensure_version_registered(config):
+    """Register any runtime-only shower_flow_version before versions_dict is
+    indexed, so `versions_dict[config.shower_flow_version]` cannot KeyError.
+
+    No-op for the statically-defined versions, and idempotent per dataset, so
+    it is safe to call in front of every lookup.
+    """
+    version = getattr(config, "shower_flow_version", None)
+    if version not in RUNTIME_REGISTERED_VERSIONS:
+        return
+    # deferred import: stable_log1 imports from pointcloud.models.shower_flow,
+    # which imports this module's package - importing it at module scope would
+    # close the cycle.
+    from pointcloud.models import stable_log1
+
+    stable_log1.ensure_registered(
+        get_showerflow_dir(config), getattr(config, "device", None)
+    )
+
+
 def model_save_paths(config, version, num_blocks, cut_inputs):
     showerflow_dir = get_showerflow_dir(config)
     max_input_dims = 65

@@ -10,7 +10,7 @@ class Configs(caloclouds_3.Configs):
         self.logdir_in_storage = True
 
         self.dataset_path_in_storage = False
-        self._dataset_path = "/eos/user/m/mamozzan/step2point/outputs/cc3input_hdbscan/input_cc3_file_{}.h5"
+        self._dataset_path = "/eos/project/f/fast/input_cc3/cc3input_hdbscan/input_cc3_file_{}.h5"
         self.n_dataset_files = 4
         self.metadata_folder = "/eos/user/m/mamozzan/CaloClouds-3/pointcloud/metadata/metadata_p22_th45-135_ph79-109_en5-130"
 

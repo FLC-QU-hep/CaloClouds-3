@@ -74,7 +74,8 @@ from pointcloud.config_varients import (
     caloclouds_3_S2P_hdbscan_ms8_mcs40,
     caloclouds_3_S2P_hdbscan_ms12_mcs12,
     caloclouds_3_S2P_hdbscan_ms3_mcs10,
-    caloclouds_3_S2P_hdbscan_ms40_mcs40,
+    caloclouds_3_S2P_hdbscan_ms3_mcs3,
+    caloclouds_3_S2P_hdbscan_ms7_mcs7,
     caloclouds_3_S2P_steps,
     caloclouds_3_S2P_subcell,
     caloclouds_3_S2P_withincell,
@@ -82,28 +83,47 @@ from pointcloud.config_varients import (
 )
 from pointcloud.data.conditioning import read_raw_regaxes_withcond
 from pointcloud.models.load import load_diffusion_model, load_flow_model
+from pointcloud.utils import showerflow_utils
 from pointcloud.utils.gen_utils import gen_cond_showers_batch
 from pointcloud.utils.metadata import Metadata  # noqa: E402
 
 _SHOWER_FLOW = {
     "hdbscan_ms8_mcs40": {
-        "pth": "/eos/user/m/mamozzan/point-cloud-diffusion-data/showerFlow/input_cc3_hdbscan_ms8_mcs40/ShowerFlow_alt1_nb2_inputs1152921504606846975_fnorms_best.pth",
+        "pth": "/eos/user/m/mamozzan/point-cloud-diffusion-data/showerFlow/input_cc3_hdbscan_ms8_mcs40/ShowerFlow_log1_stable_nb4_inputs1152921504606846975_fnorms_best.pth",
         "dir": "/eos/user/m/mamozzan/point-cloud-diffusion-data/showerFlow/input_cc3_hdbscan_ms8_mcs40",
     },
+    # log1_stable af_dim=14 / num_blocks=4, the winner of the 1500-epoch
+    # af_dim/num_blocks/version search (combined Wasserstein 13.12 vs 17.67 for
+    # the best alt1 there), retrained here as a full run - best val NLL -135.68
+    # at epoch 2983. The old alt1_nb2 checkpoint this used to point at now lives
+    # in .../showerFlow/input_cc3_hdbscan_ms3_mcs10_old/.
+    # log1_stable is registered at runtime from this dir's cached per-layer
+    # arrays (see pointcloud/models/stable_log1.py), so "dir" is not just where
+    # input_norms.npz lives - it also fixes the flow's log-space standardization.
     "hdbscan_ms3_mcs10": {
-        "pth": "/eos/user/m/mamozzan/point-cloud-diffusion-data/showerFlow/input_cc3_hdbscan_ms3_mcs10/ShowerFlow_alt1_nb2_inputs1152921504606846975_fnorms_best.pth",
+        "pth": "/eos/user/m/mamozzan/point-cloud-diffusion-data/showerFlow/input_cc3_hdbscan_ms3_mcs10/ShowerFlow_log1_stable_nb4_inputs1152921504606846975_fnorms_best.pth",
         "dir": "/eos/user/m/mamozzan/point-cloud-diffusion-data/showerFlow/input_cc3_hdbscan_ms3_mcs10",
     },
+    # Same log1_stable af_dim=14 / num_blocks=4 setup as hdbscan_ms3_mcs10 above,
+    # trained 2026-09-10/11. As there, "dir" also fixes the flow's log-space
+    # standardization stats.
+    "hdbscan_ms3_mcs3": {
+        "pth": "/eos/user/m/mamozzan/point-cloud-diffusion-data/showerFlow/input_cc3_hdbscan_ms3_mcs3/ShowerFlow_log1_stable_nb4_inputs1152921504606846975_fnorms_best.pth",
+        "dir": "/eos/user/m/mamozzan/point-cloud-diffusion-data/showerFlow/input_cc3_hdbscan_ms3_mcs3",
+    },
+    # Same log1_stable af_dim=14 / num_blocks=4 setup as hdbscan_ms3_mcs10 above
+    # (best val NLL written to ..._fnorms_best_data.txt), trained 2026-09-09.
+    # As there, "dir" also fixes the flow's log-space standardization stats.
+    "hdbscan_ms7_mcs7": {
+        "pth": "/eos/user/m/mamozzan/point-cloud-diffusion-data/showerFlow/input_cc3_hdbscan_ms7_mcs7/ShowerFlow_log1_stable_nb4_inputs1152921504606846975_fnorms_best.pth",
+        "dir": "/eos/user/m/mamozzan/point-cloud-diffusion-data/showerFlow/input_cc3_hdbscan_ms7_mcs7",
+    },
     "hdbscan_ms12_mcs12": {
-        "pth": "/eos/user/m/mamozzan/point-cloud-diffusion-data/showerFlow/input_cc3_hdbscan_ms12_mcs12/ShowerFlow_alt1_nb2_inputs1152921504606846975_fnorms_best.pth",
+        "pth": "/eos/user/m/mamozzan/point-cloud-diffusion-data/showerFlow/input_cc3_hdbscan_ms12_mcs12/ShowerFlow_log1_stable_nb4_inputs1152921504606846975_fnorms_best.pth",
         "dir": "/eos/user/m/mamozzan/point-cloud-diffusion-data/showerFlow/input_cc3_hdbscan_ms12_mcs12",
     },
-    "hdbscan_ms40_mcs40": {
-        "pth": "/eos/user/m/mamozzan/point-cloud-diffusion-data/showerFlow/input_cc3_hdbscan_ms40_mcs40/ShowerFlow_alt1_nb2_inputs1152921504606846975_fnorms_best.pth",
-        "dir": "/eos/user/m/mamozzan/point-cloud-diffusion-data/showerFlow/input_cc3_hdbscan_ms40_mcs40",
-    },
     "withincell": {
-        "pth": "/eos/user/m/mamozzan/point-cloud-diffusion-data/showerFlow/input_cc3_merge_within_cell/ShowerFlow_alt1_nb2_inputs1152921504606846975_fnorms_best.pth",
+        "pth": "/eos/user/m/mamozzan/point-cloud-diffusion-data/showerFlow/input_cc3_merge_within_cell/ShowerFlow_log1_stable_nb4_inputs1152921504606846975_fnorms_best.pth",
         "dir": "/eos/user/m/mamozzan/point-cloud-diffusion-data/showerFlow/input_cc3_merge_within_cell",
     },
     "steps": {
@@ -111,11 +131,11 @@ _SHOWER_FLOW = {
         "dir": "/eos/user/m/mamozzan/point-cloud-diffusion-data/showerFlow/input_cc3_identity",
     },
     "subcell": {
-        "pth": "/eos/user/m/mamozzan/point-cloud-diffusion-data/showerFlow/input_cc3_merge_within_regular_subcell/ShowerFlow_alt1_nb2_inputs1152921504606846975_fnorms_best.pth",
+        "pth": "/eos/user/m/mamozzan/point-cloud-diffusion-data/showerFlow/input_cc3_merge_within_regular_subcell/ShowerFlow_log1_stable_nb4_inputs1152921504606846975_fnorms_best.pth",
         "dir": "/eos/user/m/mamozzan/point-cloud-diffusion-data/showerFlow/input_cc3_merge_within_regular_subcell",
     },
     "subcell_6kcut": {
-        "pth": "/eos/user/m/mamozzan/point-cloud-diffusion-data/showerFlow/input_cc3_merge_within_regular_subcell_6kcut/ShowerFlow_alt1_nb2_inputs1152921504606846975_fnorms_best.pth",
+        "pth": "/eos/user/m/mamozzan/point-cloud-diffusion-data/showerFlow/input_cc3_merge_within_regular_subcell_6kcut/ShowerFlow_log1_stable_nb4_inputs1152921504606846975_fnorms_best.pth",
         "dir": "/eos/user/m/mamozzan/point-cloud-diffusion-data/showerFlow/input_cc3_merge_within_regular_subcell_6kcut",
     },
 }
@@ -127,6 +147,25 @@ _SHOWER_FLOW = {
 # gen_utils.gen_cond_showers_batch's shower_flow_n_scaling path as a flat multiplicative
 # factor on ShowerFlow's predicted per-layer cluster counts, matching the paper's simplified
 # (vs. CC2's polynomial-fit) approach. Recompute if the underlying model/ShowerFlow changes.
+#
+# STALE - ALL FOUR NUMBERS. Every value below was measured against the old
+# alt1_nb2 shower flows. As of 2026-09-10 all four of these variants generate
+# with a log1_stable_nb4 flow instead (ms3_mcs10 since 2026-09-08; withincell,
+# subcell and ms8_mcs40 once their retrains land), and a different flow has a
+# different occupancy bias, so none of these factors describes the model it is
+# supposed to correct any more.
+#
+# TODO(re-measure): for each variant, regenerate with the correction disabled and
+# take scale_n = mean(real n_points) / mean(raw generated n_points) over the first
+# 5000 conditioning-matched showers - real from
+# /eos/project/f/fast/input_cc3/cc3input_<variant>/input_cc3_file_0.h5, generated
+# from this script's own output. Then update the numbers here.
+#
+# Not urgent for the comparison plots: those use the *poly* run
+# (--occupancy_fit poly), whose coefficients calculate_coef.py recomputes per
+# variant from a fresh generation, so it does not read this table at all. It IS
+# urgent for anything reading the base (non-poly) generated_showers.h5, whose
+# absolute hit counts are corrected by these factors.
 _OCCUPANCY_SCALE_N = {
     "hdbscan_ms3_mcs10": 1.0350,
     "hdbscan_ms8_mcs40": 1.0408,
@@ -137,8 +176,9 @@ _OCCUPANCY_SCALE_N = {
 _CONFIG_CLS = {
     "hdbscan_ms8_mcs40": caloclouds_3_S2P_hdbscan_ms8_mcs40.Configs,
     "hdbscan_ms3_mcs10": caloclouds_3_S2P_hdbscan_ms3_mcs10.Configs,
+    "hdbscan_ms3_mcs3": caloclouds_3_S2P_hdbscan_ms3_mcs3.Configs,
+    "hdbscan_ms7_mcs7": caloclouds_3_S2P_hdbscan_ms7_mcs7.Configs,
     "hdbscan_ms12_mcs12": caloclouds_3_S2P_hdbscan_ms12_mcs12.Configs,
-    "hdbscan_ms40_mcs40": caloclouds_3_S2P_hdbscan_ms40_mcs40.Configs, 
     "withincell": caloclouds_3_S2P_withincell.Configs,
     "steps": caloclouds_3_S2P_steps.Configs,
     "subcell": caloclouds_3_S2P_subcell.Configs,
@@ -152,10 +192,15 @@ def _detect_variant(log_dir: str) -> str:
         return "hdbscan_ms8_mcs40"
     if "hdbscan_ms3_mcs10" in name:
         return "hdbscan_ms3_mcs10"
+    # Order-independent of the ms3_mcs10 test above: neither string is a
+    # substring of the other ("ms3_mcs3" vs "ms3_mcs10"), so no log_dir can
+    # match both.
+    if "hdbscan_ms3_mcs3" in name:
+        return "hdbscan_ms3_mcs3"
+    if "hdbscan_ms7_mcs7" in name:
+        return "hdbscan_ms7_mcs7"
     if "hdbscan_ms12_mcs12" in name:
         return "hdbscan_ms12_mcs12"
-    if "hdbscan_ms40_mcs40" in name:
-        return "hdbscan_ms40_mcs40"
     if "subcell_6kcut" in name:
         return "subcell_6kcut"
     if "subcell" in name:
@@ -170,6 +215,12 @@ def _detect_variant(log_dir: str) -> str:
     )
 
 
+def _fmt_num(x: float) -> str:
+    """Compact, filename-safe number formatting: 20.0 -> '20', -12.5 -> 'm12p5'."""
+    s = f"{x:g}"
+    return s.replace("-", "m").replace(".", "p")
+
+
 def _latest_checkpoint(log_dir: str) -> str:
     pattern = re.compile(r"ckpt_[\d.]+_(\d+)\.pt$")
     best_step, best_file = -1, None
@@ -182,6 +233,51 @@ def _latest_checkpoint(log_dir: str) -> str:
     if best_file is None:
         raise FileNotFoundError(f"No checkpoint found in {log_dir}")
     return best_file
+
+
+def _check_flow_matches_config(config, flow_pth: str, flow_dir: str) -> None:
+    """Fail early, and readably, when the shower-flow checkpoint and the config disagree.
+
+    load_flow_model builds the flow from the config's shower_flow_version /
+    shower_flow_num_blocks / af_dim and only then loads the weights, so a config
+    that has moved on from the checkpoint _SHOWER_FLOW names (as happened when
+    hdbscan_ms3_mcs10 switched from alt1_nb2 to log1_stable_nb4) otherwise shows
+    up as a load_state_dict key/shape dump. The checkpoint name encodes version,
+    num_blocks and the input mask, so compare those directly. af_dim is *not* in
+    the name - a mismatch there is still only caught by the weight shapes.
+
+    log1_stable additionally derives its log-space standardization from the
+    cached per-layer arrays of whichever showerflow dir the config resolves to
+    (pointcloud/models/stable_log1.py). That dir follows config.dataset_path, so
+    a --cond_file from a different dataset would decode the flow with the wrong
+    loc/scale and silently distort occupancies - check it points at the same dir
+    the checkpoint came from.
+    """
+    cut_inputs = np.where(~showerflow_utils.get_input_mask(config))[0]
+    _, expected_best, _ = showerflow_utils.model_save_paths(
+        config, config.shower_flow_version, config.shower_flow_num_blocks, cut_inputs
+    )
+    name_base = os.path.basename(expected_best)[: -len("_best.pth")]
+    if not os.path.basename(flow_pth).startswith(name_base):
+        raise ValueError(
+            f"Shower-flow checkpoint does not match the config for this variant.\n"
+            f"  checkpoint : {os.path.basename(flow_pth)}\n"
+            f"  config     : version={config.shower_flow_version} "
+            f"num_blocks={config.shower_flow_num_blocks} "
+            f"(expects a checkpoint named {name_base}_*.pth)\n"
+            f"Update _SHOWER_FLOW (or the config) so both name the same flow."
+        )
+    if config.shower_flow_version in showerflow_utils.RUNTIME_REGISTERED_VERSIONS:
+        stats_dir = showerflow_utils.get_showerflow_dir(config)
+        if os.path.realpath(stats_dir) != os.path.realpath(flow_dir):
+            raise ValueError(
+                f"shower_flow_version={config.shower_flow_version!r} takes its log-space "
+                f"standardization stats from the dataset's showerflow dir, but that dir "
+                f"is not where this checkpoint was trained:\n"
+                f"  stats dir (from config.dataset_path): {stats_dir}\n"
+                f"  checkpoint dir (_SHOWER_FLOW)       : {flow_dir}\n"
+                f"Pass a --cond_file from the dataset this flow was trained on."
+            )
 
 
 def _to_cc3_events(batch_showers: np.ndarray, layer_centers: np.ndarray, energy_units: str = "GeV") -> np.ndarray:
@@ -329,6 +425,14 @@ def main():
         help="HDF5 filename inside the output subdirectory.",
     )
     parser.add_argument(
+        "--shower_flow_pth",
+        default=None,
+        help="Specific ShowerFlow .pth to generate with. Default: the variant's entry in "
+        "_SHOWER_FLOW. Its version/num_blocks must match the config (a search-trial "
+        "checkpoint of the same architecture is fine); input_norms.npz and, for "
+        "log1_stable, the log-standardization stats still come from the variant's dir.",
+    )
+    parser.add_argument(
         "--occupancy_fit",
         choices=["flat", "poly"],
         default="flat",
@@ -347,9 +451,51 @@ def main():
         "DDML's LoadHdf5 loader, which applies hit energies as raw G4/DD4hep native units "
         "(MeV) with no further conversion.",
     )
+    parser.add_argument(
+        "--fixed_energy_gev",
+        type=float,
+        default=None,
+        help="Override the incident-energy conditioning column with this fixed value [GeV] "
+        "for every shower, instead of the per-shower energies read from --cond_file/the "
+        "variant's dataset. Direction (theta/phi) is left as-is, i.e. still drawn from the "
+        "real conditioning pool. Combinable with --fixed_theta_deg/--fixed_phi_deg to fix both.",
+    )
+    parser.add_argument(
+        "--fixed_theta_deg",
+        type=float,
+        default=None,
+        help="Override the local polar angle conditioning (theta_local) with this fixed value "
+        "[degrees] for every shower. Independent of --fixed_phi_deg: if phi isn't also fixed, "
+        "each shower keeps its own real phi_local from the conditioning pool (only theta is "
+        "overridden). Energy is likewise left as-is (real pool) unless --fixed_energy_gev is set.",
+    )
+    parser.add_argument(
+        "--fixed_phi_deg",
+        type=float,
+        default=None,
+        help="Override the local azimuthal angle conditioning (phi_local) with this fixed value "
+        "[degrees] for every shower. Independent of --fixed_theta_deg: if theta isn't also fixed, "
+        "each shower keeps its own real theta_local from the conditioning pool.",
+    )
     args = parser.parse_args()
     if args.cond_pool_size is None:
         args.cond_pool_size = args.n_showers
+
+    # Auto-suffix --output_file when fixing conditioning columns, so a fixed-energy
+    # or fixed-angle run can't silently overwrite a normal run's file of the same
+    # name in the same out_dir (log_dir + n_showers are otherwise identical).
+    # theta/phi can be fixed independently (the other stays random, drawn per-shower
+    # from the real conditioning pool), so each gets its own suffix piece.
+    suffix_parts = []
+    if args.fixed_energy_gev is not None:
+        suffix_parts.append(f"E{_fmt_num(args.fixed_energy_gev)}GeV")
+    if args.fixed_theta_deg is not None:
+        suffix_parts.append(f"theta{_fmt_num(args.fixed_theta_deg)}")
+    if args.fixed_phi_deg is not None:
+        suffix_parts.append(f"phi{_fmt_num(args.fixed_phi_deg)}")
+    if suffix_parts:
+        base, ext = os.path.splitext(args.output_file)
+        args.output_file = f"{base}_{'_'.join(suffix_parts)}{ext}"
 
     log_dir = os.path.abspath(args.log_dir)
     variant = _detect_variant(log_dir)
@@ -383,10 +529,17 @@ def main():
     n_layers = len(layer_centers)
 
     sf = _SHOWER_FLOW[variant]
+    flow_pth = args.shower_flow_pth or sf["pth"]
 
     # --- load shower flow ---
     print("\nLoading shower flow...")
-    flow, distribution, transforms = load_flow_model(config, sf["pth"])
+    print(f"  checkpoint: {flow_pth}")
+    print(
+        f"  version={config.shower_flow_version} af_dim={config.af_dim} "
+        f"num_blocks={config.shower_flow_num_blocks}"
+    )
+    _check_flow_matches_config(config, flow_pth, sf["dir"])
+    flow, distribution, transforms = load_flow_model(config, flow_pth)
     norms = np.load(os.path.join(sf["dir"], "input_norms.npz"))
     config.shower_flow_clusters_per_layer_norm = float(norms["clusters_per_layer_norm"])
     config.shower_flow_energy_per_layer_norm = float(norms["energy_per_layer_norm"])
@@ -437,6 +590,30 @@ def main():
     pool_size = len(cond_pool)
     indices = np.tile(np.arange(pool_size), (n_total // pool_size) + 1)[:n_total]
     full_cond = cond_pool[indices]  # (n_total, cond_dim)
+
+    # Conditioning columns are [energy_GeV, px_local, py_local, pz_local] (see
+    # cond_np unpacking below). Override one or both while leaving the other
+    # as-is (i.e. still drawn from the real conditioning pool above).
+    if args.fixed_energy_gev is not None:
+        full_cond[:, 0] = args.fixed_energy_gev
+        print(f"\nFixed energy  : {args.fixed_energy_gev} GeV (angles from real cond pool)")
+    if args.fixed_theta_deg is not None or args.fixed_phi_deg is not None:
+        # Decompose each pool row's real direction into its own theta/phi so
+        # only the fixed component is overridden - the other one keeps its
+        # real, per-shower paired value (not a single global fixed value).
+        px, py, pz = full_cond[:, 1].numpy(), full_cond[:, 2].numpy(), full_cond[:, 3].numpy()
+        theta_rad = np.arccos(np.clip(pz, -1.0, 1.0))
+        phi_rad = np.arctan2(py, px)
+        if args.fixed_theta_deg is not None:
+            theta_rad = np.full_like(theta_rad, np.radians(args.fixed_theta_deg))
+        if args.fixed_phi_deg is not None:
+            phi_rad = np.full_like(phi_rad, np.radians(args.fixed_phi_deg))
+        full_cond[:, 1] = torch.from_numpy(np.sin(theta_rad) * np.cos(phi_rad)).float()  # px_local
+        full_cond[:, 2] = torch.from_numpy(np.sin(theta_rad) * np.sin(phi_rad)).float()  # py_local
+        full_cond[:, 3] = torch.from_numpy(np.cos(theta_rad)).float()  # pz_local
+        theta_label = f"{args.fixed_theta_deg} deg" if args.fixed_theta_deg is not None else "random (real cond pool)"
+        phi_label = f"{args.fixed_phi_deg} deg" if args.fixed_phi_deg is not None else "random (real cond pool)"
+        print(f"\nFixed angle   : theta_local={theta_label}, phi_local={phi_label}")
 
     # --- generate and write incrementally ---
     print(f"\nGenerating {n_total} showers -> {out_path}")

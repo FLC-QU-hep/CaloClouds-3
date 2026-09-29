@@ -1,47 +1,246 @@
 cd /eos/user/m/mamozzan/CaloClouds-3/ || exit
-# unset PYTHONPATH
 # venv must live off EOS (EOS's FUSE mount doesn't reliably support mmap,
 # which dlopen() needs for compiled extensions -> intermittent Bus error)
 source caloclouds3/bin/activate
-cd ../projection || exit
+cd projection/ || exit
 
 # EOS FUSE doesn't reliably support the POSIX locks HDF5 takes on file
 # create/open -> intermittent BlockingIOError ("Resource temporarily
 # unavailable") on writes.
 export HDF5_USE_FILE_LOCKING=FALSE
 
-INPUT=/eos/user/m/mamozzan/CaloClouds-3/generated_showers/merge_within_regular_subcell_6kcut_2026_07_24__13_10_06/generated_showers_5000/generated_showers_poly.h5
-POSTPROCESSED="${INPUT%.h5}_postprocessed.h5"
-# Reference ("Geant4"/gray) line for the shower-profile comparison plot - the
-# actual conditioning file generation was paired against, run through the
-# grid-projection pipeline (not the raw --no-project per-hit output).
-# REFERENCE=/eos/user/m/mamozzan/step2point/outputs/cc3input_merge_within_cell/input_cc3_file_0_postprocessed.h5
-REFERENCE=/eos/user/m/mamozzan/step2point/outputs/cc3input_merge_within_regular_subcell/input_cc3_file_0_postprocessed.h5
-REFERENCE1=/eos/user/m/mamozzan/CaloClouds-3/generated_showers/merge_within_cell_2026_07_10__15_01_37/generated_showers_5000/generated_showers_poly_postprocessed.h5
-# REFERENCE2=/eos/user/m/mamozzan/CaloClouds-3/generated_showers/merge_within_regular_subcell_2026_07_20__15_35_38/generated_showers_5000/generated_showers_poly_postprocessed.h5
-REFERENCE2=/eos/user/m/mamozzan/CaloClouds-3/generated_showers/merge_within_regular_subcell_6kcut_2026_07_24__13_10_06/generated_showers_5000/generated_showers_poly_postprocessed.h5
-REFERENCE3=/eos/user/m/mamozzan/CaloClouds-3/generated_showers/hdbscan_ms3_mcs10_2026_07_10__15_46_43/generated_showers_5000/generated_showers_poly_postprocessed.h5
-REFERENCE4=/eos/user/m/mamozzan/CaloClouds-3/generated_showers/hdbscan_ms8_mcs40_2026_07_20__18_29_36/generated_showers_5000/generated_showers_poly_postprocessed.h5
-REFERENCE5=/eos/user/m/mamozzan/CaloClouds-3/generated_showers/hdbscan_ms12_mcs12_2026_07_21__10_44_53/generated_showers_5000/generated_showers_poly_postprocessed.h5
+# Algorithm variants compared throughout this script (both the plain
+# distributions/profiles/CoG comparison below and the fixed-conditioning scan
+# comparison further down reuse this same list).
+ALGO_DIRS=(
+    merge_within_cell_2026_08_13__12_44_33
+    merge_within_regular_subcell_2026_08_17__12_22_08
+    merge_within_regular_subcell_6kcut_2026_08_17__13_11_48
+    hdbscan_ms3_mcs10_2026_07_29__15_31_21
+    hdbscan_ms3_mcs3_2026_09_10__18_39_40      # diffusion finished 2026-09-12; log1_stable_nb4 flow
+    hdbscan_ms7_mcs7_2026_09_09__11_19_50      # diffusion finished 2026-09-10; log1_stable_nb4 flow
+    hdbscan_ms8_mcs40_2026_08_19__14_32_00
+    hdbscan_ms12_mcs12_2026_08_26__18_00_00   # newer retrain; 2026_07_21 is the old dir
+)
+
+# n for the main comparison. slurm_script/generate_showers.sh writes
+# generated_showers_10000/ (base + poly) and generated_showers_5000/ (the scans).
+SCAN_N=10000
+
 # postprocessing.py takes a DDML-format h5 (events/energy/layer_counts/n_points/
-# phi_global/theta_global/...), NOT a raw .edm4hep.root - point it at a
-# CaloClouds-3 generated_showers.h5 (or the output of convert_to_DDML_format.py,
-# which has the same layout). Positional args: <input> [output], output
-# defaults to <input>_postprocessed.h5 next to the input. By default (no
-# --no-project) that output IS the grid-projected file - no separate _grid.h5.
-python postprocessing.py "$INPUT"
+# phi_global/theta_global/...),  - point it at a CaloClouds-3 generated_showers.h5
+# Positional args: <input> [output], output, defaults to <input>_postprocessed.h5 next to the input.
+# Grid-project every variant's poly run, not just one hardcoded file.
+for algo in "${ALGO_DIRS[@]}"; do
+    python postprocessing.py "../generated_showers/$algo/generated_showers_$SCAN_N/generated_showers_poly.h5"
+done
 
-# Plotting scripts take one or more grid-projected h5 files (postprocessing.py's
-# default output); --output-dir defaults to plots/ next to this script. The
-# profile script's first arg is the reference (solid/gray "Geant4" line).
-python plot_distributions_from_grid.py "$REFERENCE" "$REFERENCE1" "$REFERENCE2" "$REFERENCE3" #"$REFERENCE4" "$REFERENCE5"
-python plot_shower_profiles_from_grid.py "$REFERENCE" "$REFERENCE1" "$REFERENCE2" "$REFERENCE3" #"$REFERENCE4" "$REFERENCE5"
+# Real (Geant4) grid-projected reference.  NOTE: this used to be read from
+# step2point/outputs/cc3input_*, which no longer exists - the input_cc3 data
+# now lives under /eos/project/f/fast/input_cc3/.
+REFERENCE=/eos/project/f/fast/input_cc3/cc3input_merge_within_regular_subcell/input_cc3_file_0_postprocessed.h5
 
-# plot_cog_from_grid.py computes CoG in the LOCAL, shift-aligned frame (to
-# match the paper's own CoG convention) - it does its own box cut + half-MIP
-# merge internally, so it needs the RAW pre-postprocessing files, not the
-# grid-projected (global frame) ones the other two scripts use above.
-python plot_cog_from_grid.py \
-    "${REFERENCE/_postprocessed/}" "${REFERENCE1/_postprocessed/}" \
-    "${REFERENCE2/_postprocessed/}" "${REFERENCE3/_postprocessed/}" \
-    --n-showers 5000
+GEN_FILES=("$REFERENCE")
+for algo in "${ALGO_DIRS[@]}"; do
+    GEN_FILES+=("../generated_showers/$algo/generated_showers_$SCAN_N/generated_showers_poly_postprocessed.h5")
+done
+
+# NOTE: the gun-edge (incident-position) check is deliberately NOT one of the
+# lines here - it gets its own combined figure set further down, see the
+# "gun edge test" section at the end of this script.
+
+# plot_all_from_grid.py runs plot_distributions_from_grid.py,
+# plot_shower_profiles_from_grid.py, and plot_cog_from_grid.py in one command
+# on the same file list (CoG derives its own raw, pre-postprocessing path per
+# file internally - see plot_all_from_grid.py's docstring).
+# --n-showers caps EVERY file (reference included) to the same shower count: the
+# Geant4 reference file holds 20000 showers, the generated ones 10000, and the
+# distributions/spectrum are raw counts, so without this the gray reference sits
+# a factor 2 high and every ratio panel is offset by it.
+# No --x-zoom-mm/--z-zoom-mm here: every file in this comparison was projected
+# with the same grid phase (cell centres at 0 mod CELL_SIZE_MM), so the default
+# ranges bin them all identically and any binning effect cancels in the ratio.
+# Checked explicitly: re-binning per cell column instead of the default
+# 39 linear bins leaves each variant's x/z ratio spread unchanged (e.g.
+# merge_within_cell std 0.0712 either way), i.e. the structure in those ratio
+# panels is real, not an artefact. Cell-aligned bins ARE needed once two
+# different grid phases share a plot - that is the gun-edge figure below.
+# --spectrum-max-gev / --energy-per-shower-max-gev: display-only upper caps. Both
+# panels auto-scale their top bin edge to the single most extreme value across all
+# input files, and subcell carries a 2.88 GeV cell and a 14.5 GeV shower - roughly
+# 6x and 4x past everyone else's maximum - so without the caps one outlier per panel
+# sets the axis and squeezes every distribution into the left third. The caps sit
+# just above p99.9 (cells: 0.0000% above 0.5 GeV; showers: every file's p99.9 is
+# ~3.2 GeV and only subcell's single 14.5 GeV outlier sits above 4 GeV), so
+# effectively nothing real is hidden. Counts below the cap
+# and every other panel are untouched.
+python plot_all_from_grid.py "${GEN_FILES[@]}" --n-showers "$SCAN_N" --spectrum-zoom-gev 1e-4 1e-3 \
+    --spectrum-max-gev 0.5 --energy-per-shower-max-gev 4
+
+# ============================================================================
+# Fixed-energy / fixed-theta  scan comparison (CC3 vs Geant4)
+# ============================================================================
+SCAN_N=5000
+GEN_DIRS=()
+for algo in "${ALGO_DIRS[@]}"; do
+    GEN_DIRS+=("../generated_showers/$algo/generated_showers_$SCAN_N")
+done
+
+# 1. Postprocess (grid-project) the CC3 showers generated by cc3.sh - every
+#    algorithm variant we have a fixed-conditioning scan for, not just one.
+for GEN_DIR in "${GEN_DIRS[@]}"; do
+    for f in "$GEN_DIR"/generated_showers_poly_*.h5; do
+        [[ "$f" == *_postprocessed.h5 ]] && continue  # skip already-postprocessed files on a rerun
+        python postprocessing.py "$f"
+    done
+done
+
+# 2. Plot: one --group per scan point, each group's first path is that scan
+#    point's real reference and every path after it is an algorithm variant
+#    compared against it (see plot_scan_comparison.py's docstring for why
+#    each scan point needs its own real reference rather than one shared
+#    across all of them). derive_label() prefixes each GEN's algorithm-dir
+#    name onto its scan-point label so the algorithms don't collide on the
+#    same legend entry/color. Every algorithm dir uses the same
+#    generated_showers_poly_<suffix>_postprocessed.h5 naming, only the
+#    directory (i.e. GEN_DIRS, built above from ALGO_DIRS) changes, so the
+#    --group args are built in a loop instead of repeated by hand per algorithm.
+energy_args=()
+for label in 10GeV 50GeV 100GeV; do
+    energy_args+=(--group "filtered/real_filtered_${label}_postprocessed.h5")
+    for d in "${GEN_DIRS[@]}"; do
+        energy_args+=("$d/generated_showers_poly_E${label}_postprocessed.h5")
+    done
+done
+python plot_scan_comparison.py "${energy_args[@]}" --scan-type energy --geometry all_algorithms
+
+theta_args=()
+for label in theta0 theta20 theta40; do
+    theta_args+=(--group "filtered/real_filtered_${label}_postprocessed.h5")
+    for d in "${GEN_DIRS[@]}"; do
+        theta_args+=("$d/generated_showers_poly_${label}_postprocessed.h5")
+    done
+done
+python plot_scan_comparison.py "${theta_args[@]}" --scan-type theta --geometry all_algorithms
+
+# --> Build a matched Geant4 (real) reference per scan point: filter the raw
+#    (pre-postprocessing) real events near that same energy/theta/phi from
+#    input_cc3_file_N.h5, then grid-project them the same way. A single
+#    shared, unfiltered real reference does NOT work here - it spans the
+#    full energy/angle range, so it swamps any one fixed-conditioning CC3
+#    sample in raw counts and the ratio panels come out near 0 regardless of
+#    CC3 quality (confirmed empirically - see plot_scan_comparison.py's
+#    docstring). Widen the range / add more input_cc3_file_N.h5 if a scan
+#    point's real statistics come out too low (e.g. theta0: real events are
+#    sin(theta)-weighted, so very few land near normal incidence).
+# These reference files already exist in filtered/ (built 2026-08-31) and the real
+# data behind them has only MOVED, not changed, so this block is commented out by
+# default - it is a one-off prerequisite builder, not part of a normal rerun.
+# Uncomment to rebuild them.  NOTE the paths below were repointed: the source used
+# to be step2point/outputs/cc3input_merge_within_cell/, which no longer exists.
+RAW_DIR=/eos/project/f/fast/input_cc3/cc3input_merge_within_cell
+RAW="$RAW_DIR/input_cc3_file_0.h5"
+
+# python filter_real_by_conditioning.py "$RAW" --energy-range-gev 9 11   --label 10GeV
+# python filter_real_by_conditioning.py "$RAW" --energy-range-gev 49 51  --label 50GeV
+# python filter_real_by_conditioning.py "$RAW" --energy-range-gev 99 101 --label 100GeV
+# python filter_real_by_conditioning.py \
+#     "$RAW" "$RAW_DIR/input_cc3_file_1.h5" \
+#     "$RAW_DIR/input_cc3_file_2.h5" \
+#     "$RAW_DIR/input_cc3_file_3.h5" \
+#     "$RAW_DIR/input_cc3_file_10.h5" \
+#     "$RAW_DIR/input_cc3_file_11.h5" \
+#     --theta-range-deg -4 4 --label theta0   # wider window + more files: low real stats near normal incidence
+# python filter_real_by_conditioning.py "$RAW" --theta-range-deg 18 22 --label theta20
+# python filter_real_by_conditioning.py "$RAW" --theta-range-deg 38 42 --label theta40
+#
+# for label in 10GeV 50GeV 100GeV theta0 theta20 theta40; do
+#     python postprocessing.py filtered/real_filtered_${label}.h5
+# done
+
+
+# ============================================================================
+# Gun edge test (incident-position check) -- its OWN set of plots
+# ============================================================================
+# Separate from the algorithm comparison above, on purpose: this is not a
+# comparison between merging algorithms, it is a check of the grid-projection
+# convention. test_gun_position_grid_shift.py projects ONE sample twice --
+# "gridcenter" (postprocessing.py's normal convention, gun on a cell centre)
+# and "gridedge" (same hits, grid shifted half a cell, gun on a cell boundary)
+# -- and both samples are drawn on one set of figures so the two incident
+# positions can be read off together rather than from four separate PNGs.
+#
+# --sample-tag puts the sample name into the output directory, which is what
+# derive_label() turns into the legend entry, so geant4's and hdbscan's lines
+# don't both come out as plain "gridcenter"/"gridedge".
+GUN_EDGE_N=10000
+# --random-sample, not --n-showers: this reference file holds 35000 showers and
+# we want 10000 of them to match the generated sample's statistics in the raw-count
+# panels. Taking the first 10000 would only ever read the head of the file, so draw
+# them at random instead (fixed seed, so reruns are reproducible). Both grid
+# variants are built from the same draw, so the pair stays like-for-like.
+python test_gun_position_grid_shift.py \
+    /eos/project/f/fast/input_cc3/cc3input_merge_within_regular_subcell/input_cc3_file_0.h5 \
+    --random-sample "$GUN_EDGE_N" --sample-tag geant4 --skip-plots
+python test_gun_position_grid_shift.py \
+    ../generated_showers/hdbscan_ms3_mcs10_2026_07_29__15_31_21/generated_showers_10000/generated_showers_poly.h5 \
+    --n-showers "$GUN_EDGE_N" --sample-tag hdbscan_ms3 --skip-plots
+# Third sample: the regular sub-cell merge. It is the one algorithm whose own merge
+# step already splits cells on a sub-cell grid, so whether the gun sits on a cell
+# centre or a cell boundary is exactly the convention its merging interacts with -
+# the case where a gun-edge effect is most likely to show up beyond Geant4's own.
+python test_gun_position_grid_shift.py \
+    ../generated_showers/merge_within_regular_subcell_2026_08_17__12_22_08/generated_showers_10000/generated_showers_poly.h5 \
+    --n-showers "$GUN_EDGE_N" --sample-tag subcell --skip-plots
+
+# Newest run of each, so a rerun of the three commands above is picked up.
+GE_FILES=()
+for tag in gridcenter_geant4 gridedge_geant4 gridcenter_hdbscan_ms3 gridedge_hdbscan_ms3 gridcenter_subcell gridedge_subcell; do
+    d=$(ls -td gun_edge_test/${tag}_*/ 2>/dev/null | head -1)
+    if [[ -z "$d" ]]; then
+        echo "ERROR: no gun_edge_test/${tag}_* directory found" >&2
+        continue
+    fi
+    # The inner directory is named for the shower count actually written, so
+    # glob it rather than hardcoding a count.
+    ge=$(ls -d "${d}"generated_showers_*/ 2>/dev/null | head -1)
+    GE_FILES+=("${ge}generated_showers_poly_postprocessed.h5")
+done
+
+# gridcenter_geant4 is first, so it is the reference every ratio is taken
+# against: gridedge_geant4/gridcenter_geant4 IS the gun-edge effect on real
+# data, and the two hdbscan curves sit next to it on the same scale.
+#
+# --x-zoom-mm / --z-zoom-mm: unlike the algorithm comparison above, this figure
+# mixes TWO grid phases -- gridcenter's cell columns sit at 0 mod CELL_SIZE_MM,
+# gridedge's at half a cell mod CELL_SIZE_MM. A bin width merely close to the
+# cell pitch (the default 200mm/39 = 5.128mm) then lands edges on one comb or
+# the other and merges two columns into a bin (doubling it) or leaves one empty,
+# e.g. a spurious spike at x=0. Bin width EXACTLY CELL_SIZE_MM with the edges
+# offset a quarter cell keeps every edge clear of both combs. Recompute with:
+#   python -c "from postprocessing import CELL_SIZE_MM as C; h=39*C/2; print(-h+C/4, h+C/4)"
+# Colours follow the GE_FILES order above. gridcenter_geant4 is the reference and
+# is always drawn as the filled grey band, so its entry is a placeholder; its
+# gridedge partner is black, and each generated sample gets a light/dark pair of
+# one hue - green for hdbscan_ms3, amber for subcell. The LIGHT member of each
+# pair is the exact hex that sample carries in every other figure in this
+# directory (plot_*_from_grid.py's ALGO_COLORS, Okabe-Ito), and the dark member
+# is that same hue at 0.45x HLS lightness, so a reader who has learned "green =
+# hdbscan, amber = subcell" from the comparison plots reads this figure the same
+# way. Pairing the colours by
+# SAMPLE this way (grey/black = Geant4, light/dark green = hdbscan, light/dark
+# orange = subcell) means the eye groups the two grid phases of one sample
+# together, which is the comparison this figure exists to make. With three
+# samples the pairing is what keeps six curves readable: hue picks the sample,
+# lightness picks the grid phase, so it stays a set of three two-line stories
+# rather than six competing lines.
+# --energy-per-shower-max-gev: same display-only cap as the main comparison above.
+# Adding subcell to this figure brought its single 14.5 GeV shower along, which
+# stretched the total-energy panel out to 14 GeV and squeezed the real distribution
+# (which ends by ~3.3 GeV) into the left quarter.
+python plot_all_from_grid.py "${GE_FILES[@]}" \
+    --geometry gun_edge --n-showers "$GUN_EDGE_N" --spectrum-zoom-gev 1e-4 1e-3 \
+    --energy-per-shower-max-gev 4 \
+    --colors "#9a9a92" "#0b0b0b" "#009e73" "#004734" "#e69f00" "#684800" \
+    --x-zoom-mm -97.950413 100.494579 \
+    --z-zoom-mm -151.377911 47.067081
