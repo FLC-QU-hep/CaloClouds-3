@@ -11,7 +11,6 @@ If it's called as a script, it will mirror all the notebooks in the repository.
 """
 from pathlib import Path
 import json
-import sys
 import os
 
 

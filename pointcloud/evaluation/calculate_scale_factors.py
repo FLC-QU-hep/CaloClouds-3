@@ -2,7 +2,7 @@ import numpy as np
 
 from pointcloud.utils.metadata import Metadata
 from pointcloud.utils import detector_map
-from pointcloud.data.read_write import read_raw_regaxes, get_n_events
+from pointcloud.data.read_write import get_n_events
 from pointcloud.evaluation.bin_standard_metrics import BinnedData
 from pointcloud.evaluation.bin_standard_metrics import get_path as _base_get_path
 from pointcloud.utils.gen_utils import gen_cond_showers_batch
