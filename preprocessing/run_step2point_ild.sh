@@ -37,7 +37,7 @@ if [[ "$algo" == "merge_within_regular_subcell" ]]; then
 elif [[ "$algo" == "hdbscan" ]]; then
     name=_"ms${ms}"_"mcs${mcs}"
     extra_args=(
-        --hdbscan-cell-id-encoding system:5,module:3,stave:4,tower:4,layer:6,wafer:6,slice:4,cellX:32:-16,cellY:-16 \
+        --cell-id-encoding system:5,module:3,stave:4,tower:4,layer:6,wafer:6,slice:4,cellX:32:-16,cellY:-16 \
         --min-cluster-size $mcs \
         --min-samples $ms \
         --epsilon 0.0 \
@@ -69,7 +69,7 @@ python examples/generate_validation_plots.py \
   --min-cluster-size "$mcs" \
   --min-samples "$ms" \
   --merge-scope cell_id \
-  --hdbscan-cell-id-encoding system:5,module:3,stave:4,tower:4,layer:6,wafer:6,slice:4,cellX:32:-16,cellY:-16 \
+  --cell-id-encoding system:5,module:3,stave:4,tower:4,layer:6,wafer:6,slice:4,cellX:32:-16,cellY:-16 \
 
 # shower display
 export index=10
