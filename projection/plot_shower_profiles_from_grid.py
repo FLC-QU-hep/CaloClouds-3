@@ -38,8 +38,8 @@ import matplotlib.pyplot as plt
 import matplotlib.ticker as mticker
 import numpy as np
 
-sys.path.insert(0, "/eos/user/m/mamozzan/step2point")
-from martina_test.metadata import Metadata  # noqa: E402
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from preprocessing.metadata import Metadata  # noqa: E402
 
 from postprocessing import CELL_SIZE_MM  # noqa: E402
 

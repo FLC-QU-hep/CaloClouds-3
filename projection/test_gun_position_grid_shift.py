@@ -51,8 +51,8 @@ import sys
 import h5py
 import numpy as np
 
-sys.path.insert(0, "/eos/user/m/mamozzan/step2point")
-from martina_test.metadata import Metadata  # noqa: E402
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from preprocessing.metadata import Metadata  # noqa: E402
 
 from postprocessing import (  # noqa: E402
     BOX_HALF_SIZE_MM,

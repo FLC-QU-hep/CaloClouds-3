@@ -218,8 +218,8 @@ def main():
 
     os.makedirs(args.output_dir, exist_ok=True)
 
-    sys.path.insert(0, "/eos/user/m/mamozzan/step2point")
-    from martina_test.metadata import Metadata  # noqa: E402
+    sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    from preprocessing.metadata import Metadata  # noqa: E402
 
     metadata = Metadata()
     n_layers = len(metadata.layer_bottom_pos_global)

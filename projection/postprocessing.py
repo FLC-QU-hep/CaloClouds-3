@@ -66,8 +66,8 @@ import h5py
 import numpy as np
 from tqdm import tqdm
 
-sys.path.insert(0, "/eos/user/m/mamozzan/step2point")
-from martina_test.metadata import Metadata  # noqa: E402
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from preprocessing.metadata import Metadata  # noqa: E402
 
 BOX_HALF_SIZE_MM = 250.0
 CELL_SIZE_MM = 5.0883331298828125  # ECAL transverse cell pitch (regular CartesianGridXY readout)
