@@ -129,10 +129,10 @@ done
 # now it is also wrong cause i modified generated showers to give me directly the input for DDML
 
 # for plotting, you can use the same script as the one for generating the inputs 
-python ../step2point/martina_test/plot_check_cc3_format.py generated_showers/$log_dir/generated_showers_$n/generated_showers.h5
+python preprocessing/plot_check_cc3_format.py generated_showers/$log_dir/generated_showers_$n/generated_showers.h5
 
 # for converting to input for step2point
-python ../step2point/martina_test/convert_from_cc3_format.py ../CaloClouds-3/generated_showers/$log_dir/generated_showers_$n/generated_showers.h5
+python preprocessing/convert_from_cc3_format.py ../CaloClouds-3/generated_showers/$log_dir/generated_showers_$n/generated_showers.h5
 
 # apply projection inside step2point
 # better to open a new terminal

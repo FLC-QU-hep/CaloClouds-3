@@ -1,3 +1,4 @@
+import sys
 from pathlib import Path
 
 import h5py
@@ -35,8 +36,10 @@ def inspect_h5(path, label):
 
 
 if __name__ == "__main__":
-    f1 = h5py.File("../photons_h5/p22_th45-135_ph79-109_en5-130_seed0_ip.h5", "r")
-    f2 = h5py.File("outputs/pipeline_identity_0/compressed_identity.h5", "r")
+    if len(sys.argv) != 3:
+        sys.exit("Usage: python compare_h5_files.py <original_photons.h5> <compressed_identity.h5>")
+    f1 = h5py.File(sys.argv[1], "r")
+    f2 = h5py.File(sys.argv[2], "r")
 
     print("=== GUN PARTICLE COMPARISON ===")
     # PDG

@@ -24,8 +24,8 @@ import h5py
 import matplotlib.pyplot as plt
 import numpy as np
 
-sys.path.insert(0, "/eos/user/m/mamozzan/step2point")
-from martina_test.metadata import Metadata  # noqa: E402
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from preprocessing.metadata import Metadata  # noqa: E402
 
 
 REFERENCE_LABEL = "Geant4"
