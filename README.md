@@ -1,3 +1,20 @@
+# step2point-ild-cc3
+
+CaloClouds-3 trained on [step2point](https://github.com/fast-sim/step2point) point-cloud
+representations of ILD photon showers: one model per way of turning the Geant4 steps
+into points (merge within cell, merge within regular subcell and several HDBSCAN
+settings), all with the same architecture and training budget.
+
+- **Weights:** [huggingface.co/fast-sim/step2point-ild-cc3](https://huggingface.co/fast-sim/step2point-ild-cc3)
+- **ILD preprocessing** (step2point output to CaloClouds-3 input): [`preprocessing/`](preprocessing/)
+- **Paper figures:** [`paper_figures/`](paper_figures/), [`projection/`](projection/)
+
+This repository is derived from [FLC-QU-hep/CaloClouds-3](https://github.com/FLC-QU-hep/CaloClouds-3)
+and keeps its history; it is distributed under the same Apache License 2.0 (see
+[`LICENSE`](LICENSE) and [`NOTICE`](NOTICE)). The original CaloClouds 3 README follows.
+
+---
+
 [![arXiv](https://img.shields.io/badge/arXiv-2511.01460-<COLOR>.svg)](https://arxiv.org/abs/2511.01460)
 [![Run python tests](https://github.com/FLC-QU-hep/CaloClouds-3/actions/workflows/ci.yml/badge.svg)](https://github.com/FLC-QU-hep/CaloClouds-3/actions/workflows/ci.yml)
 [![cov](https://FLC-QU-hep.github.io/CaloClouds-3/badges/coverage.svg)](https://github.com/FLC-QU-hep/CaloClouds-3/actions)
