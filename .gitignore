@@ -152,3 +152,5 @@ testbed.ipynb
 log_dir/
 comet_api_key.txt
 generated_showers/
+# local data products (e.g. the HDBSCAN sweep outputs read by step2point hdbscan_sweep/)
+outputs/
