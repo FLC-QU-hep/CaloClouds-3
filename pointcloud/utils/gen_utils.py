@@ -3,7 +3,6 @@ import numpy as np
 import torch
 
 from .metadata import Metadata
-from .detector_map import get_shift
 
 from ..configs import Configs
 

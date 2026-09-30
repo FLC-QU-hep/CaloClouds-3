@@ -13,7 +13,7 @@ from pointcloud.evaluation.bin_standard_metrics import (
     get_caloclouds_models,
 )
 
-from scripts.evaluation.create_standard_metrics import main, get_configs
+from scripts.evaluation.create_standard_metrics import main
 
 
 def fake_models(config, tmpdir):

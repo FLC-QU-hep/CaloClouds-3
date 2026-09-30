@@ -5,27 +5,21 @@ import os
 import time
 import numpy as np
 import torch
-import os
 
 from pointcloud.config_varients import (
     caloclouds_3,
-    caloclouds_3,
-    default,
     caloclouds_2,
 )
 
 
 from pointcloud.utils.metadata import Metadata
 from pointcloud.utils import detector_map
-from pointcloud.data.read_write import read_raw_regaxes, get_n_events
 from pointcloud.data.conditioning import read_raw_regaxes_withcond
 
 from pointcloud.utils.gen_utils import gen_cond_showers_batch
 
 # imports specific to this evaluation
 from pointcloud.evaluation.bin_standard_metrics import (
-    get_wish_models,
-    get_fish_models,
     get_caloclouds_models,
 )
 from pointcloud.evaluation.bin_standard_metrics import get_path as base_get_path

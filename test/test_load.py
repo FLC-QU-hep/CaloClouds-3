@@ -1,7 +1,6 @@
 """
 Module to test the functions in evaluation.generate
 """
-import os
 import torch
 from pointcloud.models import load
 

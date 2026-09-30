@@ -10,7 +10,6 @@ from torch.utils.data import DataLoader
 import k_diffusion
 import time
 import os
-import warnings
 
 
 from ..data.naming import dataset_name_from_path

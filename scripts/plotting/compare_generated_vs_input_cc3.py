@@ -30,7 +30,6 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 from pointcloud.utils.metadata import Metadata
-from pointcloud.utils.detector_map import floors_ceilings
 from pointcloud.data.conditioning import read_raw_regaxes_withcond
 
 CONFIG_MODULES = {
