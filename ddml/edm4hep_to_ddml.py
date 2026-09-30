@@ -110,9 +110,14 @@ def edm4hep_to_ddml(
     # name from compressed_h5's parent dir (outdir's basename), not from the `algorithm` string,
     # so a naive f"outputs/cc3input_{algorithm}/..." guess here can silently point at a stale
     # file from an unrelated run (e.g. a prior full, non-traced run) instead of this run's output.
-    cc3_path = _cc3_output_path(compressed_h5)
+    # Write the CC3 file next to this run's outputs (<outdir>/../cc3input_<algo>/), not into
+    # convert()'s default CC3_INPUT_BASE: that is the production CC3 training input, and this
+    # run may be shower-limited, so the default would overwrite a full file with a partial one.
+    default_cc3_path = _cc3_output_path(compressed_h5)
+    cc3_dir = os.path.join(os.path.dirname(os.path.normpath(outdir)), os.path.basename(os.path.dirname(default_cc3_path)))
+    cc3_path = os.path.join(cc3_dir, os.path.basename(default_cc3_path))
     print(f"[2/3] Converting {compressed_h5} -> {cc3_path} ...")
-    convert_to_cc3(compressed_h5)
+    convert_to_cc3(compressed_h5, output_folder=cc3_dir)
     if not os.path.isfile(cc3_path):
         raise RuntimeError(f"convert_to_cc3_format.convert() finished but expected output {cc3_path} wasn't created.")
 
