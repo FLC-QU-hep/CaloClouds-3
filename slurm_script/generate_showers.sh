@@ -16,7 +16,7 @@
 #   ./generate_showers.sh <variant> [device]
 #
 #   variant : withincell | subcell | subcell_6kcut
-#             hdbscan_ms8_mcs40 | hdbscan_ms3_mcs10 | hdbscan_ms3_mcs3
+#             hdbscan_ms8_mcs40 | hdbscan_ms3_mcs10 | hdbscan_ms3_mcs3 | hdbscan_ms3_mcs5
 #             hdbscan_ms7_mcs7
 #             hdbscan_ms12_mcs12
 #   device  : torch device, default "cuda".  (cc3.sh passed no --device at all
@@ -45,7 +45,7 @@ scan_e=(${SCAN_E:-10 50 100})
 scan_theta=(${SCAN_THETA:-0 20 40})
 
 # option [withincell, subcell, subcell_6kcut, hdbscan_ms8_mcs40,
-#         hdbscan_ms3_mcs10, hdbscan_ms3_mcs3, hdbscan_ms7_mcs7, hdbscan_ms12_mcs12]
+#         hdbscan_ms3_mcs10, hdbscan_ms3_mcs3, hdbscan_ms3_mcs5, hdbscan_ms7_mcs7, hdbscan_ms12_mcs12]
 if [[ "$data" == "withincell" ]]; then
     # export log_dir=merge_within_cell_2026_07_10__15_01_37 # only 10 files
     export log_dir=merge_within_cell_2026_08_13__12_44_33
@@ -66,6 +66,9 @@ elif [[ "$data" == "hdbscan_ms3_mcs10" ]]; then
 elif [[ "$data" == "hdbscan_ms3_mcs3" ]]; then
     export log_dir=hdbscan_ms3_mcs3_2026_09_10__18_39_40 # ms 3 mcs 3, diffusion done 2026-09-12 (10M iters)
     export file="/eos/project/f/fast/input_cc3/cc3input_hdbscan_ms3_mcs3/input_cc3_file_0.h5"
+elif [[ "$data" == "hdbscan_ms3_mcs5" ]]; then
+    export log_dir=hdbscan_ms3_mcs5_2026_10_07__15_48_21 # ms 3 mcs 5, diffusion done 2026-10-10 (10M iters)
+    export file="/eos/project/f/fast/input_cc3/cc3input_hdbscan_ms3_mcs5/input_cc3_file_0.h5"
 elif [[ "$data" == "hdbscan_ms7_mcs7" ]]; then
     export log_dir=hdbscan_ms7_mcs7_2026_09_09__11_19_50 # ms 7 mcs 7, diffusion done 2026-09-10 (10M iters)
     export file="/eos/project/f/fast/input_cc3/cc3input_hdbscan_ms7_mcs7/input_cc3_file_0.h5"
@@ -74,7 +77,7 @@ elif [[ "$data" == "hdbscan_ms12_mcs12" ]]; then
     export log_dir=hdbscan_ms12_mcs12_2026_08_26__18_00_00 # ms 12 mcs 12, newer retrain
     export file="/eos/project/f/fast/input_cc3/cc3input_hdbscan_ms12_mcs12/input_cc3_file_0.h5"
 else
-    echo "usage: $0 <withincell|subcell|subcell_6kcut|hdbscan_ms8_mcs40|hdbscan_ms3_mcs10|hdbscan_ms3_mcs3|hdbscan_ms7_mcs7|hdbscan_ms12_mcs12> [device]" >&2
+    echo "usage: $0 <withincell|subcell|subcell_6kcut|hdbscan_ms8_mcs40|hdbscan_ms3_mcs10|hdbscan_ms3_mcs3|hdbscan_ms3_mcs5|hdbscan_ms7_mcs7|hdbscan_ms12_mcs12> [device]" >&2
     exit 2
 fi
 

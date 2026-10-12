@@ -37,6 +37,7 @@ CONFIG_MODULES = {
     "hdbscan_ms8_mcs40": "pointcloud.config_varients.caloclouds_3_S2P_hdbscan_ms8_mcs40",
     "hdbscan_ms3_mcs10": "pointcloud.config_varients.caloclouds_3_S2P_hdbscan_ms3_mcs10",
     "hdbscan_ms3_mcs3": "pointcloud.config_varients.caloclouds_3_S2P_hdbscan_ms3_mcs3",
+    "hdbscan_ms3_mcs5": "pointcloud.config_varients.caloclouds_3_S2P_hdbscan_ms3_mcs5",
     "hdbscan_ms7_mcs7": "pointcloud.config_varients.caloclouds_3_S2P_hdbscan_ms7_mcs7",
     "hdbscan_ms12_mcs12": "pointcloud.config_varients.caloclouds_3_S2P_hdbscan_ms12_mcs12",
     "steps": "pointcloud.config_varients.caloclouds_3_S2P_steps",
