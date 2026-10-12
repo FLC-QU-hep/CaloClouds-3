@@ -75,6 +75,7 @@ from pointcloud.config_varients import (
     caloclouds_3_S2P_hdbscan_ms12_mcs12,
     caloclouds_3_S2P_hdbscan_ms3_mcs10,
     caloclouds_3_S2P_hdbscan_ms3_mcs3,
+    caloclouds_3_S2P_hdbscan_ms3_mcs5,
     caloclouds_3_S2P_hdbscan_ms7_mcs7,
     caloclouds_3_S2P_steps,
     caloclouds_3_S2P_subcell,
@@ -110,6 +111,12 @@ _SHOWER_FLOW = {
     "hdbscan_ms3_mcs3": {
         "pth": "/eos/user/m/mamozzan/point-cloud-diffusion-data/showerFlow/input_cc3_hdbscan_ms3_mcs3/ShowerFlow_log1_stable_nb4_inputs1152921504606846975_fnorms_best.pth",
         "dir": "/eos/user/m/mamozzan/point-cloud-diffusion-data/showerFlow/input_cc3_hdbscan_ms3_mcs3",
+    },
+    # Same log1_stable af_dim=14 / num_blocks=4 setup, trained 2026-10-08
+    # (3000 epochs, best val NLL -139.61).
+    "hdbscan_ms3_mcs5": {
+        "pth": "/eos/user/m/mamozzan/point-cloud-diffusion-data/showerFlow/input_cc3_hdbscan_ms3_mcs5/ShowerFlow_log1_stable_nb4_inputs1152921504606846975_fnorms_best.pth",
+        "dir": "/eos/user/m/mamozzan/point-cloud-diffusion-data/showerFlow/input_cc3_hdbscan_ms3_mcs5",
     },
     # Same log1_stable af_dim=14 / num_blocks=4 setup as hdbscan_ms3_mcs10 above
     # (best val NLL written to ..._fnorms_best_data.txt), trained 2026-09-09.
@@ -162,6 +169,7 @@ _CONFIG_CLS = {
     "hdbscan_ms8_mcs40": caloclouds_3_S2P_hdbscan_ms8_mcs40.Configs,
     "hdbscan_ms3_mcs10": caloclouds_3_S2P_hdbscan_ms3_mcs10.Configs,
     "hdbscan_ms3_mcs3": caloclouds_3_S2P_hdbscan_ms3_mcs3.Configs,
+    "hdbscan_ms3_mcs5": caloclouds_3_S2P_hdbscan_ms3_mcs5.Configs,
     "hdbscan_ms7_mcs7": caloclouds_3_S2P_hdbscan_ms7_mcs7.Configs,
     "hdbscan_ms12_mcs12": caloclouds_3_S2P_hdbscan_ms12_mcs12.Configs,
     "withincell": caloclouds_3_S2P_withincell.Configs,
@@ -182,6 +190,8 @@ def _detect_variant(log_dir: str) -> str:
     # match both.
     if "hdbscan_ms3_mcs3" in name:
         return "hdbscan_ms3_mcs3"
+    if "hdbscan_ms3_mcs5" in name:
+        return "hdbscan_ms3_mcs5"
     if "hdbscan_ms7_mcs7" in name:
         return "hdbscan_ms7_mcs7"
     if "hdbscan_ms12_mcs12" in name:
